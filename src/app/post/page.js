@@ -204,13 +204,17 @@ export default function PostPage() {
                     if (myPosts?.length > 0) {
                         const myPost = myPosts[0];
 
-                        // Create match
+                        // Create match with 24-hour expiration
+                        const matchExpiresAt = new Date();
+                        matchExpiresAt.setHours(matchExpiresAt.getHours() + 24);
+
                         await supabase.from('matches').insert({
                             post_a_id: myPost.id,
                             post_b_id: matchingPost.id,
                             user_a_id: currentUser?.id,
                             user_b_id: matchingPost.user_id,
                             status: 'pending',
+                            expires_at: matchExpiresAt.toISOString(),
                         });
 
                         // Lock both posts

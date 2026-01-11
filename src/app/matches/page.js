@@ -18,6 +18,16 @@ export default function MatchesPage() {
 
     useEffect(() => {
         checkAuth();
+
+        // Check for expired matches on page load
+        fetch('/api/expire-matches').catch(() => { });
+
+        // Refresh timer display every minute
+        const timerInterval = setInterval(() => {
+            setMatches(prev => [...prev]); // Force re-render to update timer
+        }, 60000);
+
+        return () => clearInterval(timerInterval);
     }, []);
 
     const checkAuth = async () => {
@@ -148,13 +158,17 @@ export default function MatchesPage() {
             if (potentialMatches?.length > 0) {
                 const newMatch = potentialMatches[0];
 
-                // Create new match
+                // Create new match with 24-hour expiration
+                const matchExpiresAt = new Date();
+                matchExpiresAt.setHours(matchExpiresAt.getHours() + 24);
+
                 await supabase.from('matches').insert({
                     post_a_id: post.id,
                     post_b_id: newMatch.id,
                     user_a_id: post.user_id,
                     user_b_id: newMatch.user_id,
                     status: 'pending',
+                    expires_at: matchExpiresAt.toISOString(),
                 });
 
                 // Lock both posts
@@ -283,6 +297,11 @@ export default function MatchesPage() {
                                                     <span className={`${styles.matchBadge} ${bothAccepted ? styles.matchBadgeAccepted : ''}`}>
                                                         {bothAccepted ? '✅ Matched!' : '⏳ Pending'}
                                                     </span>
+                                                    {!bothAccepted && match.expires_at && (
+                                                        <span className={styles.matchTimer}>
+                                                            ⏱️ {getTimeRemaining(match.expires_at)}
+                                                        </span>
+                                                    )}
                                                 </div>
 
                                                 <div className={styles.matchContent}>
