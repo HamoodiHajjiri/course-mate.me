@@ -330,7 +330,7 @@ export default function MatchesPage() {
                                                         )}
                                                         {myAccepted && !theirAccepted && (
                                                             <span className={styles.waitingThem}>
-                                                                You accepted! Waiting for {theirPost?.profile?.name}
+                                                                You accepted! Waiting for {theirPost?.profile?.name} to accept
                                                             </span>
                                                         )}
                                                     </div>
