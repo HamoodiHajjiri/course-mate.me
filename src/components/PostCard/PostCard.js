@@ -123,14 +123,16 @@ export default function PostCard({
                         <button
                             onClick={() => onComplete?.(post.id)}
                             className={`${styles.actionBtn} ${styles.completeBtn}`}
+                            title="Mark this swap as completed"
                         >
-                            ✓ Complete
+                            ✓ Mark as Swapped
                         </button>
                         <button
                             onClick={() => onDelete?.(post.id)}
                             className={`${styles.actionBtn} ${styles.deleteBtn}`}
+                            title="Cancel and remove this post"
                         >
-                            ✕ Delete
+                            ✕ Cancel Post
                         </button>
                     </div>
                 )}
