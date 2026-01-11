@@ -12,6 +12,7 @@ import styles from './page.module.css';
 export default function HomePage() {
     const [posts, setPosts] = useState([]);
     const [courses, setCourses] = useState({});
+    const [sections, setSections] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all');
     const [search, setSearch] = useState('');
@@ -23,6 +24,7 @@ export default function HomePage() {
         checkAuth();
         fetchPosts();
         fetchCourses();
+        fetchSections();
     }, []);
 
     const checkAuth = async () => {
@@ -47,6 +49,16 @@ export default function HomePage() {
             const courseMap = {};
             data.forEach(c => courseMap[c.course_id] = c.name || c.course_name);
             setCourses(courseMap);
+        }
+    };
+
+    const fetchSections = async () => {
+        const { data, error } = await supabase
+            .from('sections')
+            .select('*');
+
+        if (!error && data) {
+            setSections(data);
         }
     };
 
@@ -83,7 +95,15 @@ export default function HomePage() {
             const courseName = (post.course_name || courses[post.course_code] || '').toLowerCase();
             const matchesCourseCode = post.course_code?.includes(search);
             const matchesCourseName = courseName.includes(searchLower);
-            if (!matchesCourseCode && !matchesCourseName) return false;
+
+            // Check CRN match - find if any section's CRN matches the search
+            const matchesCRN = sections.some(section =>
+                section.crn?.toLowerCase().includes(searchLower) &&
+                section.course_id === post.course_code &&
+                (section.section_num === post.have_section || section.section_num === post.want_section)
+            );
+
+            if (!matchesCourseCode && !matchesCourseName && !matchesCRN) return false;
         }
 
         return true;
@@ -108,7 +128,7 @@ export default function HomePage() {
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         className={styles.searchInput}
-                        placeholder="Search by course ID or name..."
+                        placeholder="Search by course ID, name, or CRN..."
                     />
                 </div>
 
