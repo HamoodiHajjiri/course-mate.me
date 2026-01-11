@@ -140,9 +140,9 @@ export default function HomePage() {
                             onClick={() => setFilter(type)}
                             className={`${styles.filterBtn} ${filter === type ? styles.filterBtnActive : ''}`}
                         >
-                            {type === 'all' ? '📋 All' :
-                                type === 'swap' ? '🔄 Swaps' :
-                                    type === 'giveaway' ? '🎁 Giveaways' : '🙋 Requests'}
+                            {type === 'all' ? 'All' :
+                                type === 'swap' ? 'Swaps' :
+                                    type === 'giveaway' ? 'Giveaways' : 'Requests'}
                         </button>
                     ))}
                 </div>
