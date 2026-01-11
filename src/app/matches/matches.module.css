@@ -376,3 +376,62 @@
     background: rgba(239, 68, 68, 0.1);
     color: #ef4444;
 }
+
+/* Decline Notifications */
+.declineNotifications {
+    margin-bottom: 24px;
+}
+
+.declineCard {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: var(--radius-md);
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.declineContent {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+.declineIcon {
+    font-size: 1.25rem;
+}
+
+.declineText {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.declineText strong {
+    color: var(--text-primary);
+}
+
+.declineCourse {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.dismissBtn {
+    padding: 6px 12px;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.dismissBtn:hover {
+    background: var(--bg-secondary);
+}

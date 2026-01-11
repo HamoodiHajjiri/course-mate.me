@@ -9,6 +9,7 @@ import styles from './matches.module.css';
 
 export default function MatchesPage() {
     const [matches, setMatches] = useState([]);
+    const [declinedMatches, setDeclinedMatches] = useState([]);
     const [myPosts, setMyPosts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [user, setUser] = useState(null);
@@ -38,6 +39,7 @@ export default function MatchesPage() {
         }
         setUser(user);
         fetchMatches(user.id);
+        fetchDeclinedMatches(user.id);
         fetchMyPosts(user.id);
         fetchCourses();
     };
@@ -88,6 +90,38 @@ export default function MatchesPage() {
             .order('created_at', { ascending: false });
 
         setMyPosts(data || []);
+    };
+
+    const fetchDeclinedMatches = async (userId) => {
+        // Fetch declined matches where current user hasn't seen the notification
+        const { data } = await supabase
+            .from('matches')
+            .select(`
+                *,
+                post_a:posts!matches_post_a_id_fkey(*, profile:profiles!posts_user_id_fkey(name)),
+                post_b:posts!matches_post_b_id_fkey(*, profile:profiles!posts_user_id_fkey(name))
+            `)
+            .eq('status', 'declined')
+            .or(`user_a_id.eq.${userId},user_b_id.eq.${userId}`)
+            .not('declined_seen_by', 'cs', `{${userId}}`);
+
+        setDeclinedMatches(data || []);
+    };
+
+    const dismissDecline = async (matchId) => {
+        // Add current user to declined_seen_by array
+        const match = declinedMatches.find(m => m.id === matchId);
+        if (!match) return;
+
+        const updatedSeenBy = [...(match.declined_seen_by || []), user.id];
+
+        await supabase
+            .from('matches')
+            .update({ declined_seen_by: updatedSeenBy })
+            .eq('id', matchId);
+
+        // Remove from local state
+        setDeclinedMatches(prev => prev.filter(m => m.id !== matchId));
     };
 
     const handleAccept = async (matchId, isUserA) => {
@@ -272,6 +306,37 @@ export default function MatchesPage() {
                     </div>
                 ) : (
                     <>
+                        {/* Decline Notifications */}
+                        {declinedMatches.length > 0 && (
+                            <section className={styles.declineNotifications}>
+                                {declinedMatches.map((match) => {
+                                    const isUserA = match.user_a_id === user?.id;
+                                    const theirPost = isUserA ? match.post_b : match.post_a;
+                                    const myPost = isUserA ? match.post_a : match.post_b;
+
+                                    return (
+                                        <div key={match.id} className={styles.declineCard}>
+                                            <div className={styles.declineContent}>
+                                                <span className={styles.declineIcon}>❌</span>
+                                                <div className={styles.declineText}>
+                                                    <strong>{theirPost?.profile?.name || 'Someone'}</strong> declined your swap request
+                                                    <span className={styles.declineCourse}>
+                                                        {myPost?.course_code} • Section {myPost?.have_section} ↔ {myPost?.want_section}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => dismissDecline(match.id)}
+                                                className={styles.dismissBtn}
+                                            >
+                                                Dismiss
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </section>
+                        )}
+
                         {/* Active Matches */}
                         <section className={styles.section}>
                             <h2 className={styles.sectionTitle}>Active Matches</h2>
