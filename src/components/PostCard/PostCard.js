@@ -40,6 +40,23 @@ function formatTimeAgo(dateString) {
     return `${Math.floor(seconds / 86400)}d ago`;
 }
 
+function getTimeRemaining(expiresAt) {
+    if (!expiresAt) return null;
+    const now = new Date();
+    const expires = new Date(expiresAt);
+    const diff = expires - now;
+
+    if (diff <= 0) return { text: 'Expired', urgent: true };
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+
+    if (days > 1) return { text: `${days}d left`, urgent: false };
+    if (days === 1) return { text: '1d left', urgent: false };
+    if (hours > 0) return { text: `${hours}h left`, urgent: true };
+    return { text: '<1h left', urgent: true };
+}
+
 export default function PostCard({
     post,
     courseName,
@@ -138,7 +155,17 @@ export default function PostCard({
 
             {/* Footer */}
             <div className={styles.footer}>
-                <span className={styles.timestamp}>{formatTimeAgo(post.created_at)}</span>
+                <div className={styles.footerLeft}>
+                    <span className={styles.timestamp}>{formatTimeAgo(post.created_at)}</span>
+                    {post.expires_at && post.status === 'active' && (() => {
+                        const remaining = getTimeRemaining(post.expires_at);
+                        return remaining ? (
+                            <span className={`${styles.expiryTimer} ${remaining.urgent ? styles.expiryTimerUrgent : ''}`}>
+                                ⏱️ {remaining.text}
+                            </span>
+                        ) : null;
+                    })()}
+                </div>
 
                 {showActions && isOwn && post.status === 'active' && (
                     <div className={styles.actions}>

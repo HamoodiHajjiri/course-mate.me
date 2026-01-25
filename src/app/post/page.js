@@ -154,9 +154,9 @@ export default function PostPage() {
                 ? sections.find(s => s.section_num === wantSection)?.class_time || ''
                 : null;
 
-            // No practical expiration - set to 1 year from now
+            // Posts expire after 1 week
             const expiresAt = new Date();
-            expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+            expiresAt.setDate(expiresAt.getDate() + 7);
 
             const { error: insertError } = await supabase
                 .from('posts')
