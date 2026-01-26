@@ -31,7 +31,6 @@ export default function PostPage() {
 
     useEffect(() => {
         checkAuth();
-        fetchCourses();
     }, []);
 
     useEffect(() => {
@@ -66,6 +65,9 @@ export default function PostPage() {
 
         setProfile(profileData);
 
+        // Fetch courses for user's major
+        fetchCourses(profileData.major);
+
         // Count active posts
         const { count } = await supabase
             .from('posts')
@@ -76,12 +78,32 @@ export default function PostPage() {
         setActivePostCount(count || 0);
     };
 
-    const fetchCourses = async () => {
+    const fetchCourses = async (userMajor) => {
+        if (!userMajor) return;
+
         try {
+            // Fetch course IDs for the user's major from major_courses junction table
+            const { data: majorCourses, error: majorError } = await supabase
+                .from('major_courses')
+                .select('course_id')
+                .eq('major_code', userMajor);
+
+            if (majorError || !majorCourses?.length) {
+                console.error('Error fetching major courses:', majorError);
+                setCourses([]);
+                return;
+            }
+
+            // Get the list of course IDs for this major
+            const courseIds = majorCourses.map(mc => mc.course_id);
+
+            // Fetch the actual course details
             const { data, error } = await supabase
                 .from('courses')
                 .select('course_id, course_name')
+                .in('course_id', courseIds)
                 .order('course_id');
+
             // Map course_name to name for consistency
             const mappedData = (data || []).map(c => ({ course_id: c.course_id, name: c.course_name }));
             setCourses(mappedData);
