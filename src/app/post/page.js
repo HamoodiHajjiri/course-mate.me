@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import BottomNav from '@/components/BottomNav';
@@ -13,7 +13,7 @@ const POST_TYPES = [
     { value: 'request', label: '🙋 Request', description: 'Looking for a specific section' },
 ];
 
-export default function PostPage() {
+function PostContent() {
     const [postType, setPostType] = useState('swap');
     const [courseId, setCourseId] = useState('');
     const [courseSearch, setCourseSearch] = useState('');
@@ -434,5 +434,19 @@ export default function PostPage() {
 
             <BottomNav />
         </div>
+    );
+}
+
+export default function PostPage() {
+    return (
+        <Suspense fallback={
+            <div className={styles.page}>
+                <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '40vh' }}>
+                    <div className={styles.spinner}></div>
+                </div>
+            </div>
+        }>
+            <PostContent />
+        </Suspense>
     );
 }
