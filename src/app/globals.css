@@ -15,6 +15,10 @@
     --gradient-primary: linear-gradient(135deg, #00C389 0%, #1E3A5F 100%);
     --gradient-accent: linear-gradient(135deg, #00C389 0%, #00A775 100%);
 
+    /* Icon Colors */
+    --icon-color: #1E3A5F;
+    /* Navy Blue for Light Mode */
+
     /* Backgrounds - Light Mode */
     --bg-primary: #F8F9FA;
     --bg-secondary: #FFFFFF;
@@ -73,6 +77,10 @@
     --color-accent: #2EDBA3;
     --color-accent-light: #5EE8BA;
     --color-accent-dark: #00C389;
+
+    /* Icon Colors */
+    --icon-color: #FFFFFF;
+    /* White for Dark Mode */
 
     /* Backgrounds - Dark Mode */
     --bg-primary: #0F172A;

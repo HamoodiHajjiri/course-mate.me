@@ -26,8 +26,10 @@ function ProfileContent() {
         student_id: '',
         phone: '',
         major: '',
+        major: '',
         gender: ''
     });
+    const [errors, setErrors] = useState({});
 
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -159,6 +161,24 @@ function ProfileContent() {
 
     const handleSaveProfile = async () => {
         if (!canEdit) return;
+
+        // Validation: Verify no fields are empty
+        const newErrors = {};
+        if (!editForm.name.trim()) newErrors.name = true;
+        if (!editForm.student_id.trim()) newErrors.student_id = true;
+        if (!editForm.phone.trim()) newErrors.phone = true;
+        if (!editForm.major) newErrors.major = true;
+        if (!editForm.gender) newErrors.gender = true;
+
+        if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors);
+            // Revert after showing error for 1.5s
+            setTimeout(() => {
+                setErrors({});
+                handleCancelEdit();
+            }, 1000);
+            return;
+        }
 
         setSaving(true);
         const { data: { user } } = await supabase.auth.getUser();
@@ -321,7 +341,7 @@ function ProfileContent() {
                                 onClick={handleStartEdit}
                                 className={styles.editBtn}
                             >
-                                ✏️ Edit
+                                Edit
                             </button>
                         )}
                     </div>
@@ -334,8 +354,11 @@ function ProfileContent() {
                                 <input
                                     type="text"
                                     value={editForm.name}
-                                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                                    className={styles.input}
+                                    onChange={(e) => {
+                                        setEditForm({ ...editForm, name: e.target.value });
+                                        if (errors.name) setErrors({ ...errors, name: false });
+                                    }}
+                                    className={`${styles.input} ${errors.name ? styles.inputError : ''}`}
                                     placeholder="Enter your full name"
                                 />
                             </div>
@@ -344,8 +367,11 @@ function ProfileContent() {
                                 <input
                                     type="text"
                                     value={editForm.student_id}
-                                    onChange={(e) => setEditForm({ ...editForm, student_id: e.target.value })}
-                                    className={styles.input}
+                                    onChange={(e) => {
+                                        setEditForm({ ...editForm, student_id: e.target.value });
+                                        if (errors.student_id) setErrors({ ...errors, student_id: false });
+                                    }}
+                                    className={`${styles.input} ${errors.student_id ? styles.inputError : ''}`}
                                     placeholder="Enter your student ID"
                                 />
                             </div>
@@ -354,8 +380,11 @@ function ProfileContent() {
                                 <input
                                     type="tel"
                                     value={editForm.phone}
-                                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                                    className={styles.input}
+                                    onChange={(e) => {
+                                        setEditForm({ ...editForm, phone: e.target.value });
+                                        if (errors.phone) setErrors({ ...errors, phone: false });
+                                    }}
+                                    className={`${styles.input} ${errors.phone ? styles.inputError : ''}`}
                                     placeholder="Enter your phone number"
                                 />
                             </div>
@@ -363,8 +392,11 @@ function ProfileContent() {
                                 <label className={styles.label}>Major</label>
                                 <select
                                     value={editForm.major}
-                                    onChange={(e) => setEditForm({ ...editForm, major: e.target.value })}
-                                    className={styles.select}
+                                    onChange={(e) => {
+                                        setEditForm({ ...editForm, major: e.target.value });
+                                        if (errors.major) setErrors({ ...errors, major: false });
+                                    }}
+                                    className={`${styles.select} ${errors.major ? styles.inputError : ''}`}
                                 >
                                     <option value="">Select your major</option>
                                     {majors.map(m => (
@@ -376,8 +408,11 @@ function ProfileContent() {
                                 <label className={styles.label}>Gender</label>
                                 <select
                                     value={editForm.gender}
-                                    onChange={(e) => setEditForm({ ...editForm, gender: e.target.value })}
-                                    className={styles.select}
+                                    onChange={(e) => {
+                                        setEditForm({ ...editForm, gender: e.target.value });
+                                        if (errors.gender) setErrors({ ...errors, gender: false });
+                                    }}
+                                    className={`${styles.select} ${errors.gender ? styles.inputError : ''}`}
                                 >
                                     <option value="">Select your gender</option>
                                     <option value="male">Male</option>
@@ -452,7 +487,7 @@ function ProfileContent() {
 
                 {/* Sign Out */}
                 <button onClick={handleSignOut} className={styles.signOutBtn}>
-                    🚪 Sign Out
+                    Sign Out
                 </button>
             </main>
 

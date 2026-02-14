@@ -318,8 +318,8 @@ export default function SchedulePage() {
     const [prefs, setPrefs] = useState({
         noClassesBefore: '',
         noClassesAfter: '',
-        gapPref: 'minimize',
-        compactPref: 'fewer',
+        gapPref: 'none',
+        compactPref: 'none',
         preferredInstructors: {},
         pinnedSections: {},
     });
@@ -605,7 +605,7 @@ export default function SchedulePage() {
                     <div className={styles.section}>
                         <div className={styles.prefsCard}>
                             <div className={styles.prefsHeader} onClick={() => setPrefsOpen(!prefsOpen)}>
-                                <span className={styles.prefsHeaderTitle}>⚙️ Preferences</span>
+                                <span className={styles.prefsHeaderTitle}>Preferences</span>
                                 <span className={`${styles.prefsChevron} ${prefsOpen ? styles.prefsChevronOpen : ''}`}>▼</span>
                             </div>
                             {prefsOpen && (
@@ -621,11 +621,10 @@ export default function SchedulePage() {
                                                 onChange={e => setPrefs(p => ({ ...p, noClassesBefore: e.target.value }))}
                                             >
                                                 <option value="">Any</option>
-                                                <option value="08:00 AM">8:00 AM</option>
-                                                <option value="09:00 AM">9:00 AM</option>
-                                                <option value="10:00 AM">10:00 AM</option>
+                                                <option value="09:30 AM">9:30 AM</option>
                                                 <option value="11:00 AM">11:00 AM</option>
-                                                <option value="12:00 PM">12:00 PM</option>
+                                                <option value="12:30 PM">12:30 PM</option>
+                                                <option value="02:00 PM">2:00 PM</option>
                                             </select>
                                         </div>
                                         <div className={styles.timeRow}>
@@ -637,10 +636,9 @@ export default function SchedulePage() {
                                             >
                                                 <option value="">Any</option>
                                                 <option value="02:00 PM">2:00 PM</option>
-                                                <option value="03:00 PM">3:00 PM</option>
-                                                <option value="04:00 PM">4:00 PM</option>
+                                                <option value="03:15 PM">3:30 PM</option>
                                                 <option value="05:00 PM">5:00 PM</option>
-                                                <option value="06:00 PM">6:00 PM</option>
+                                                <option value="06:30 PM">6:30 PM</option>
                                             </select>
                                         </div>
                                     </div>
@@ -649,6 +647,10 @@ export default function SchedulePage() {
                                     <div className={styles.prefGroup}>
                                         <span className={styles.prefLabel}>Gap Preference</span>
                                         <div className={styles.toggleRow}>
+                                            <button
+                                                className={`${styles.toggleBtn} ${prefs.gapPref === 'none' ? styles.toggleBtnActive : ''}`}
+                                                onClick={() => setPrefs(p => ({ ...p, gapPref: 'none' }))}
+                                            >No preference</button>
                                             <button
                                                 className={`${styles.toggleBtn} ${prefs.gapPref === 'minimize' ? styles.toggleBtnActive : ''}`}
                                                 onClick={() => setPrefs(p => ({ ...p, gapPref: 'minimize' }))}
@@ -664,6 +666,10 @@ export default function SchedulePage() {
                                     <div className={styles.prefGroup}>
                                         <span className={styles.prefLabel}>Day Spread</span>
                                         <div className={styles.toggleRow}>
+                                            <button
+                                                className={`${styles.toggleBtn} ${prefs.compactPref === 'none' ? styles.toggleBtnActive : ''}`}
+                                                onClick={() => setPrefs(p => ({ ...p, compactPref: 'none' }))}
+                                            >No preference</button>
                                             <button
                                                 className={`${styles.toggleBtn} ${prefs.compactPref === 'fewer' ? styles.toggleBtnActive : ''}`}
                                                 onClick={() => setPrefs(p => ({ ...p, compactPref: 'fewer' }))}
@@ -735,7 +741,7 @@ export default function SchedulePage() {
                         onClick={handleGenerate}
                         disabled={generating}
                     >
-                        {generating ? <span className={styles.spinner}></span> : '🚀 Generate Schedules'}
+                        {generating ? <span className={styles.spinner}></span> : 'Generate Schedules'}
                     </button>
                 )}
 
@@ -953,7 +959,7 @@ function ScheduleCard({ result, rank, courseNameMap, selectedCourses, onSave, on
                                                     }}
                                                 >
                                                     <span className={styles.ttBlockCourse}>{block.courseId}</span>
-                                                    <span className={styles.ttBlockSection}>§{block.sectionNum}</span>
+                                                    <span className={styles.ttBlockSection}>{block.sectionNum}</span>
                                                 </div>
                                             );
                                         })}
@@ -975,20 +981,33 @@ function ScheduleCard({ result, rank, courseNameMap, selectedCourses, onSave, on
                 <div className={styles.scheduleDetails}>
                     {schedule.map((group) => {
                         const courseIdx = selectedCourses.findIndex(c => c.course_id === group.courseId);
-                        return group.sections.map(sec => (
-                            <div key={sec.crn} className={styles.detailRow}>
-                                <span className={styles.detailDot} style={{ background: colors[courseIdx % 8] }}></span>
-                                <span className={styles.detailCourse}>{sec.course_id}</span>
-                                <span className={styles.detailSection}>§{sec.section_num} — {sec.class_time}</span>
-                                {sec.instructor && <span className={styles.detailProf}>{sec.instructor}</span>}
-                                {isSaved && (
-                                    <a
-                                        className={styles.requestLink}
-                                        href={`/post?type=request&course=${sec.course_id}&section=${sec.section_num}`}
-                                    >
-                                        Request
-                                    </a>
-                                )}
+                        return group.sections.map((sec, secIdx) => (
+                            <div key={sec.crn || `${sec.course_id}-${sec.section_num}-${secIdx}`} className={styles.detailRow}>
+                                <div className={styles.detailColorBar} style={{ background: colors[courseIdx % 8] }}></div>
+                                <div className={styles.detailContent}>
+                                    <div className={styles.detailHeader}>
+                                        <span className={styles.detailCourseName}>{courseNameMap[sec.course_id] || sec.course_id}</span>
+                                        {isSaved && (
+                                            <a
+                                                className={styles.requestLink}
+                                                href={`/post?type=request&course=${sec.course_id}&section=${sec.section_num}`}
+                                            >
+                                                Request
+                                            </a>
+                                        )}
+                                    </div>
+                                    <div className={styles.detailMeta}>
+                                        <span className={styles.detailSection}>{sec.section_num}</span>
+                                        <span className={styles.detailSep}>•</span>
+                                        <span className={styles.detailTime}>{sec.class_time}</span>
+                                        {sec.instructor && (
+                                            <>
+                                                <span className={styles.detailSep}>•</span>
+                                                <span className={styles.detailProf}>{sec.instructor}</span>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         ));
                     })}

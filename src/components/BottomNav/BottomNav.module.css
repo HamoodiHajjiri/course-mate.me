@@ -19,7 +19,7 @@
     align-items: center;
     gap: 4px;
     padding: 8px 16px;
-    color: var(--text-muted);
+    color: var(--icon-color);
     text-decoration: none;
     font-size: 0.75rem;
     transition: color var(--transition-fast), transform var(--transition-fast);
@@ -34,13 +34,19 @@
     color: var(--color-accent);
 }
 
-.navItem.active .navIcon {
-    transform: scale(1.1);
-}
+
 
 .navIcon {
-    font-size: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     transition: transform var(--transition-fast);
+}
+
+.navIcon svg {
+    width: 24px;
+    height: 24px;
+    stroke-width: 2px;
 }
 
 .navLabel {

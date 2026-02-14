@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
+import { SearchIcon } from '@/components/Icons';
 import BottomNav from '@/components/BottomNav';
 import PostCard from '@/components/PostCard';
 import ThemeToggle from '@/components/ThemeToggle';
@@ -172,7 +173,9 @@ export default function HomePage() {
 
                 {/* Search */}
                 <div className={styles.searchWrapper}>
-                    <span className={styles.searchIcon}>🔍</span>
+                    <span className={styles.searchIcon}>
+                        <SearchIcon width={20} height={20} />
+                    </span>
                     <input
                         type="text"
                         value={search}

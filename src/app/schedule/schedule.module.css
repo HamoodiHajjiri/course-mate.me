@@ -785,43 +785,82 @@
 
 .detailRow {
     display: flex;
+    align-items: stretch;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.detailRow:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.detailColorBar {
+    width: 4px;
+    border-radius: 2px;
+    flex-shrink: 0;
+    margin: 2px 0;
+    opacity: 0.8;
+}
+
+.detailContent {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.detailHeader {
+    display: flex;
+    justify-content: space-between;
     align-items: center;
     gap: 8px;
-    font-size: 0.8rem;
-    flex-wrap: nowrap;
-    overflow: hidden;
 }
 
-.detailDot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-
-.detailCourse {
+.detailCourseName {
+    font-size: 0.9rem;
     font-weight: 600;
     color: var(--text-primary);
-    flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.detailSection {
+.detailMeta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
     color: var(--text-secondary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    min-width: 0;
+}
+
+.detailSep {
+    color: var(--text-muted);
+    font-size: 0.6rem;
+    opacity: 0.6;
+}
+
+.detailSection {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.detailTime {
+    color: var(--text-secondary);
 }
 
 .detailProf {
-    color: var(--text-muted);
-    font-size: 0.75rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    min-width: 0;
-    flex-shrink: 1;
+    color: var(--text-secondary);
+    font-weight: 400;
 }
+
+
 
 .requestLink {
     font-size: 0.7rem;
