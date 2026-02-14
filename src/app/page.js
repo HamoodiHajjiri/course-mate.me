@@ -209,7 +209,7 @@ export default function HomePage() {
                     </div>
                 ) : filteredPosts.length === 0 ? (
                     <div className={styles.empty}>
-                        <span className={styles.emptyIcon}></span>
+                        <span className={styles.emptyIcon}>📭</span>
                         <h3>No posts found</h3>
                         <p>
                             {search ? 'Try a different search term' : 'Be the first to create a post!'}
