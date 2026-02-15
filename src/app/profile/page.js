@@ -145,6 +145,7 @@ function ProfileContent() {
             major: profile?.major || '',
             gender: profile?.gender || ''
         });
+        setErrors({});
         setIsEditing(true);
     };
 
@@ -157,6 +158,7 @@ function ProfileContent() {
             major: profile?.major || '',
             gender: profile?.gender || ''
         });
+        setErrors({});
     };
 
     const handleSaveProfile = async () => {
@@ -172,11 +174,6 @@ function ProfileContent() {
 
         if (Object.keys(newErrors).length > 0) {
             setErrors(newErrors);
-            // Revert after showing error for 1.5s
-            setTimeout(() => {
-                setErrors({});
-                handleCancelEdit();
-            }, 1000);
             return;
         }
 
@@ -361,6 +358,7 @@ function ProfileContent() {
                                     className={`${styles.input} ${errors.name ? styles.inputError : ''}`}
                                     placeholder="Enter your full name"
                                 />
+                                {errors.name && <span className={styles.fieldError}>Name cannot be empty</span>}
                             </div>
                             <div className={styles.formGroup}>
                                 <label className={styles.label}>University ID</label>
@@ -374,6 +372,7 @@ function ProfileContent() {
                                     className={`${styles.input} ${errors.student_id ? styles.inputError : ''}`}
                                     placeholder="Enter your student ID"
                                 />
+                                {errors.student_id && <span className={styles.fieldError}>Student ID cannot be empty</span>}
                             </div>
                             <div className={styles.formGroup}>
                                 <label className={styles.label}>Phone Number</label>
@@ -387,6 +386,7 @@ function ProfileContent() {
                                     className={`${styles.input} ${errors.phone ? styles.inputError : ''}`}
                                     placeholder="Enter your phone number"
                                 />
+                                {errors.phone && <span className={styles.fieldError}>Phone number cannot be empty</span>}
                             </div>
                             <div className={styles.formGroup}>
                                 <label className={styles.label}>Major</label>
@@ -403,6 +403,7 @@ function ProfileContent() {
                                         <option key={m.code} value={m.code}>{m.name}</option>
                                     ))}
                                 </select>
+                                {errors.major && <span className={styles.fieldError}>Please select a major</span>}
                             </div>
                             <div className={styles.formGroup}>
                                 <label className={styles.label}>Gender</label>
@@ -418,6 +419,7 @@ function ProfileContent() {
                                     <option value="male">Male</option>
                                     <option value="female">Female</option>
                                 </select>
+                                {errors.gender && <span className={styles.fieldError}>Please select a gender</span>}
                             </div>
                             <div className={styles.editActions}>
                                 <button
