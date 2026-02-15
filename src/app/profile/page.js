@@ -114,6 +114,50 @@ function ProfileContent() {
         setMyPosts(data || []);
     };
 
+    const validateAndCleanSchedule = async (newMajor, newGender) => {
+        try {
+            const saved = localStorage.getItem('schedule_saved');
+            if (!saved) return;
+            const { courseIds } = JSON.parse(saved);
+            if (!courseIds || courseIds.length === 0) return;
+
+            // 1. Validate Major
+            const { data: majorCourses } = await supabase
+                .from('major_courses')
+                .select('course_id')
+                .eq('major_code', newMajor);
+
+            const validMajorCourseIds = new Set((majorCourses || []).map(mc => mc.course_id));
+
+            // 2. Validate Gender/Campus
+            const allowedCampuses = newGender === 'male' ? ['main', 'men'] : ['main', 'women'];
+
+            // Check if courses have sections in allowed campuses
+            const { data: validSections } = await supabase
+                .from('sections')
+                .select('course_id')
+                .in('course_id', courseIds)
+                .in('campus', allowedCampuses);
+
+            const validCampusCourseIds = new Set((validSections || []).map(s => s.course_id));
+
+            // Filter (must match BOTH major and campus availability)
+            const validCourseIds = courseIds.filter(id =>
+                validMajorCourseIds.has(id) && validCampusCourseIds.has(id)
+            );
+
+            // Update localStorage
+            // Always unsave (savedIdx: null) because changing major/gender invalidates the specific schedule permutation
+            const newData = {
+                courseIds: validCourseIds,
+                savedIdx: null
+            };
+            localStorage.setItem('schedule_saved', JSON.stringify(newData));
+        } catch (e) {
+            console.error('Error cleaning schedule:', e);
+        }
+    };
+
     const handleSaveMajor = async () => {
         if (!selectedMajor) return;
 
@@ -130,6 +174,10 @@ function ProfileContent() {
             const majorData = majors.find(m => m.code === selectedMajor);
             setMajorName(majorData?.name || selectedMajor);
             setProfile({ ...profile, major: selectedMajor });
+
+            // Clean up schedule
+            await validateAndCleanSchedule(selectedMajor, profile.gender);
+
             setShowMajorSelect(false);
             router.push('/');
         }
@@ -206,6 +254,9 @@ function ProfileContent() {
             const majorData = majors.find(m => m.code === editForm.major);
             setMajorName(majorData?.name || editForm.major);
 
+            // Clean up schedule
+            await validateAndCleanSchedule(editForm.major, editForm.gender);
+
             setIsEditing(false);
         }
         setSaving(false);
@@ -250,6 +301,12 @@ function ProfileContent() {
                 setMajorName(majorData?.name || updates.major);
             }
             setProfile({ ...profile, ...updates });
+
+            // Clean up schedule
+            const finalMajor = updates.major || profile.major;
+            const finalGender = updates.gender || profile.gender;
+            await validateAndCleanSchedule(finalMajor, finalGender);
+
             setShowMajorSelect(false);
             router.push('/');
         }

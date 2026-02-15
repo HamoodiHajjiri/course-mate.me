@@ -211,7 +211,7 @@ export default function AuthPage() {
                                 aria-label={showPassword ? "Hide password" : "Show password"}
                                 tabIndex={-1}
                             >
-                                {showPassword ? <EyeOffIcon width={20} height={20} /> : <EyeIcon width={20} height={20} />}
+                                {showPassword ? <EyeIcon width={20} height={20} /> : <EyeOffIcon width={20} height={20} />}
                             </button>
                         </div>
                     </div>
@@ -236,7 +236,7 @@ export default function AuthPage() {
                                     aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                                     tabIndex={-1}
                                 >
-                                    {showConfirmPassword ? <EyeOffIcon width={20} height={20} /> : <EyeIcon width={20} height={20} />}
+                                    {showConfirmPassword ? <EyeIcon width={20} height={20} /> : <EyeOffIcon width={20} height={20} />}
                                 </button>
                             </div>
                         </div>

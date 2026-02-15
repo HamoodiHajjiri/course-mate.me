@@ -197,8 +197,8 @@ function generateSchedules(courseGroups, prefs, courseNames) {
     let results = solve(applyFilters(true));
     let timeRelaxed = false;
 
-    // If no results and we had time constraints, relax them
-    if (results.length === 0 && hasTimeConstraints) {
+    // If no results and we had time constraints, relax them (unless strict mode)
+    if (results.length === 0 && hasTimeConstraints && !prefs.strictTime) {
         results = solve(applyFilters(false));
         timeRelaxed = true;
     }
@@ -211,25 +211,33 @@ function generateSchedules(courseGroups, prefs, courseNames) {
 
         // Time constraint violation penalty (when relaxed)
         if (timeRelaxed && hasTimeConstraints) {
-            let worstBefore = 0; // minutes before constraint
-            let worstAfter = 0;  // minutes after constraint
+            let totalPenalty = 0;
+            let maxEarly = 0;
+            let maxLate = 0;
+            let earlyCount = 0;
+            let lateCount = 0;
+
             for (const s of allSlots) {
                 if (prefs.noClassesBefore && s.start < beforeMin) {
-                    worstBefore = Math.max(worstBefore, beforeMin - s.start);
+                    const diff = beforeMin - s.start;
+                    totalPenalty += 10 + (diff / 10);
+                    maxEarly = Math.max(maxEarly, diff);
+                    earlyCount++;
                 }
                 if (prefs.noClassesAfter && s.end > afterMin) {
-                    worstAfter = Math.max(worstAfter, s.end - afterMin);
+                    const diff = s.end - afterMin;
+                    totalPenalty += 10 + (diff / 10);
+                    maxLate = Math.max(maxLate, diff);
+                    lateCount++;
                 }
             }
-            if (worstBefore > 0) {
-                score -= 20 + worstBefore / 10;
-                const mins = worstBefore;
-                warnings.push(`Class starts ${mins} min before preferred time`);
+            score -= totalPenalty;
+
+            if (earlyCount > 0) {
+                warnings.push(`${earlyCount} class${earlyCount > 1 ? 'es' : ''} start${earlyCount === 1 ? 's' : ''} up to ${maxEarly} min early`);
             }
-            if (worstAfter > 0) {
-                score -= 20 + worstAfter / 10;
-                const mins = worstAfter;
-                warnings.push(`Class ends ${mins} min after preferred time`);
+            if (lateCount > 0) {
+                warnings.push(`${lateCount} class${lateCount > 1 ? 'es' : ''} end${lateCount === 1 ? 's' : ''} up to ${maxLate} min late`);
             }
         }
 
@@ -321,7 +329,9 @@ export default function SchedulePage() {
         gapPref: 'none',
         compactPref: 'none',
         preferredInstructors: {},
+        preferredInstructors: {},
         pinnedSections: {},
+        strictTime: false,
     });
     const [generating, setGenerating] = useState(false);
     const [results, setResults] = useState(null);
@@ -645,6 +655,18 @@ export default function SchedulePage() {
                                                 <option value="06:30 PM">6:30 PM</option>
                                             </select>
                                         </div>
+                                    </div>
+
+                                    <div className={styles.prefGroup}>
+                                        <label className={styles.checkboxLabel} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={prefs.strictTime}
+                                                onChange={e => setPrefs(p => ({ ...p, strictTime: e.target.checked }))}
+                                                style={{ width: '16px', height: '16px' }}
+                                            />
+                                            Strict time constraints (don't show alternatives)
+                                        </label>
                                     </div>
 
                                     {/* Gap Preference */}
