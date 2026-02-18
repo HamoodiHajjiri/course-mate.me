@@ -54,7 +54,7 @@ export async function POST(request) {
                 </div>
                 
                 <div style="padding: 20px; background: #f8f9fa; border-radius: 10px; margin-top: 20px;">
-                    <h2 style="color: #333; margin-bottom: 20px;">Course Swap Match Found</h2>
+                    <h2 style="color: #333; margin-bottom: 20px;">CourseMate Match Found</h2>
                     
                     <p style="color: #666; font-size: 16px;">
                         Great news, <strong>${recipientName || 'Student'}</strong>! Someone wants to swap sections with you.
@@ -68,7 +68,7 @@ export async function POST(request) {
                     </div>
                     
                     <p style="color: #666; font-size: 14px;">
-                        Log in to Course Swap to accept or decline this match.
+                        Log in to CourseMate to accept or decline this match.
                     </p>
                     
                     <div style="text-align: center; margin-top: 30px;">
@@ -80,7 +80,7 @@ export async function POST(request) {
                 </div>
                 
                 <p style="color: #999; font-size: 12px; text-align: center; margin-top: 20px;">
-                    University Course Swap - Section Exchange Platform
+                    CourseMate - University Section Exchange Platform
                 </p>
             </div>
         `;
@@ -92,7 +92,7 @@ export async function POST(request) {
         if (userAEmail && getResend()) {
             try {
                 await getResend().emails.send({
-                    from: 'Course Swap <onboarding@resend.dev>',
+                    from: 'CourseMate <noreply@course-mate.me>',
                     to: userAEmail,
                     subject: `🔄 Match Found for ${courseCode}!`,
                     html: createEmailHtml(userAName || userAProfile?.name, userASection, userBName || userBProfile?.name, userBSection),
@@ -108,7 +108,7 @@ export async function POST(request) {
         if (userBEmail && getResend()) {
             try {
                 await getResend().emails.send({
-                    from: 'Course Swap <onboarding@resend.dev>',
+                    from: 'CourseMate <noreply@course-mate.me>',
                     to: userBEmail,
                     subject: `🔄 Match Found for ${courseCode}!`,
                     html: createEmailHtml(userBName || userBProfile?.name, userBSection, userAName || userAProfile?.name, userASection),

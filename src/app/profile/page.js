@@ -228,6 +228,22 @@ function ProfileContent() {
         setSaving(true);
         const { data: { user } } = await supabase.auth.getUser();
 
+        // Check for duplicate student ID
+        if (editForm.student_id !== profile.student_id) {
+            const { data: existing } = await supabase
+                .from('profiles')
+                .select('id')
+                .eq('student_id', editForm.student_id)
+                .neq('id', user.id) // Exclude self
+                .single();
+
+            if (existing) {
+                setErrors({ ...newErrors, student_id: 'This Student ID is already taken' });
+                setSaving(false);
+                return;
+            }
+        }
+
         const { error } = await supabase
             .from('profiles')
             .update({
@@ -429,7 +445,7 @@ function ProfileContent() {
                                     className={`${styles.input} ${errors.student_id ? styles.inputError : ''}`}
                                     placeholder="Enter your student ID"
                                 />
-                                {errors.student_id && <span className={styles.fieldError}>Student ID cannot be empty</span>}
+                                {errors.student_id && <span className={styles.fieldError}>{typeof errors.student_id === 'string' ? errors.student_id : 'Student ID cannot be empty'}</span>}
                             </div>
                             <div className={styles.formGroup}>
                                 <label className={styles.label}>Phone Number</label>

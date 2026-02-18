@@ -165,8 +165,10 @@ export default function HomePage() {
             <header className={styles.header}>
                 <div className={styles.headerTop}>
                     <div className={styles.logoContainer}>
-                        <Image src="/logo.png" alt="Course Swap" width={36} height={36} className={styles.logoImage} />
-                        <span className={styles.logoText}>Course Swap</span>
+                        <div className={styles.logoFrame}>
+                            <Image src="/logo-v2.png" alt="CourseMate" width={36} height={36} className={styles.logoImage} />
+                        </div>
+                        <span className={styles.logoText}>CourseMate</span>
                     </div>
                     <ThemeToggle />
                 </div>

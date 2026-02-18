@@ -104,6 +104,19 @@ export default function AuthPage() {
                     throw new Error('Please enter a valid email address');
                 }
 
+                // Check if student ID is already taken (for signup)
+                if (!isLogin) {
+                    const { data: existingId } = await supabase
+                        .from('profiles')
+                        .select('id')
+                        .eq('student_id', studentId)
+                        .single();
+
+                    if (existingId) {
+                        throw new Error('This Student ID is already registered');
+                    }
+                }
+
                 const { data, error } = await supabase.auth.signUp({
                     email,
                     password,
@@ -172,8 +185,10 @@ export default function AuthPage() {
                 </div>
                 {/* Logo */}
                 <div className={styles.logoWrapper}>
-                    <Image src="/logo.png" alt="Course Swap" width={72} height={72} className={styles.logo} />
-                    <h1 className={styles.title}>Course Swap</h1>
+                    <div className={styles.logoFrame}>
+                        <Image src="/logo-v2.png" alt="CourseMate" width={72} height={72} className={styles.logo} />
+                    </div>
+                    <h1 className={styles.title}>CourseMate</h1>
                     <p className={styles.subtitle}>University course section exchange</p>
                 </div>
 

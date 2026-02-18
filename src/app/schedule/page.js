@@ -231,13 +231,13 @@ function generateSchedules(courseGroups, prefs, courseNames) {
             for (const s of allSlots) {
                 if (prefs.noClassesBefore && s.start < beforeMin) {
                     const diff = beforeMin - s.start;
-                    totalPenalty += 10 + (diff / 10);
+                    totalPenalty += 20 + (diff / 10);
                     maxEarly = Math.max(maxEarly, diff);
                     earlyCount++;
                 }
                 if (prefs.noClassesAfter && s.end > afterMin) {
                     const diff = s.end - afterMin;
-                    totalPenalty += 10 + (diff / 10);
+                    totalPenalty += 20 + (diff / 10);
                     maxLate = Math.max(maxLate, diff);
                     lateCount++;
                 }
@@ -266,17 +266,24 @@ function generateSchedules(courseGroups, prefs, courseNames) {
             }
         }
         if (prefs.gapPref === 'minimize') {
-            score -= totalGap / 30;
+            score -= totalGap / 30; // Still penalize long gaps
         } else if (prefs.gapPref === 'prefer') {
-            score += Math.min(totalGap / 30, 10);
+            // Penalize for NOT having enough gaps (target ~120 mins)
+            if (totalGap < 120) {
+                score -= Math.max(0, (120 - totalGap) / 10);
+            }
         }
 
         // Day compactness scoring
         const daysUsed = Object.keys(daySlots).length;
         if (prefs.compactPref === 'fewer') {
-            score -= daysUsed * 3;
+            // Penalize for more days (target 2 days)
+            // 3 days = -5, 4 days = -10, 5 days = -15
+            score -= Math.max(0, (daysUsed - 2) * 5);
         } else if (prefs.compactPref === 'spread') {
-            score += daysUsed * 2;
+            // Penalize for fewer days (target 5 days)
+            // 4 days = -5, 3 days = -10, 2 days = -15
+            score -= Math.max(0, (5 - daysUsed) * 5);
         }
 
         // Instructor preference scoring
@@ -287,11 +294,14 @@ function generateSchedules(courseGroups, prefs, courseNames) {
                     s.section_num === getBaseSection(s.section_num)
                 ) || group.sections[0];
                 if (mainSection.instructor && mainSection.instructor !== prefs.preferredInstructors[cid]) {
-                    score -= 5;
+                    score -= 15;
                     warnings.push(`Different instructor for ${courseNames[cid] || cid}`);
                 }
             }
         }
+
+        // Clamp score
+        score = Math.max(0, Math.min(100, score));
 
         return { schedule, score, warnings };
     });
@@ -959,9 +969,18 @@ export default function SchedulePage() {
                                     return showCount < remaining && (
                                         <button
                                             className={styles.showMoreBtn}
-                                            onClick={() => setShowCount(prev => prev + 3)}
+                                            onClick={() => {
+                                                if (showCount >= 9) {
+                                                    setShowCount(remaining + 100); // Show all
+                                                } else {
+                                                    setShowCount(prev => prev + 3);
+                                                }
+                                            }}
                                         >
-                                            Show More ({remaining - showCount} remaining)
+                                            {showCount >= 9
+                                                ? `Show All Remaining (${remaining - showCount} schedules)`
+                                                : `Show More (${Math.min(3, remaining - showCount)} of ${remaining - showCount})`
+                                            }
                                         </button>
                                     );
                                 })()}

@@ -2,12 +2,12 @@ import './globals.css';
 import Script from 'next/script';
 
 export const metadata = {
-    title: 'Course Swap',
+    title: 'CourseMate',
     description: 'University course section swap platform',
     icons: {
-        icon: '/logo.png',
-        shortcut: '/logo.png',
-        apple: '/logo.png',
+        icon: '/logo-v2.png',
+        shortcut: '/logo-v2.png',
+        apple: '/logo-v2.png',
     },
 };
 

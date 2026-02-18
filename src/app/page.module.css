@@ -27,8 +27,19 @@
     gap: 10px;
 }
 
-.logoImage {
+.logoFrame {
+    width: 36px;
+    height: 36px;
+    overflow: hidden;
     border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.logoImage {
+    transform: scale(1.4);
+    object-fit: cover;
 }
 
 .logoText {
