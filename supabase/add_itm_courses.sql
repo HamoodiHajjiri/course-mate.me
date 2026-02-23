@@ -8,10 +8,11 @@ INSERT INTO majors (code, name, college) VALUES
     ('ITM', 'Information Technology Multimedia', 'College of Computing and Informatics')
 ON CONFLICT (code) DO NOTHING;
 
--- STEP 2: Add missing courses that don't exist yet
+-- STEP 2: Add/update courses (safe to re-run)
 INSERT INTO courses (course_id, college_code, college_name, course_number, course_name) VALUES
 
 -- Mathematics
+('1440181', '1440', 'Department of Mathematics', '181', 'Statistics for Science'),
 ('1440182', '1440', 'Department of Mathematics', '182', 'Statistics for Science Lab'),
 
 -- Business Information Systems
@@ -20,21 +21,20 @@ INSERT INTO courses (course_id, college_code, college_name, course_number, cours
 -- Computer Science - ITM specific
 ('1501114', '1501', 'Department of Computer Science', '114', 'Problem Solving'),
 ('1501214', '1501', 'Department of Computer Science', '214', 'Programming with Data Str.'),
+('1501240', '1501', 'Department of Computer Science', '240', 'Graphic Design'),
 ('1501242', '1501', 'Department of Computer Science', '242', 'Interactive Multimedia'),
-('1501247', '1501', 'Department of Computer Science', '247', 'Digital Animation'),
-('1501249', '1501', 'Department of Computer Science', '249', 'Graphic Design'),
+('1501244', '1501', 'Department of Computer Science', '244', 'Design and Authoring'),
+('1501247', '1501', 'Department of Computer Science', '247', 'Multimedia Prog.and Design'),
 ('1501330', '1501', 'Department of Computer Science', '330', 'Introduction to Artif.Intelig.'),
-('1501341', '1501', 'Department of Computer Science', '341', 'Multimedia Prog.and Design'),
+('1501341', '1501', 'Department of Computer Science', '341', 'Web Programming'),
 ('1501342', '1501', 'Department of Computer Science', '342', '2d/3d Animation'),
 ('1501343', '1501', 'Department of Computer Science', '343', 'Interactive 3D Design'),
-('1501361', '1501', 'Department of Computer Science', '361', 'Obj. On.Software Design & Imp'),
+('1501361', '1501', 'Department of Computer Science', '361', 'Obj.Ori.Software Design & Imp'),
 ('1501393', '1501', 'Department of Computer Science', '393', 'Multimedia Junior Project'),
-('1501394', '1501', 'Department of Computer Science', '394', 'Practical Training'),
-('1501396', '1501', 'Department of Computer Science', '396', 'Web Design and Programming'),
+('1501396', '1501', 'Department of Computer Science', '396', 'CO-OP Summer Training'),
 ('1501444', '1501', 'Department of Computer Science', '444', 'Game Design and Development'),
 ('1501445', '1501', 'Department of Computer Science', '445', 'IT Application in E.Comm.'),
 ('1501465', '1501', 'Department of Computer Science', '465', 'Development of Web Applica.'),
-('1501494', '1501', 'Department of Computer Science', '494', 'Multimedia Senior Project'),
 ('1501496', '1501', 'Department of Computer Science', '496', 'Multimedia Senior Project')
 
 ON CONFLICT (course_id) DO UPDATE SET
@@ -97,7 +97,7 @@ INSERT INTO major_courses (major_code, course_id) VALUES
 
 -- Mathematics
 ('ITM', '1440131'),
-('ITM', '1440132'),
+('ITM', '1440181'),
 ('ITM', '1440182'),
 
 -- Chemistry
@@ -105,7 +105,7 @@ INSERT INTO major_courses (major_code, course_id) VALUES
 ('ITM', '1420102'),
 
 -- Physics
-('ITM', '1430101'),
+('ITM', '1430110'),
 ('ITM', '1430116'),
 
 -- Biology
@@ -121,10 +121,12 @@ INSERT INTO major_courses (major_code, course_id) VALUES
 -- Computer Science / IT Core
 ('ITM', '1501100'),
 ('ITM', '1501114'),
+('ITM', '1501116'),
 ('ITM', '1501214'),
+('ITM', '1501240'),
 ('ITM', '1501242'),
+('ITM', '1501244'),
 ('ITM', '1501247'),
-('ITM', '1501249'),
 ('ITM', '1501250'),
 ('ITM', '1501263'),
 ('ITM', '1501319'),
@@ -139,7 +141,6 @@ INSERT INTO major_courses (major_code, course_id) VALUES
 ('ITM', '1501366'),
 ('ITM', '1501370'),
 ('ITM', '1501393'),
-('ITM', '1501394'),
 ('ITM', '1501396'),
 ('ITM', '1501433'),
 ('ITM', '1501440'),
@@ -158,7 +159,6 @@ INSERT INTO major_courses (major_code, course_id) VALUES
 ('ITM', '1501490'),
 ('ITM', '1501491'),
 ('ITM', '1501492'),
-('ITM', '1501494'),
 ('ITM', '1501496')
 
 ON CONFLICT (major_code, course_id) DO NOTHING;
