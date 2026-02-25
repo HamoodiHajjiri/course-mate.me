@@ -116,6 +116,12 @@ INSERT INTO courses (course_id, college_code, college_name, course_number, cours
 -- Computer Engineering
 ('1502201', '1502', 'Department of Computer Engineering', '201', 'Digital Logic Design'),
 ('1502202', '1502', 'Department of Computer Engineering', '202', 'Digital Logic Design Lab.'),
+('1502442', '1502', 'Department of Computer Engineering', '442', 'Network Programming'),
+('1502461', '1502', 'Department of Computer Engineering', '461', 'S. T. in Cyber Security'),
+('1502470', '1502', 'Department of Computer Engineering', '470', 'Data Confid. and Cloud Secur.'),
+('1502471', '1502', 'Department of Computer Engineering', '471', 'Internet and Web Security'),
+('1502473', '1502', 'Department of Computer Engineering', '473', 'Ethical Hacking'),
+('1502474', '1502', 'Department of Computer Engineering', '474', 'Data Hiding and Staganography'),
 
 -- Education
 ('1602100', '1602', 'College of Education', '100', 'Smart & Effec. Learning Skills')

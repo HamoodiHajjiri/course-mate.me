@@ -96,29 +96,43 @@ function buildSectionGroups(sections, courseId) {
 
     // For each base group, generate one "option" per sub-section choice
     // e.g. base 01 with subs [01X, 01Y] => two groups: [01+01X], [01+01Y]
+    // Tutorials (suffix 'T') are mandatory and included in all options.
     const result = [];
     for (const [baseNum, group] of Object.entries(baseGroups)) {
         const baseSec = group.base;
         const subs = group.subs;
 
-        if (subs.length === 0) {
-            // Standalone section (no linked sub-sections)
-            const secs = baseSec ? [baseSec] : [];
-            if (secs.length === 0) continue;
-            const allSlots = secs.flatMap(s => parseClassTime(s.class_time));
-            result.push({ sections: secs, slots: allSlots, courseId });
-        } else if (baseSec) {
-            // Linked: base + one sub-section per option
-            for (const sub of subs) {
-                const secs = [baseSec, sub];
-                const allSlots = secs.flatMap(s => parseClassTime(s.class_time));
-                result.push({ sections: secs, slots: allSlots, courseId });
+        // Separate tutorials (T) from optional labs (X, Y, Z, etc.)
+        const tutorials = [];
+        const options = [];
+        for (const sub of subs) {
+            const suffix = sub.section_num.slice(baseNum.length);
+            if (suffix === 'T') {
+                tutorials.push(sub);
+            } else {
+                options.push(sub);
             }
-        } else {
+        }
+
+        if (!baseSec) {
             // Sub-sections without a base (unusual) — treat each as standalone
             for (const sub of subs) {
                 const allSlots = parseClassTime(sub.class_time);
                 result.push({ sections: [sub], slots: allSlots, courseId });
+            }
+        } else if (options.length === 0) {
+            // Base + tutorials only (no alternative labs to pick from)
+            const secs = [baseSec, ...tutorials];
+            const allSlots = secs.flatMap(s => parseClassTime(s.class_time));
+            if (secs.length > 0) {
+                result.push({ sections: secs, slots: allSlots, courseId });
+            }
+        } else {
+            // Base + tutorials + ONE lab option each
+            for (const opt of options) {
+                const secs = [baseSec, ...tutorials, opt];
+                const allSlots = secs.flatMap(s => parseClassTime(s.class_time));
+                result.push({ sections: secs, slots: allSlots, courseId });
             }
         }
     }
@@ -145,8 +159,19 @@ function generateSchedules(courseGroups, prefs, courseNames) {
 
             // Pin filter (always hard)
             if (prefs.pinnedSections[cid]) {
+                const pinnedBase = prefs.pinnedSections[cid];
+                // Base pin means we must have the exact base section included
                 groups = groups.filter(g =>
-                    g.sections.some(s => s.section_num === prefs.pinnedSections[cid])
+                    g.sections.some(s => s.section_num === pinnedBase)
+                );
+            }
+
+            // Pin lab filter
+            if (prefs.pinnedLabs && prefs.pinnedLabs[cid]) {
+                const pinnedLab = prefs.pinnedLabs[cid];
+                // Lab pin means we must have the exact lab section included
+                groups = groups.filter(g =>
+                    g.sections.some(s => s.section_num === pinnedLab)
                 );
             }
 
@@ -169,12 +194,15 @@ function generateSchedules(courseGroups, prefs, courseNames) {
             }
 
             // Hard elective filter for basket courses
-            if (cid.startsWith('BASKET_') && prefs.hardElectiveFilter?.[cid]) {
-                const preferred = prefs.preferredElectives?.[cid] || [];
-                if (preferred.length > 0) {
-                    groups = groups.filter(g =>
-                        g.sections.some(s => preferred.includes(s.course_id))
-                    );
+            if (cid.startsWith('BASKET_')) {
+                const prefsKey = cid.startsWith('BASKET_DEPT_') ? 'BASKET_DEPT' : cid;
+                if (prefs.hardElectiveFilter?.[prefsKey]) {
+                    const preferred = prefs.preferredElectives?.[prefsKey] || [];
+                    if (preferred.length > 0) {
+                        groups = groups.filter(g =>
+                            g.sections.some(s => preferred.includes(s.course_id))
+                        );
+                    }
                 }
             }
 
@@ -196,9 +224,17 @@ function generateSchedules(courseGroups, prefs, courseNames) {
             const cid = courseIds[idx];
             for (const group of filteredGroups[cid]) {
                 let conflict = false;
+
+                // For baskets (including DEPT_ELECTIVE), ensure we don't pick the same actual course twice
+                const actualCourseId = group.courseId;
+
                 for (const selected of currentSchedule) {
                     if (groupConflicts(group, selected)) {
                         conflict = true;
+                        break;
+                    }
+                    if (actualCourseId === selected.courseId) {
+                        conflict = true; // Same actual course selected for different slots
                         break;
                     }
                 }
@@ -300,27 +336,50 @@ function generateSchedules(courseGroups, prefs, courseNames) {
         for (const group of schedule) {
             const cid = group.courseId;
             if (prefs.preferredInstructors[cid]) {
-                const mainSection = group.sections.find(s =>
-                    s.section_num === getBaseSection(s.section_num)
-                ) || group.sections[0];
-                if (mainSection.instructor && mainSection.instructor !== prefs.preferredInstructors[cid]) {
+                const pref = prefs.preferredInstructors[cid];
+                const hasPref = group.sections.some(s => s.instructor === pref);
+
+                if (!hasPref) {
                     score -= 15;
                     warnings.push(`Different instructor for ${courseNames[cid] || cid}`);
+                } else {
+                    // Instructor is present in at least ONE section (e.g., they teach the lab)
+                    const lecture = group.sections.find(s => s.section_num === getBaseSection(s.section_num));
+                    const labs = group.sections.filter(s => s.section_num !== getBaseSection(s.section_num) && !s.section_num.endsWith('T'));
+
+                    if (lecture && lecture.instructor && lecture.instructor !== pref) {
+                        warnings.push(`Different lecture instructor for ${courseNames[cid] || cid}`);
+                    }
+
+                    const differentLab = labs.find(l => l.instructor && l.instructor !== pref);
+                    if (differentLab) {
+                        warnings.push(`Different lab instructor for ${courseNames[cid] || cid}`);
+                    }
                 }
             }
 
             // Preferred elective scoring (soft boost)
             const basketId = group.originalCourseId;
-            if (basketId?.startsWith('BASKET_') && !prefs.hardElectiveFilter?.[basketId]) {
-                const preferred = prefs.preferredElectives?.[basketId] || [];
-                if (preferred.length > 0 && preferred.includes(group.courseId)) {
-                    score += 20;
+            if (basketId?.startsWith('BASKET_')) {
+                const isDept = basketId.startsWith('BASKET_DEPT_');
+                const prefsKey = isDept ? 'BASKET_DEPT' : basketId;
+
+                if (!prefs.hardElectiveFilter?.[prefsKey]) {
+                    const preferred = prefs.preferredElectives?.[prefsKey] || [];
+                    if (preferred.length > 0 && preferred.includes(group.courseId)) {
+                        if (isDept) {
+                            const deptCount = schedule.filter(g => g.originalCourseId?.startsWith('BASKET_DEPT_')).length;
+                            score += (20 / deptCount);
+                        } else {
+                            score += 20;
+                        }
+                    }
                 }
             }
         }
 
-        // Clamp score
-        score = Math.max(0, Math.min(100, score));
+        // Clamp & Round score
+        score = Math.round(Math.max(0, Math.min(100, score)));
 
         return { schedule, score, warnings };
     });
@@ -357,6 +416,7 @@ function formatTimeShort(minutes) {
 
 export default function SchedulePage() {
     const [profile, setProfile] = useState(null);
+    const [majorInfo, setMajorInfo] = useState(null);
     const [courses, setCourses] = useState([]);
     const [selectedCourses, setSelectedCourses] = useState([]);
     const [courseSearch, setCourseSearch] = useState('');
@@ -370,6 +430,7 @@ export default function SchedulePage() {
         compactPref: 'none',
         preferredInstructors: {},
         pinnedSections: {},
+        pinnedLabs: {},
         strictTime: false,
         languagePref: 'any',
         preferredElectives: {},    // { BASKET_1: ['CS101', ...], BASKET_2: [] }
@@ -396,6 +457,12 @@ export default function SchedulePage() {
             .from('profiles').select('*').eq('id', user.id).single();
         const isComplete = profileData?.name && profileData?.student_id && profileData?.phone;
         if (!isComplete || !profileData?.major) { router.push('/profile?selectMajor=true'); return; }
+
+        // Fetch major info
+        const { data: majorData } = await supabase
+            .from('majors').select('dept_electives_count').eq('code', profileData.major).single();
+
+        setMajorInfo(majorData || { dept_electives_count: 0 });
         setProfile(profileData);
         fetchCourses(profileData.major);
         restoreSavedSchedule(profileData);
@@ -464,6 +531,51 @@ export default function SchedulePage() {
         const allowedCampuses = profile?.gender === 'male' ? ['main', 'men'] : ['main', 'women'];
 
         try {
+            // Handle Department Electives
+            if (courseId.startsWith('BASKET_DEPT')) {
+                if (!profile?.major) {
+                    setAllSections(prev => ({ ...prev, [courseId]: [] })); // Use passed courseId (e.g. BASKET_DEPT_1)
+                    return;
+                }
+
+                // 1. Get courses in this major marked as 'Major Elective'
+                const { data: majorElectives } = await supabase
+                    .from('major_courses')
+                    .select('course_id')
+                    .eq('major_code', profile.major)
+                    .eq('category', 'Major Elective');
+
+                if (!majorElectives?.length) {
+                    setAllSections(prev => ({ ...prev, [courseId]: [] }));
+                    return;
+                }
+
+                const electiveIds = majorElectives.map(mc => mc.course_id);
+
+                // Need course names for the dropdown/display
+                const { data: courseData } = await supabase
+                    .from('courses')
+                    .select('course_id, course_name')
+                    .in('course_id', electiveIds);
+
+                const newExtraNames = {};
+                if (courseData) {
+                    courseData.forEach(c => newExtraNames[c.course_id] = c.course_name);
+                    setExtraCourseNames(prev => ({ ...prev, ...newExtraNames }));
+                }
+
+                // 2. Get sections for these courses
+                const { data } = await supabase
+                    .from('sections')
+                    .select('*')
+                    .in('course_id', electiveIds)
+                    .in('campus', allowedCampuses)
+                    .order('section_num');
+
+                setAllSections(prev => ({ ...prev, [courseId]: data || [] })); // Assign to specific slot
+                return;
+            }
+
             // Handle Basket Wildcards
             if (courseId.startsWith('BASKET_')) {
                 const basketName = courseId === 'BASKET_1' ? 'Basket 1' : 'Basket 2';
@@ -519,15 +631,56 @@ export default function SchedulePage() {
         fetchSectionsForCourse(course.course_id);
     };
 
+    const addDeptElective = () => {
+        const maxElectives = majorInfo?.dept_electives_count || 0;
+
+        if (maxElectives === 0) {
+            setError('Your major does not have department electives configured.');
+            return;
+        }
+
+        // Find next available department elective ID
+        let nextIndex = 1;
+        while (selectedCourses.find(c => c.course_id === `BASKET_DEPT_${nextIndex}`)) {
+            nextIndex++;
+        }
+
+        // Max based on major
+        if (nextIndex > maxElectives) {
+            setError(`Maximum of ${maxElectives} department electives allowed for your major.`);
+            return;
+        }
+
+        addCourse({
+            course_id: `BASKET_DEPT_${nextIndex}`,
+            name: `Department Elective ${nextIndex}`,
+            is_basket: true,
+            basket_name: 'Department Elective'
+        });
+    };
+
     const removeCourse = (courseId) => {
-        setSelectedCourses(prev => prev.filter(c => c.course_id !== courseId));
+        setSelectedCourses(prev => {
+            const next = prev.filter(c => c.course_id !== courseId);
+
+            // Cleanup shared BASKET_DEPT preferences if the last one was removed
+            if (courseId.startsWith('BASKET_DEPT_') && !next.some(c => c.course_id.startsWith('BASKET_DEPT_'))) {
+                setPrefs(p => {
+                    const pe = { ...p.preferredElectives }; delete pe['BASKET_DEPT'];
+                    const hf = { ...p.hardElectiveFilter }; delete hf['BASKET_DEPT'];
+                    return { ...p, preferredElectives: pe, hardElectiveFilter: hf };
+                });
+            }
+            return next;
+        });
         setAllSections(prev => { const n = { ...prev }; delete n[courseId]; return n; });
         setPrefs(prev => {
             const pi = { ...prev.preferredInstructors }; delete pi[courseId];
             const ps = { ...prev.pinnedSections }; delete ps[courseId];
+            const pl = { ...prev.pinnedLabs }; delete pl[courseId];
             const pe = { ...prev.preferredElectives }; delete pe[courseId];
             const hf = { ...prev.hardElectiveFilter }; delete hf[courseId];
-            return { ...prev, preferredInstructors: pi, pinnedSections: ps, preferredElectives: pe, hardElectiveFilter: hf };
+            return { ...prev, preferredInstructors: pi, pinnedSections: ps, pinnedLabs: pl, preferredElectives: pe, hardElectiveFilter: hf };
         });
         setResults(null);
     };
@@ -549,10 +702,35 @@ export default function SchedulePage() {
         return [...instructors].sort();
     };
 
-    // Get main sections (no suffix) for pinning
-    const getMainSections = (courseId) => {
+    // Get unique base (lecture) sections
+    const getBaseSections = (courseId) => {
         const secs = allSections[courseId] || [];
-        return secs.filter(s => s.section_num === getBaseSection(s.section_num));
+        const baseMap = {};
+        for (const s of secs) {
+            const base = getBaseSection(s.section_num);
+            if (!baseMap[base]) {
+                baseMap[base] = s;
+            } else if (s.section_num === base) {
+                baseMap[base] = s;
+            }
+        }
+        return Object.values(baseMap).sort((a, b) =>
+            getBaseSection(a.section_num).localeCompare(getBaseSection(b.section_num))
+        );
+    };
+
+    // Get lab sections (filter out T suffixes, and filter by pinned base if set)
+    const getLabSections = (courseId, pinnedBase) => {
+        const secs = allSections[courseId] || [];
+        return secs.filter(s => {
+            const base = getBaseSection(s.section_num);
+            const suffix = s.section_num.slice(base.length);
+            // Hide base lectures and tutorials
+            if (suffix === '' || suffix === 'T') return false;
+            // If a base lecture is pinned, only show its labs
+            if (pinnedBase && base !== pinnedBase) return false;
+            return true;
+        }).sort((a, b) => a.section_num.localeCompare(b.section_num));
     };
 
     const handleGenerate = () => {
@@ -723,13 +901,19 @@ export default function SchedulePage() {
                                 className={styles.basketBtn}
                                 onClick={() => addCourse({ course_id: 'BASKET_1', name: 'University Elective (Basket 1)', is_basket: true, basket_name: 'Basket 1' })}
                             >
-                                + Add Basket 1 Elective
+                                + Group 1 Elective
                             </button>
                             <button
                                 className={styles.basketBtn}
                                 onClick={() => addCourse({ course_id: 'BASKET_2', name: 'University Elective (Basket 2)', is_basket: true, basket_name: 'Basket 2' })}
                             >
-                                + Add Basket 2 Elective
+                                + Group 2 Elective
+                            </button>
+                            <button
+                                className={`${styles.basketBtn} ${styles.basketBtnFull}`}
+                                onClick={addDeptElective}
+                            >
+                                + Department Elective
                             </button>
                         </div>
                     </div>
@@ -853,28 +1037,38 @@ export default function SchedulePage() {
                                     {/* Per-course preferences */}
                                     {selectedCourses.map(c => {
                                         const isBasket = c.course_id.startsWith('BASKET_');
+                                        const isDeptBasket = c.course_id.startsWith('BASKET_DEPT_');
+
+                                        // If it's a department basket, only show preferences for the FIRST one added
+                                        if (isDeptBasket) {
+                                            const firstDeptBasket = selectedCourses.find(sc => sc.course_id.startsWith('BASKET_DEPT_'));
+                                            if (c.course_id !== firstDeptBasket.course_id) return null;
+                                        }
 
                                         if (isBasket) {
+                                            const prefsKey = isDeptBasket ? 'BASKET_DEPT' : c.course_id;
+                                            const displayName = isDeptBasket ? 'Department Electives' : c.name;
+
                                             const basketSections = allSections[c.course_id] || [];
                                             const subCourseIds = [...new Set(basketSections.map(s => s.course_id))].sort();
                                             if (subCourseIds.length === 0) return null;
 
-                                            const preferred = prefs.preferredElectives?.[c.course_id] || [];
-                                            const isHard = prefs.hardElectiveFilter?.[c.course_id] || false;
+                                            const preferred = prefs.preferredElectives?.[prefsKey] || [];
+                                            const isHard = prefs.hardElectiveFilter?.[prefsKey] || false;
 
                                             const toggleElective = (subId) => {
                                                 setPrefs(p => {
-                                                    const current = p.preferredElectives?.[c.course_id] || [];
+                                                    const current = p.preferredElectives?.[prefsKey] || [];
                                                     const next = current.includes(subId)
                                                         ? current.filter(x => x !== subId)
                                                         : [...current, subId];
-                                                    return { ...p, preferredElectives: { ...p.preferredElectives, [c.course_id]: next } };
+                                                    return { ...p, preferredElectives: { ...p.preferredElectives, [prefsKey]: next } };
                                                 });
                                             };
 
                                             return (
-                                                <div key={c.course_id} className={styles.prefCourseItem}>
-                                                    <div className={styles.prefCourseName}>{c.name}</div>
+                                                <div key={prefsKey} className={styles.prefCourseItem}>
+                                                    <div className={styles.prefCourseName}>{displayName}</div>
                                                     <div className={styles.prefGroup}>
                                                         <span className={styles.prefLabel}>Preferred Courses</span>
                                                         <div className={styles.electiveList}>
@@ -900,7 +1094,7 @@ export default function SchedulePage() {
                                                                 checked={isHard}
                                                                 onChange={e => setPrefs(p => ({
                                                                     ...p,
-                                                                    hardElectiveFilter: { ...p.hardElectiveFilter, [c.course_id]: e.target.checked }
+                                                                    hardElectiveFilter: { ...p.hardElectiveFilter, [prefsKey]: e.target.checked }
                                                                 }))}
                                                             />
                                                             <span>Only show schedules with selected courses</span>
@@ -912,8 +1106,12 @@ export default function SchedulePage() {
 
                                         // Regular (non-basket) course
                                         const instructors = getInstructors(c.course_id);
-                                        const mainSections = getMainSections(c.course_id);
-                                        if (instructors.length === 0 && mainSections.length === 0) return null;
+                                        const baseSections = getBaseSections(c.course_id);
+                                        const pinnedBaseId = prefs.pinnedSections[c.course_id] || '';
+                                        const labSections = getLabSections(c.course_id, pinnedBaseId);
+
+                                        if (instructors.length === 0 && baseSections.length === 0 && labSections.length === 0) return null;
+
                                         return (
                                             <div key={c.course_id} className={styles.prefCourseItem}>
                                                 <div className={styles.prefCourseName}>{c.course_id} — {c.name}</div>
@@ -933,21 +1131,54 @@ export default function SchedulePage() {
                                                         </select>
                                                     </div>
                                                 )}
-                                                {mainSections.length > 1 && (
+                                                {baseSections.length > 1 && (
                                                     <div className={styles.prefGroup}>
-                                                        <span className={styles.prefLabel}>Pin Section</span>
+                                                        <span className={styles.prefLabel}>Pin Lecture Section</span>
                                                         <select
                                                             className={styles.select}
-                                                            value={prefs.pinnedSections[c.course_id] || ''}
+                                                            value={pinnedBaseId}
+                                                            onChange={e => {
+                                                                const newVal = e.target.value;
+                                                                setPrefs(p => {
+                                                                    const next = { ...p, pinnedSections: { ...p.pinnedSections, [c.course_id]: newVal } };
+                                                                    // Clear pinned lab if it no longer belongs to the newly pinned lecture
+                                                                    if (newVal && p.pinnedLabs?.[c.course_id]) {
+                                                                        const pl = p.pinnedLabs[c.course_id];
+                                                                        if (getBaseSection(pl) !== newVal) {
+                                                                            delete next.pinnedLabs[c.course_id];
+                                                                        }
+                                                                    }
+                                                                    return next;
+                                                                });
+                                                            }}
+                                                        >
+                                                            <option value="">Any lecture</option>
+                                                            {baseSections.map(s => {
+                                                                const baseNum = getBaseSection(s.section_num);
+                                                                return (
+                                                                    <option key={baseNum} value={baseNum}>
+                                                                        Section {baseNum}{s.class_time ? ` — ${s.class_time}` : ''}{s.instructor ? ` — ${s.instructor}` : ''}
+                                                                    </option>
+                                                                );
+                                                            })}
+                                                        </select>
+                                                    </div>
+                                                )}
+                                                {labSections.length > 1 && (
+                                                    <div className={styles.prefGroup}>
+                                                        <span className={styles.prefLabel}>Pin Lab Section</span>
+                                                        <select
+                                                            className={styles.select}
+                                                            value={prefs.pinnedLabs?.[c.course_id] || ''}
                                                             onChange={e => setPrefs(p => ({
                                                                 ...p,
-                                                                pinnedSections: { ...p.pinnedSections, [c.course_id]: e.target.value }
+                                                                pinnedLabs: { ...(p.pinnedLabs || {}), [c.course_id]: e.target.value }
                                                             }))}
                                                         >
-                                                            <option value="">Any section</option>
-                                                            {mainSections.map(s => (
+                                                            <option value="">Any lab</option>
+                                                            {labSections.map(s => (
                                                                 <option key={s.section_num} value={s.section_num}>
-                                                                    Section {s.section_num}{s.class_time ? ` — ${s.class_time}` : ''}{s.instructor ? ` — ${s.instructor}` : ''}
+                                                                    Lab {s.section_num}{s.class_time ? ` — ${s.class_time}` : ''}{s.instructor ? ` — ${s.instructor}` : ''}
                                                                 </option>
                                                             ))}
                                                         </select>

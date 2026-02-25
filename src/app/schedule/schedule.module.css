@@ -1033,14 +1033,15 @@
 
 /* ===== Basket Buttons ===== */
 .basketButtons {
-    display: flex;
-    gap: 12px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
     margin: 16px 0;
 }
 
 .basketBtn {
-    flex: 1;
-    padding: 14px 16px;
+    width: 100%;
+    padding: 12px 14px;
     border: none;
     border-radius: var(--radius-md);
     background: #374151;
@@ -1062,4 +1063,8 @@
 
 .basketBtn:active {
     transform: translateY(0);
+}
+
+.basketBtnFull {
+    grid-column: span 2;
 }
