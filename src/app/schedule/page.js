@@ -168,6 +168,16 @@ function generateSchedules(courseGroups, prefs, courseNames) {
                 );
             }
 
+            // Hard elective filter for basket courses
+            if (cid.startsWith('BASKET_') && prefs.hardElectiveFilter?.[cid]) {
+                const preferred = prefs.preferredElectives?.[cid] || [];
+                if (preferred.length > 0) {
+                    groups = groups.filter(g =>
+                        g.sections.some(s => preferred.includes(s.course_id))
+                    );
+                }
+            }
+
             filtered[cid] = groups;
         }
         return filtered;
@@ -216,7 +226,7 @@ function generateSchedules(courseGroups, prefs, courseNames) {
 
     // Score each schedule
     const scored = results.map(schedule => {
-        let score = 100;
+        let score = 80;
         const warnings = [];
         const allSlots = schedule.flatMap(g => g.slots);
 
@@ -298,6 +308,15 @@ function generateSchedules(courseGroups, prefs, courseNames) {
                     warnings.push(`Different instructor for ${courseNames[cid] || cid}`);
                 }
             }
+
+            // Preferred elective scoring (soft boost)
+            const basketId = group.originalCourseId;
+            if (basketId?.startsWith('BASKET_') && !prefs.hardElectiveFilter?.[basketId]) {
+                const preferred = prefs.preferredElectives?.[basketId] || [];
+                if (preferred.length > 0 && preferred.includes(group.courseId)) {
+                    score += 20;
+                }
+            }
         }
 
         // Clamp score
@@ -348,12 +367,13 @@ export default function SchedulePage() {
         noClassesBefore: '',
         noClassesAfter: '',
         gapPref: 'none',
-
         compactPref: 'none',
         preferredInstructors: {},
         pinnedSections: {},
         strictTime: false,
         languagePref: 'any',
+        preferredElectives: {},    // { BASKET_1: ['CS101', ...], BASKET_2: [] }
+        hardElectiveFilter: {},    // { BASKET_1: false, BASKET_2: true }
     });
     const [generating, setGenerating] = useState(false);
     const [results, setResults] = useState(null);
@@ -505,7 +525,9 @@ export default function SchedulePage() {
         setPrefs(prev => {
             const pi = { ...prev.preferredInstructors }; delete pi[courseId];
             const ps = { ...prev.pinnedSections }; delete ps[courseId];
-            return { ...prev, preferredInstructors: pi, pinnedSections: ps };
+            const pe = { ...prev.preferredElectives }; delete pe[courseId];
+            const hf = { ...prev.hardElectiveFilter }; delete hf[courseId];
+            return { ...prev, preferredInstructors: pi, pinnedSections: ps, preferredElectives: pe, hardElectiveFilter: hf };
         });
         setResults(null);
     };
@@ -830,13 +852,72 @@ export default function SchedulePage() {
 
                                     {/* Per-course preferences */}
                                     {selectedCourses.map(c => {
+                                        const isBasket = c.course_id.startsWith('BASKET_');
+
+                                        if (isBasket) {
+                                            const basketSections = allSections[c.course_id] || [];
+                                            const subCourseIds = [...new Set(basketSections.map(s => s.course_id))].sort();
+                                            if (subCourseIds.length === 0) return null;
+
+                                            const preferred = prefs.preferredElectives?.[c.course_id] || [];
+                                            const isHard = prefs.hardElectiveFilter?.[c.course_id] || false;
+
+                                            const toggleElective = (subId) => {
+                                                setPrefs(p => {
+                                                    const current = p.preferredElectives?.[c.course_id] || [];
+                                                    const next = current.includes(subId)
+                                                        ? current.filter(x => x !== subId)
+                                                        : [...current, subId];
+                                                    return { ...p, preferredElectives: { ...p.preferredElectives, [c.course_id]: next } };
+                                                });
+                                            };
+
+                                            return (
+                                                <div key={c.course_id} className={styles.prefCourseItem}>
+                                                    <div className={styles.prefCourseName}>{c.name}</div>
+                                                    <div className={styles.prefGroup}>
+                                                        <span className={styles.prefLabel}>Preferred Courses</span>
+                                                        <div className={styles.electiveList}>
+                                                            {subCourseIds.map(subId => (
+                                                                <label key={subId} className={styles.electiveItem}>
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={preferred.includes(subId)}
+                                                                        onChange={() => toggleElective(subId)}
+                                                                    />
+                                                                    <span className={styles.electiveId}>{subId}</span>
+                                                                    {extraCourseNames[subId] && (
+                                                                        <span className={styles.electiveName}>{extraCourseNames[subId]}</span>
+                                                                    )}
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                    {preferred.length > 0 && (
+                                                        <label className={styles.electiveHardFilter}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={isHard}
+                                                                onChange={e => setPrefs(p => ({
+                                                                    ...p,
+                                                                    hardElectiveFilter: { ...p.hardElectiveFilter, [c.course_id]: e.target.checked }
+                                                                }))}
+                                                            />
+                                                            <span>Only show schedules with selected courses</span>
+                                                        </label>
+                                                    )}
+                                                </div>
+                                            );
+                                        }
+
+                                        // Regular (non-basket) course
                                         const instructors = getInstructors(c.course_id);
                                         const mainSections = getMainSections(c.course_id);
                                         if (instructors.length === 0 && mainSections.length === 0) return null;
                                         return (
                                             <div key={c.course_id} className={styles.prefCourseItem}>
                                                 <div className={styles.prefCourseName}>{c.course_id} — {c.name}</div>
-                                                {instructors.length > 0 && (
+                                                {instructors.length > 1 && (
                                                     <div className={styles.prefGroup}>
                                                         <span className={styles.prefLabel}>Preferred Instructor</span>
                                                         <select
@@ -866,7 +947,7 @@ export default function SchedulePage() {
                                                             <option value="">Any section</option>
                                                             {mainSections.map(s => (
                                                                 <option key={s.section_num} value={s.section_num}>
-                                                                    Section {s.section_num} {s.instructor ? `— ${s.instructor}` : ''}
+                                                                    Section {s.section_num}{s.class_time ? ` — ${s.class_time}` : ''}{s.instructor ? ` — ${s.instructor}` : ''}
                                                                 </option>
                                                             ))}
                                                         </select>
@@ -1028,6 +1109,7 @@ function ScheduleCard({ result, rank, courseNameMap, selectedCourses, onSave, on
                 blocks.push({
                     ...slot,
                     courseId: group.courseId,
+                    courseName: courseNameMap[group.courseId] || courseNameMap[group.originalCourseId] || null,
                     sectionNum: sec.section_num,
                     colorIdx: courseIdx % 8,
                 });
@@ -1123,6 +1205,7 @@ function ScheduleCard({ result, rank, courseNameMap, selectedCourses, onSave, on
                                                     }}
                                                 >
                                                     <span className={styles.ttBlockCourse}>{block.courseId}</span>
+                                                    {block.courseName && <span className={styles.ttBlockName}>{block.courseName}</span>}
                                                     <span className={styles.ttBlockSection}>{block.sectionNum}</span>
                                                 </div>
                                             );
