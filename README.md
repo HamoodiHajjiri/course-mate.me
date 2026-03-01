@@ -1,69 +1,20 @@
-# CourseMate
+# CourseMate 🎓
 
-CourseMate (formerly Course Swap) is a mobile-first web application designed specifically for University of Sharjah (UoS) students. It facilitates the seamless swapping of course sections and the announcement of section giveaways. 
+CourseMate (formerly Course Swap) is a centralized platform created specifically for University of Sharjah (UoS) students to solve the chaos and frustration of course registration. 
 
-## Features
+## The Problem
+During registration periods, getting into the right course sections with preferred timings or instructors can be incredibly difficult. Students often resort to constantly refreshing the registration portal hoping a seat opens up, or they turn to social media groups trying to arrange manual "swaps" with other students. This process is uncoordinated, relies heavily on luck, and requires tedious manual communication.
 
-* **Authentication & Profiles**: Secure user registration and login using Supabase authentication, complete with personalized user profiles.
-* **Section Swapping & Giveaways**: Create posts to swap a specific course section you have for one you want, or offer a section you no longer need.
-* **Smart Matching Algorithm**: Automatically finds and alerts users of compatible swap matches.
-* **Real-Time Search & Filtering**: Fast search functionality with advanced filtering, including campus-specific filters (Main, Men's, Women's) and gender-based access.
-* **Schedule Builder**: Visually plan and manage your academic timetable within the app.
-* **Watchlist**: Keep track of desired sections and get notified when they become available.
-* **Notifications**: Instant in-app alerts and reliable email notifications (powered by Resend) for successful matches.
+## The Idea
+CourseMate acts as an intelligent intermediary. Instead of hunting through WhatsApp groups or hoping for a random drop, students can use CourseMate to declare exactly what course section they *have*, and what section they *want*. The platform handles the rest. 
 
-## Tech Stack
+## How It Solves These Problems
+CourseMate streamlines the entire process through several key mechanisms:
 
-* **Framework**: [Next.js](https://nextjs.org/) (React)
-* **Database & Backend**: [Supabase](https://supabase.com/) (PostgreSQL, Authentication, Row Level Security)
-* **Styling**: Vanilla CSS for custom, high-performance styling
-* **Emails**: [Resend](https://resend.com/)
+* **Smart Swapping:** If Student A has Section 1 but wants Section 2, and Student B has Section 2 but wants Section 1, CourseMate's smart matching algorithm instantly connects them.
+* **Giveaways & Requests:** If a student is simply dropping a course and doesn't need a swap, they can list it as a "Giveaway" for anyone who needs it. Conversely, students can post "Requests" for sections they desperately need.
+* **Instant Notifications:** Students no longer need to constantly monitor the app. They can add courses to a Watchlist and receive instant email and push notifications the moment a relevant swap or giveaway becomes available.
+* **Tailored Academic Experience:** The platform understands UoS's structure. By capturing a student's gender and major, it automatically filters out irrelevant sections (e.g., hiding Men's campus sections for female students, or filtering out courses outside their major).
+* **Visual Schedule Builder:** To prevent overlapping swaps, students can visually plan and preview their potential schedule right within the app before finalizing any changes.
 
-## Getting Started
-
-### Prerequisites
-
-* Node.js (v18 or higher recommended)
-* npm 
-* Supabase account and project
-
-### Installation
-
-1. Clone the repository and navigate to the project directory:
-   ```bash
-   cd CourseMate
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Set up environment variables:
-   Create a `.env.local` file in the root directory and add your Supabase and Resend credentials:
-   ```env
-   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-   RESEND_API_KEY=your_resend_api_key
-   ```
-
-4. Run the development server:
-   ```bash
-   npm run dev
-   ```
-
-5. Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
-
-## Architecture & Database
-
-The backend relies on Supabase. The core database schema includes tables for:
-*   `profiles`: User information and campus preferences.
-*   `posts`: Swap requests and giveaway announcements.
-*   `matches`: Records of successful and pending swaps.
-*   `courses`, `majors`, `sections`: Academic catalog data updated regularly (e.g., via JSON data dumps).
-
-Security is enforced using deep Row Level Security (RLS) policies within Supabase to ensure user data privacy.
-
-## License
-
-This project is tailored for academic community use.
+By automating the discovery and matching process, CourseMate transforms course registration from a stressful scramble into a seamless, collaborative experience for the student body.
