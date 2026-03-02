@@ -2,12 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
+import { EyeIcon, EyeOffIcon } from '@/components/Icons';
 import styles from '../auth.module.css';
 
 export default function ResetPasswordPage() {
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
@@ -16,14 +20,11 @@ export default function ResetPasswordPage() {
     const supabase = createClient();
 
     useEffect(() => {
-        // The callback route already exchanged the code for a session
-        // Just verify there's an active session
         const checkSession = async () => {
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
                 setReady(true);
             } else {
-                // No session means the link was invalid or expired
                 setError('This reset link is invalid or has expired. Please request a new one.');
                 setReady(true);
             }
@@ -71,6 +72,9 @@ export default function ResetPasswordPage() {
             <div className={styles.container}>
                 <div className={styles.card}>
                     <div className={styles.logoWrapper}>
+                        <div className={styles.logoFrame}>
+                            <Image src="/logo-v2.png" alt="CourseMate" width={72} height={72} className={styles.logo} />
+                        </div>
                         <h1 className={styles.title}>CourseMate</h1>
                         <p className={styles.subtitle}>Verifying reset link...</p>
                     </div>
@@ -86,6 +90,9 @@ export default function ResetPasswordPage() {
         <div className={styles.container}>
             <div className={styles.card}>
                 <div className={styles.logoWrapper}>
+                    <div className={styles.logoFrame}>
+                        <Image src="/logo-v2.png" alt="CourseMate" width={72} height={72} className={styles.logo} />
+                    </div>
                     <h1 className={styles.title}>CourseMate</h1>
                     <p className={styles.subtitle}>Reset your password</p>
                 </div>
@@ -113,28 +120,50 @@ export default function ResetPasswordPage() {
                     <form onSubmit={handleReset} className={styles.form}>
                         <div className={styles.formGroup}>
                             <label className={styles.label}>New Password</label>
-                            <input
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className={styles.input}
-                                placeholder="Enter new password"
-                                required
-                                disabled={loading}
-                            />
+                            <div className={styles.passwordWrapper}>
+                                <input
+                                    type={showPassword ? 'text' : 'password'}
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className={`${styles.input} ${styles.inputPassword}`}
+                                    placeholder="Enter new password"
+                                    required
+                                    disabled={loading}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className={styles.passwordToggle}
+                                    aria-label={showPassword ? "Hide password" : "Show password"}
+                                    tabIndex={-1}
+                                >
+                                    {showPassword ? <EyeIcon width={20} height={20} /> : <EyeOffIcon width={20} height={20} />}
+                                </button>
+                            </div>
                         </div>
 
                         <div className={styles.formGroup}>
                             <label className={styles.label}>Confirm Password</label>
-                            <input
-                                type="password"
-                                value={confirmPassword}
-                                onChange={(e) => setConfirmPassword(e.target.value)}
-                                className={styles.input}
-                                placeholder="Confirm new password"
-                                required
-                                disabled={loading}
-                            />
+                            <div className={styles.passwordWrapper}>
+                                <input
+                                    type={showConfirmPassword ? 'text' : 'password'}
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    className={`${styles.input} ${styles.inputPassword}`}
+                                    placeholder="Confirm new password"
+                                    required
+                                    disabled={loading}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                    className={styles.passwordToggle}
+                                    aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                                    tabIndex={-1}
+                                >
+                                    {showConfirmPassword ? <EyeIcon width={20} height={20} /> : <EyeOffIcon width={20} height={20} />}
+                                </button>
+                            </div>
                         </div>
 
                         {error && <div className={styles.error}>{error}</div>}
