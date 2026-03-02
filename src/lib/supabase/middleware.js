@@ -43,15 +43,5 @@ export async function updateSession(request) {
         // Ignore auth errors during middleware
     }
 
-    // If a code param arrives on any page (e.g. Supabase redirects to root),
-    // redirect to the callback route which properly handles code exchange
-    const code = request.nextUrl.searchParams.get('code');
-    if (code && !request.nextUrl.pathname.startsWith('/auth/callback')) {
-        const url = request.nextUrl.clone();
-        url.pathname = '/auth/callback';
-        // Keep the code param, callback route will use it
-        return NextResponse.redirect(url);
-    }
-
     return supabaseResponse;
 }

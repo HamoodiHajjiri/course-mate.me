@@ -29,6 +29,19 @@ export default function HomePage() {
     }, []);
 
     const initializePage = async () => {
+        // Handle auth callback code (e.g., from password reset email)
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        if (code) {
+            const { error } = await supabase.auth.exchangeCodeForSession(code);
+            if (!error) {
+                // Clean up URL and redirect to reset-password page
+                window.history.replaceState({}, '', '/');
+                router.push('/auth/reset-password');
+                return;
+            }
+        }
+
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
             router.push('/auth');
