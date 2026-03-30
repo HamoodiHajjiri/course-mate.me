@@ -63,8 +63,16 @@ function parseClassTime(classTimeStr) {
 
 
 function getBaseSection(sectionNum) {
-    // Strip trailing letters (X, Y, Z, T, L) to get base section number
-    return sectionNum.replace(/[A-Za-z]+$/, '');
+    // Strip trailing lab/tutorial letters, but preserve language indicators (A, E)
+    // For example, '01A' -> '01A', '01AL' -> '01A', '51AT' -> '51A', '01X' -> '01', '01' -> '01'
+    return sectionNum.replace(/[A-Za-z]+$/, (match) => {
+        // If the suffix starts with A or E (language indicator), keep just that letter
+        if (match[0].toUpperCase() === 'A' || match[0].toUpperCase() === 'E') {
+            return match[0];
+        }
+        // Otherwise, strip all trailing letters
+        return '';
+    });
 }
 
 function timeSlotsConflict(slotsA, slotsB) {
@@ -81,61 +89,80 @@ function timeSlotsConflict(slotsA, slotsB) {
 // ===== SCHEDULE ALGORITHM =====
 
 function buildSectionGroups(sections, courseId) {
-    // Group sections by base section number
-    const baseGroups = {};
-    for (const sec of sections) {
-        if (sec.course_id !== courseId) continue;
+    const courseSecs = sections.filter(sec => sec.course_id === courseId);
+    if (courseSecs.length === 0) return [];
+
+    // Find all base sections
+    const baseMap = {}; // base -> lecture section
+    courseSecs.forEach(sec => {
         const base = getBaseSection(sec.section_num);
-        if (!baseGroups[base]) baseGroups[base] = { base: null, subs: [] };
         if (sec.section_num === base) {
-            baseGroups[base].base = sec;
-        } else {
-            baseGroups[base].subs.push(sec);
+            baseMap[base] = sec;
         }
-    }
+    });
 
-    // For each base group, generate one "option" per sub-section choice
-    // e.g. base 01 with subs [01X, 01Y] => two groups: [01+01X], [01+01Y]
-    // Tutorials (suffix 'T') are mandatory and included in all options.
     const result = [];
-    for (const [baseNum, group] of Object.entries(baseGroups)) {
-        const baseSec = group.base;
-        const subs = group.subs;
+    const lectures = Object.values(baseMap);
+    
+    // If no lectures at all (e.g. standalone lab/project), return each section as a standalone option
+    if (lectures.length === 0) {
+        return courseSecs.map(sec => ({
+            sections: [sec],
+            slots: parseClassTime(sec.class_time),
+            courseId
+        }));
+    }
 
-        // Separate tutorials (T) from optional labs (X, Y, Z, etc.)
-        const tutorials = [];
-        const options = [];
-        for (const sub of subs) {
-            const suffix = sub.section_num.slice(baseNum.length);
-            if (suffix === 'T') {
-                tutorials.push(sub);
+    // Categorize non-base sections
+    const tutsByBase = {};
+    const labsByBase = {};
+    const unattachedTuts = [];
+    const unattachedLabs = [];
+
+    courseSecs.forEach(sec => {
+        const base = getBaseSection(sec.section_num);
+        if (sec.section_num !== base) {
+            const isTut = sec.section_num.endsWith('T');
+            if (baseMap[base]) {
+                if (isTut) {
+                    if (!tutsByBase[base]) tutsByBase[base] = [];
+                    tutsByBase[base].push(sec);
+                } else {
+                    if (!labsByBase[base]) labsByBase[base] = [];
+                    labsByBase[base].push(sec);
+                }
             } else {
-                options.push(sub);
+                if (isTut) unattachedTuts.push(sec);
+                else unattachedLabs.push(sec);
             }
         }
+    });
 
-        if (!baseSec) {
-            // Sub-sections without a base (unusual) — treat each as standalone
-            for (const sub of subs) {
-                const allSlots = parseClassTime(sub.class_time);
-                result.push({ sections: [sub], slots: allSlots, courseId });
-            }
-        } else if (options.length === 0) {
-            // Base + tutorials only (no alternative labs to pick from)
-            const secs = [baseSec, ...tutorials];
-            const allSlots = secs.flatMap(s => parseClassTime(s.class_time));
-            if (secs.length > 0) {
-                result.push({ sections: secs, slots: allSlots, courseId });
-            }
-        } else {
-            // Base + tutorials + ONE lab option each
-            for (const opt of options) {
-                const secs = [baseSec, ...tutorials, opt];
-                const allSlots = secs.flatMap(s => parseClassTime(s.class_time));
-                result.push({ sections: secs, slots: allSlots, courseId });
+    // Generate combinations of [lecture, tut, lab]
+    for (const lec of lectures) {
+        const base = lec.section_num;
+        
+        let tutOptions = tutsByBase[base] || unattachedTuts;
+        let labOptions = labsByBase[base] || unattachedLabs;
+        
+        if (tutOptions.length === 0) tutOptions = [null];
+        if (labOptions.length === 0) labOptions = [null];
+        
+        for (const tut of tutOptions) {
+            for (const lab of labOptions) {
+                const combined = [lec];
+                if (tut) combined.push(tut);
+                if (lab) combined.push(lab);
+                
+                result.push({
+                    sections: combined,
+                    slots: combined.flatMap(s => parseClassTime(s.class_time)),
+                    courseId
+                });
             }
         }
     }
+    
     return result;
 }
 
@@ -802,15 +829,22 @@ export default function SchedulePage() {
     // Get lab sections (filter out T suffixes, and filter by pinned base if set)
     const getLabSections = (courseId, pinnedBase) => {
         const secs = allSections[courseId] || [];
-        return secs.filter(s => {
+        const allLabs = secs.filter(s => {
             const base = getBaseSection(s.section_num);
-            const suffix = s.section_num.slice(base.length);
-            // Hide base lectures and tutorials
-            if (suffix === '' || suffix === 'T') return false;
-            // If a base lecture is pinned, only show its labs
-            if (pinnedBase && base !== pinnedBase) return false;
-            return true;
+            return s.section_num !== base && !s.section_num.endsWith('T');
         }).sort((a, b) => a.section_num.localeCompare(b.section_num));
+        
+        if (!pinnedBase) return allLabs;
+        
+        // If pinnedBase is set, check if it has specifically attached labs
+        const attachedLabs = allLabs.filter(s => getBaseSection(s.section_num) === pinnedBase);
+        if (attachedLabs.length > 0) {
+            return attachedLabs;
+        }
+        
+        // If it doesn't have attached labs, return the "unattached" pool of labs
+        const baseSet = new Set(secs.filter(s => s.section_num === getBaseSection(s.section_num)).map(s => s.section_num));
+        return allLabs.filter(s => !baseSet.has(getBaseSection(s.section_num)));
     };
 
     const handleGenerate = () => {
