@@ -2,6 +2,14 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 
 export async function updateSession(request) {
+    // Redirect www to non-www
+    const host = request.headers.get('host') || '';
+    if (host.startsWith('www.')) {
+        const url = request.nextUrl.clone();
+        url.host = host.replace('www.', '');
+        return NextResponse.redirect(url, 301);
+    }
+
     // Check if Supabase is configured
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
