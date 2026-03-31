@@ -1,17 +1,23 @@
 .card {
     background: var(--bg-card);
     border-radius: var(--radius-lg);
-    padding: 16px;
-    margin-bottom: 12px;
-    box-shadow: var(--shadow-sm);
+    padding: 18px;
+    box-shadow: var(--shadow-card);
     border: 1px solid var(--border-color);
     border-left-width: 4px;
-    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    transition: transform var(--transition-fast) var(--ease-out-expo), box-shadow var(--transition-fast);
+    position: relative;
+    animation: fadeInUp 0.35s var(--ease-out-expo) both;
 }
 
 .card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-card-hover);
+}
+
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .cardswap {
@@ -40,23 +46,23 @@
     gap: 4px;
     padding: 4px 10px;
     border-radius: var(--radius-full);
-    font-size: 0.75rem;
-    font-weight: 600;
+    font-size: 0.6875rem;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
-.badgeswap {
+.badgeSwap {
     background: var(--post-swap-bg);
     color: var(--post-swap);
 }
 
-.badgegiveaway {
+.badgeGiveaway {
     background: var(--post-giveaway-bg);
     color: var(--post-giveaway);
 }
 
-.badgerequest {
+.badgeRequest {
     background: var(--post-request-bg);
     color: var(--post-request);
 }
@@ -69,8 +75,8 @@
 }
 
 .statusDot {
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
 }
 
@@ -89,20 +95,14 @@
 }
 
 .statusLabel {
-    font-size: 0.75rem;
+    font-size: 0.6875rem;
     color: var(--text-muted);
+    font-weight: 500;
 }
 
 @keyframes pulse {
-
-    0%,
-    100% {
-        opacity: 1;
-    }
-
-    50% {
-        opacity: 0.5;
-    }
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
 }
 
 /* Course Info */
@@ -112,14 +112,15 @@
 
 .courseId {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 1.25rem;
+    font-size: 1.125rem;
     font-weight: 700;
     color: var(--text-primary);
     display: block;
+    letter-spacing: -0.01em;
 }
 
 .courseName {
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
     color: var(--text-secondary);
     display: block;
     margin-top: 2px;
@@ -130,8 +131,9 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 12px;
-    background: var(--bg-tertiary);
+    padding: 12px 14px;
+    background: var(--gradient-subtle);
+    border: 1px solid var(--border-color-subtle);
     border-radius: var(--radius-md);
     margin-bottom: 12px;
 }
@@ -142,30 +144,31 @@
 
 .sectionLabel {
     display: block;
-    font-size: 0.7rem;
-    font-weight: 600;
+    font-size: 0.625rem;
+    font-weight: 700;
     text-transform: uppercase;
     color: var(--text-muted);
-    margin-bottom: 2px;
+    margin-bottom: 3px;
+    letter-spacing: 0.5px;
 }
 
 .sectionValue {
-    font-size: 1rem;
-    font-weight: 600;
+    font-size: 0.9375rem;
+    font-weight: 700;
     color: var(--text-primary);
 }
 
 .instructor {
     display: block;
-    font-size: 0.8rem;
-    color: var(--text-primary);
-    margin-top: 4px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-top: 3px;
     font-weight: 500;
 }
 
 .sectionTime {
     display: block;
-    font-size: 0.75rem;
+    font-size: 0.6875rem;
     color: var(--text-muted);
     margin-top: 2px;
 }
@@ -174,6 +177,7 @@
     color: var(--color-accent);
     font-size: 1.25rem;
     font-weight: bold;
+    flex-shrink: 0;
 }
 
 /* Poster Info */
@@ -182,12 +186,12 @@
     align-items: center;
     flex-wrap: wrap;
     gap: 4px;
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
     margin-bottom: 8px;
 }
 
 .posterName {
-    font-weight: 500;
+    font-weight: 600;
     color: var(--text-primary);
 }
 
@@ -200,20 +204,40 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 10px 12px;
-    background: var(--color-accent);
-    background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-light) 100%);
+    padding: 10px 14px;
+    background: var(--gradient-accent-vivid);
     border-radius: var(--radius-md);
     margin-bottom: 12px;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Subtle shine on contact */
+.contactInfo::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+    animation: shimmerSweep 3s ease-in-out infinite;
+}
+
+@keyframes shimmerSweep {
+    0% { left: -100%; }
+    50% { left: 100%; }
+    100% { left: 100%; }
 }
 
 .contactLabel {
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
     color: var(--text-inverse);
+    font-weight: 500;
 }
 
 .contactValue {
-    font-weight: 600;
+    font-weight: 700;
     color: var(--text-inverse);
     text-decoration: none;
 }
@@ -228,27 +252,27 @@
     justify-content: space-between;
     align-items: center;
     padding-top: 12px;
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid var(--border-color-subtle);
 }
 
 .timestamp {
-    font-size: 0.75rem;
+    font-size: 0.6875rem;
     color: var(--text-muted);
 }
 
 .actions {
     display: flex;
-    gap: 8px;
+    gap: 6px;
 }
 
 .actionBtn {
     padding: 6px 12px;
-    font-size: 0.75rem;
-    font-weight: 500;
+    font-size: 0.6875rem;
+    font-weight: 600;
     border: none;
     border-radius: var(--radius-sm);
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: all var(--transition-fast) var(--ease-out-expo);
 }
 
 .completeBtn {
@@ -259,6 +283,7 @@
 .completeBtn:hover {
     background: var(--post-giveaway);
     color: white;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
 }
 
 .deleteBtn {
@@ -267,15 +292,15 @@
 }
 
 .deleteBtn:hover {
-    background: var(--status-expired);
-    color: white;
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--status-expired);
 }
 
 /* Footer layout */
 .footerLeft {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
 }
 
 /* Expiry Timer */
@@ -283,16 +308,17 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    font-size: 0.75rem;
+    font-size: 0.6875rem;
     color: var(--text-muted);
     padding: 2px 8px;
     background: var(--bg-tertiary);
     border-radius: var(--radius-sm);
+    font-weight: 500;
 }
 
 .expiryTimerUrgent {
     color: var(--status-expired);
-    background: rgba(239, 68, 68, 0.1);
-    font-weight: 600;
+    background: rgba(239, 68, 68, 0.08);
+    font-weight: 700;
     animation: pulse 2s infinite;
 }

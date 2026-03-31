@@ -6,44 +6,59 @@
 
 .header {
     padding: 16px;
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-color);
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border-bottom: 1px solid var(--glass-border);
     display: flex;
     align-items: center;
     justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 50;
 }
 
 .header h1 {
     font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
 }
 
 .main {
     max-width: 500px;
     margin: 0 auto;
     padding: 16px;
+    animation: fadeInUp 0.35s var(--ease-out-expo);
+}
+
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 /* ===== Step Indicator ===== */
 .steps {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     margin-bottom: 24px;
 }
 
 .step {
     flex: 1;
     height: 4px;
-    border-radius: 2px;
+    border-radius: var(--radius-full);
     background: var(--bg-tertiary);
-    transition: background var(--transition-normal);
+    transition: background var(--transition-normal), box-shadow var(--transition-normal);
 }
 
 .stepActive {
-    background: var(--color-accent);
+    background: var(--gradient-accent-vivid);
+    box-shadow: 0 0 8px var(--color-accent-muted);
 }
 
 .stepDone {
-    background: var(--color-accent-dark);
+    background: var(--color-accent);
+    opacity: 0.5;
 }
 
 /* ===== Course Selection ===== */
@@ -52,9 +67,9 @@
 }
 
 .sectionTitle {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-bottom: 12px;
@@ -67,19 +82,21 @@
 
 .input {
     width: 100%;
-    padding: 12px 16px;
+    padding: 13px 16px;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
-    font-size: 1rem;
+    font-size: 0.9375rem;
     color: var(--text-primary);
-    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background-color var(--transition-fast);
+    box-shadow: var(--shadow-xs);
 }
 
 .input:focus {
     outline: none;
     border-color: var(--color-accent);
-    box-shadow: 0 0 0 3px rgba(0, 195, 137, 0.15);
+    box-shadow: 0 0 0 3px var(--color-accent-muted), var(--shadow-xs);
+    background: var(--bg-elevated);
 }
 
 .input::placeholder {
@@ -94,11 +111,17 @@
     background: var(--bg-card);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
-    box-shadow: var(--shadow-lg);
+    box-shadow: var(--shadow-elevated);
     z-index: 50;
     max-height: 240px;
     overflow-y: auto;
     margin-top: 4px;
+    animation: dropdownIn 0.2s var(--ease-out-expo);
+}
+
+@keyframes dropdownIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .dropdownItem {
@@ -114,21 +137,26 @@
     transition: background var(--transition-fast);
     color: var(--text-primary);
     font-size: 0.9rem;
+    border-bottom: 1px solid var(--border-color-subtle);
+}
+
+.dropdownItem:last-child {
+    border-bottom: none;
 }
 
 .dropdownItem:hover {
-    background: var(--bg-tertiary);
+    background: var(--color-accent-muted);
 }
 
 .dropdownId {
     font-family: 'JetBrains Mono', monospace;
-    font-weight: 600;
-    font-size: 0.85rem;
+    font-weight: 700;
+    font-size: 0.8125rem;
     color: var(--color-accent);
 }
 
 .dropdownName {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: var(--text-secondary);
 }
 
@@ -147,7 +175,12 @@
     background: var(--bg-card);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
-    transition: all var(--transition-fast);
+    transition: all var(--transition-fast) var(--ease-out-expo);
+    box-shadow: var(--shadow-xs);
+}
+
+.courseChip:hover {
+    box-shadow: var(--shadow-sm);
 }
 
 .courseChipInfo {
@@ -158,13 +191,13 @@
 
 .courseChipId {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.85rem;
-    font-weight: 600;
+    font-size: 0.8125rem;
+    font-weight: 700;
     color: var(--text-primary);
 }
 
 .courseChipName {
-    font-size: 0.75rem;
+    font-size: 0.6875rem;
     color: var(--text-secondary);
 }
 
@@ -180,12 +213,13 @@
     color: var(--text-muted);
     cursor: pointer;
     font-size: 1rem;
-    transition: all var(--transition-fast);
+    transition: all var(--transition-fast) var(--ease-out-expo);
 }
 
 .removeBtn:hover {
-    background: var(--status-expired);
-    color: white;
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--status-expired);
+    transform: scale(1.1);
 }
 
 /* XOR Toggle */
@@ -201,7 +235,7 @@
     border-radius: var(--radius-full);
     background: var(--bg-secondary);
     color: var(--text-muted);
-    font-size: 0.65rem;
+    font-size: 0.625rem;
     font-weight: 700;
     letter-spacing: 0.5px;
     cursor: pointer;
@@ -226,13 +260,13 @@
 
 .courseChipXor {
     border-color: var(--color-accent);
-    box-shadow: 0 0 0 1px rgba(0, 195, 137, 0.2);
+    box-shadow: 0 0 0 1px rgba(0, 195, 137, 0.15);
 }
 
 .xorInfo {
-    font-size: 0.78rem;
+    font-size: 0.75rem;
     color: var(--color-accent);
-    background: rgba(0, 195, 137, 0.08);
+    background: var(--color-accent-muted);
     padding: 8px 12px;
     border-radius: var(--radius-sm);
     margin-top: 4px;
@@ -244,7 +278,7 @@
     text-align: center;
     padding: 24px;
     color: var(--text-muted);
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
     background: var(--bg-secondary);
     border: 1px dashed var(--border-color);
     border-radius: var(--radius-md);
@@ -261,6 +295,7 @@
     border-radius: var(--radius-md);
     margin-bottom: 16px;
     gap: 10px;
+    box-shadow: var(--shadow-xs);
 }
 
 .compactCourses {
@@ -272,8 +307,8 @@
 
 .compactChip {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.75rem;
-    font-weight: 600;
+    font-size: 0.6875rem;
+    font-weight: 700;
     padding: 4px 8px;
     background: var(--bg-tertiary);
     border-radius: var(--radius-sm);
@@ -286,8 +321,8 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--text-secondary);
-    font-size: 0.8rem;
-    font-weight: 500;
+    font-size: 0.75rem;
+    font-weight: 600;
     cursor: pointer;
     transition: all var(--transition-fast);
     white-space: nowrap;
@@ -302,11 +337,12 @@
 .detailsToggle {
     padding: 10px 16px;
     text-align: center;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: var(--text-muted);
     cursor: pointer;
     border-top: 1px solid var(--border-color);
     transition: color var(--transition-fast);
+    font-weight: 500;
 }
 
 .detailsToggle:hover {
@@ -319,6 +355,7 @@
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     overflow: hidden;
+    box-shadow: var(--shadow-card);
 }
 
 .prefsHeader {
@@ -335,15 +372,15 @@
 }
 
 .prefsHeaderTitle {
-    font-size: 0.9rem;
-    font-weight: 600;
+    font-size: 0.875rem;
+    font-weight: 700;
     color: var(--text-primary);
 }
 
 .prefsChevron {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: var(--text-muted);
-    transition: transform var(--transition-fast);
+    transition: transform var(--transition-fast) var(--ease-spring);
 }
 
 .prefsChevronOpen {
@@ -364,8 +401,8 @@
 }
 
 .prefLabel {
-    font-size: 0.8rem;
-    font-weight: 500;
+    font-size: 0.75rem;
+    font-weight: 600;
     color: var(--text-secondary);
 }
 
@@ -377,38 +414,40 @@
 
 .timeInput {
     flex: 1;
-    padding: 8px 10px;
+    padding: 9px 10px;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
-    font-size: 0.85rem;
+    font-size: 0.8125rem;
     color: var(--text-primary);
+    box-shadow: var(--shadow-xs);
 }
 
 .timeInput:focus {
     outline: none;
     border-color: var(--color-accent);
+    box-shadow: 0 0 0 2px var(--color-accent-muted);
 }
 
 .timeSep {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: var(--text-muted);
     white-space: nowrap;
 }
 
 .toggleRow {
     display: flex;
-    gap: 4px;
+    gap: 2px;
 }
 
 .toggleBtn {
     flex: 1;
-    padding: 8px 12px;
+    padding: 9px 12px;
     border: 1px solid var(--border-color);
     background: var(--bg-secondary);
     color: var(--text-secondary);
-    font-size: 0.8rem;
-    font-weight: 500;
+    font-size: 0.75rem;
+    font-weight: 600;
     cursor: pointer;
     transition: all var(--transition-fast);
 }
@@ -422,34 +461,36 @@
 }
 
 .toggleBtnActive {
-    background: var(--color-accent);
+    background: var(--gradient-accent-vivid);
     border-color: var(--color-accent);
     color: var(--text-inverse);
 }
 
 .select {
     width: 100%;
-    padding: 8px 10px;
+    padding: 9px 10px;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
-    font-size: 0.85rem;
+    font-size: 0.8125rem;
     color: var(--text-primary);
     appearance: none;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 10px center;
     padding-right: 30px;
+    box-shadow: var(--shadow-xs);
 }
 
 .select:focus {
     outline: none;
     border-color: var(--color-accent);
+    box-shadow: 0 0 0 2px var(--color-accent-muted);
 }
 
 .prefCourseItem {
     padding: 8px 0;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color-subtle);
 }
 
 .prefCourseItem:last-child {
@@ -457,8 +498,8 @@
 }
 
 .prefCourseName {
-    font-size: 0.8rem;
-    font-weight: 600;
+    font-size: 0.75rem;
+    font-weight: 700;
     color: var(--text-primary);
     margin-bottom: 6px;
 }
@@ -476,7 +517,7 @@
     align-items: center;
     gap: 8px;
     cursor: pointer;
-    font-size: 0.82rem;
+    font-size: 0.75rem;
     color: var(--text-secondary);
     padding: 4px 0;
 }
@@ -491,15 +532,15 @@
 
 .electiveId {
     font-family: 'JetBrains Mono', monospace;
-    font-weight: 600;
-    font-size: 0.78rem;
+    font-weight: 700;
+    font-size: 0.6875rem;
     color: var(--text-primary);
     white-space: nowrap;
 }
 
 .electiveName {
     color: var(--text-muted);
-    font-size: 0.78rem;
+    font-size: 0.6875rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -512,7 +553,7 @@
     margin-top: 8px;
     padding-top: 8px;
     border-top: 1px dashed var(--border-color);
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: var(--text-secondary);
     cursor: pointer;
 }
@@ -532,23 +573,33 @@
     padding: 14px;
     border: none;
     border-radius: var(--radius-md);
-    background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-dark) 100%);
+    background: var(--gradient-accent-vivid);
     color: white;
-    font-size: 1rem;
-    font-weight: 600;
+    font-size: 0.9375rem;
+    font-weight: 700;
     cursor: pointer;
-    transition: all var(--transition-fast);
-    box-shadow: var(--shadow-accent);
+    transition: all var(--transition-fast) var(--ease-out-expo);
+    box-shadow: var(--shadow-md), var(--shadow-accent);
     margin-top: 8px;
+    position: relative;
+    overflow: hidden;
 }
 
-.generateBtn:hover {
+.generateBtn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.12) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+.generateBtn:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0, 195, 137, 0.4);
+    box-shadow: var(--shadow-lg), var(--shadow-accent-lg);
 }
 
-.generateBtn:active {
-    transform: translateY(0);
+.generateBtn:active:not(:disabled) {
+    transform: translateY(0) scale(0.98);
 }
 
 .generateBtn:disabled {
@@ -569,9 +620,7 @@
 }
 
 @keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
+    to { transform: rotate(360deg); }
 }
 
 /* ===== Results Section ===== */
@@ -584,17 +633,19 @@
 }
 
 .resultsTitle {
-    font-size: 1.1rem;
-    font-weight: 700;
+    font-size: 1.125rem;
+    font-weight: 800;
     color: var(--text-primary);
+    letter-spacing: -0.02em;
 }
 
 .resultsCount {
-    font-size: 0.8rem;
+    font-size: 0.6875rem;
     color: var(--text-muted);
     background: var(--bg-tertiary);
     padding: 4px 10px;
     border-radius: var(--radius-full);
+    font-weight: 600;
 }
 
 .scheduleCard {
@@ -603,11 +654,13 @@
     border-radius: var(--radius-lg);
     overflow: hidden;
     margin-bottom: 16px;
-    transition: box-shadow var(--transition-fast);
+    transition: box-shadow var(--transition-fast), transform var(--transition-fast) var(--ease-out-expo);
+    box-shadow: var(--shadow-card);
 }
 
 .scheduleCard:hover {
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-2px);
 }
 
 .scheduleCardHeader {
@@ -620,14 +673,15 @@
 }
 
 .scheduleRank {
-    font-size: 0.85rem;
-    font-weight: 700;
+    font-size: 0.8125rem;
+    font-weight: 800;
     color: var(--color-accent);
 }
 
 .scheduleScore {
-    font-size: 0.75rem;
+    font-size: 0.6875rem;
     color: var(--text-muted);
+    font-weight: 600;
 }
 
 .prefWarnings {
@@ -638,12 +692,12 @@
 }
 
 .prefWarning {
-    font-size: 0.7rem;
+    font-size: 0.625rem;
     padding: 3px 8px;
-    background: rgba(245, 158, 11, 0.1);
+    background: rgba(245, 158, 11, 0.08);
     color: #F59E0B;
     border-radius: var(--radius-full);
-    font-weight: 500;
+    font-weight: 600;
 }
 
 /* ===== Save Schedule ===== */
@@ -653,16 +707,17 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--color-accent);
-    font-size: 0.8rem;
-    font-weight: 600;
+    font-size: 0.75rem;
+    font-weight: 700;
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: all var(--transition-fast) var(--ease-out-expo);
     white-space: nowrap;
 }
 
 .saveBtn:hover {
     background: var(--color-accent);
     color: var(--text-inverse);
+    box-shadow: var(--shadow-accent);
 }
 
 .saveFooter {
@@ -689,7 +744,7 @@
 
 .savedBadge {
     font-size: 1rem;
-    font-weight: 700;
+    font-weight: 800;
     color: var(--color-accent);
 }
 
@@ -699,8 +754,8 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--text-muted);
-    font-size: 0.8rem;
-    font-weight: 500;
+    font-size: 0.75rem;
+    font-weight: 600;
     cursor: pointer;
     transition: all var(--transition-fast);
 }
@@ -715,6 +770,7 @@
     width: 100%;
     overflow-x: auto;
     padding: 8px;
+    -webkit-overflow-scrolling: touch;
 }
 
 .ttContainer {
@@ -732,12 +788,13 @@
     position: absolute;
     left: 0;
     width: 40px;
-    font-size: 0.6rem;
+    font-size: 0.5625rem;
     color: var(--text-muted);
     text-align: right;
     padding-right: 6px;
     transform: translateY(-50%);
     line-height: 1;
+    font-weight: 500;
 }
 
 .ttColumns {
@@ -753,18 +810,20 @@
 
 .ttDayHeader {
     text-align: center;
-    font-size: 0.7rem;
-    font-weight: 600;
+    font-size: 0.625rem;
+    font-weight: 700;
     color: var(--text-primary);
     padding: 6px 2px;
     background: var(--bg-tertiary);
     border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .ttDayBody {
     position: relative;
     background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border-color-subtle);
     border-top: none;
 }
 
@@ -774,16 +833,16 @@
     right: 0;
     height: 1px;
     background: var(--border-color);
-    opacity: 0.5;
+    opacity: 0.3;
 }
 
 .ttBlock {
     position: absolute;
     left: 2px;
     right: 2px;
-    border-radius: 4px;
+    border-radius: 5px;
     padding: 3px 4px;
-    font-size: 0.6rem;
+    font-size: 0.5625rem;
     line-height: 1.3;
     overflow: hidden;
     z-index: 1;
@@ -791,6 +850,12 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
+    transition: transform var(--transition-fast);
+}
+
+.ttBlock:hover {
+    transform: scale(1.02);
+    z-index: 5;
 }
 
 .ttBlockCourse {
@@ -806,7 +871,7 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    font-size: 0.55rem;
+    font-size: 0.5rem;
 }
 
 .ttBlockSection {
@@ -866,37 +931,14 @@
     color: #F97316;
 }
 
-[data-theme="dark"] .courseColor0 {
-    background: rgba(59, 130, 246, 0.25);
-}
-
-[data-theme="dark"] .courseColor1 {
-    background: rgba(16, 185, 129, 0.25);
-}
-
-[data-theme="dark"] .courseColor2 {
-    background: rgba(245, 158, 11, 0.25);
-}
-
-[data-theme="dark"] .courseColor3 {
-    background: rgba(239, 68, 68, 0.25);
-}
-
-[data-theme="dark"] .courseColor4 {
-    background: rgba(139, 92, 246, 0.25);
-}
-
-[data-theme="dark"] .courseColor5 {
-    background: rgba(236, 72, 153, 0.25);
-}
-
-[data-theme="dark"] .courseColor6 {
-    background: rgba(20, 184, 166, 0.25);
-}
-
-[data-theme="dark"] .courseColor7 {
-    background: rgba(249, 115, 22, 0.25);
-}
+[data-theme="dark"] .courseColor0 { background: rgba(59, 130, 246, 0.25); }
+[data-theme="dark"] .courseColor1 { background: rgba(16, 185, 129, 0.25); }
+[data-theme="dark"] .courseColor2 { background: rgba(245, 158, 11, 0.25); }
+[data-theme="dark"] .courseColor3 { background: rgba(239, 68, 68, 0.25); }
+[data-theme="dark"] .courseColor4 { background: rgba(139, 92, 246, 0.25); }
+[data-theme="dark"] .courseColor5 { background: rgba(236, 72, 153, 0.25); }
+[data-theme="dark"] .courseColor6 { background: rgba(20, 184, 166, 0.25); }
+[data-theme="dark"] .courseColor7 { background: rgba(249, 115, 22, 0.25); }
 
 /* ===== Section Details Below Timetable ===== */
 .scheduleDetails {
@@ -912,7 +954,7 @@
     align-items: stretch;
     gap: 12px;
     padding: 8px 0;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color-subtle);
 }
 
 .detailRow:last-child {
@@ -922,7 +964,7 @@
 
 .detailColorBar {
     width: 4px;
-    border-radius: 2px;
+    border-radius: var(--radius-full);
     flex-shrink: 0;
     margin: 2px 0;
     opacity: 0.8;
@@ -944,8 +986,8 @@
 }
 
 .detailCourseName {
-    font-size: 0.9rem;
-    font-weight: 600;
+    font-size: 0.8125rem;
+    font-weight: 700;
     color: var(--text-primary);
     white-space: nowrap;
     overflow: hidden;
@@ -956,7 +998,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 0.75rem;
+    font-size: 0.6875rem;
     color: var(--text-secondary);
     white-space: nowrap;
     overflow: hidden;
@@ -965,13 +1007,13 @@
 
 .detailSep {
     color: var(--text-muted);
-    font-size: 0.6rem;
-    opacity: 0.6;
+    font-size: 0.5rem;
+    opacity: 0.5;
 }
 
 .detailSection {
     font-family: 'JetBrains Mono', monospace;
-    font-weight: 500;
+    font-weight: 600;
     color: var(--text-primary);
 }
 
@@ -984,11 +1026,9 @@
     font-weight: 400;
 }
 
-
-
 .requestLink {
-    font-size: 0.7rem;
-    font-weight: 600;
+    font-size: 0.625rem;
+    font-weight: 700;
     color: var(--color-accent);
     text-decoration: none;
     padding: 2px 8px;
@@ -1013,8 +1053,8 @@
     border-radius: var(--radius-md);
     background: transparent;
     color: var(--text-secondary);
-    font-size: 0.9rem;
-    font-weight: 500;
+    font-size: 0.8125rem;
+    font-weight: 600;
     cursor: pointer;
     transition: all var(--transition-fast);
     margin-bottom: 16px;
@@ -1023,17 +1063,18 @@
 .showMoreBtn:hover {
     border-color: var(--color-accent);
     color: var(--color-accent);
-    background: var(--bg-secondary);
+    background: var(--color-accent-muted);
 }
 
 /* ===== No Results ===== */
 .noResults {
     text-align: center;
-    padding: 32px 16px;
+    padding: 36px 16px;
     background: var(--bg-card);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     margin-top: 16px;
+    box-shadow: var(--shadow-card);
 }
 
 .noResultsIcon {
@@ -1043,13 +1084,13 @@
 
 .noResultsTitle {
     font-size: 1rem;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--text-primary);
     margin-bottom: 6px;
 }
 
 .noResultsText {
-    font-size: 0.85rem;
+    font-size: 0.8125rem;
     color: var(--text-muted);
 }
 
@@ -1067,19 +1108,19 @@
     border-radius: var(--radius-md);
     background: transparent;
     color: var(--text-secondary);
-    font-size: 0.875rem;
-    font-weight: 500;
+    font-size: 0.8125rem;
+    font-weight: 600;
     cursor: pointer;
     transition: all var(--transition-fast);
 }
 
 .secondaryBtn:hover {
-    border-color: var(--text-secondary);
-    color: var(--text-primary);
+    border-color: var(--color-accent);
+    color: var(--color-accent);
 }
 
 .noResultsHint {
-    font-size: 0.78rem;
+    font-size: 0.6875rem;
     color: var(--text-muted);
     margin-top: 16px;
     line-height: 1.4;
@@ -1087,22 +1128,23 @@
 
 .xorSelectedInfo {
     padding: 6px 16px;
-    font-size: 0.78rem;
-    font-weight: 500;
+    font-size: 0.6875rem;
+    font-weight: 600;
     color: var(--color-accent);
-    background: rgba(0, 195, 137, 0.06);
+    background: var(--color-accent-muted);
     border-bottom: 1px solid var(--border-color);
 }
 
 /* ===== Error ===== */
 .error {
     padding: 12px 16px;
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.3);
+    background: rgba(239, 68, 68, 0.06);
+    border: 1px solid rgba(239, 68, 68, 0.15);
     border-radius: var(--radius-md);
     color: var(--status-expired);
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
     margin-bottom: 12px;
+    font-weight: 500;
 }
 
 /* ===== Back button ===== */
@@ -1112,11 +1154,12 @@
     border-radius: var(--radius-md);
     background: var(--bg-secondary);
     color: var(--text-secondary);
-    font-size: 0.85rem;
+    font-size: 0.8125rem;
     cursor: pointer;
     transition: all var(--transition-fast);
     margin-top: 12px;
     width: 100%;
+    font-weight: 600;
 }
 
 .backBtn:hover {
@@ -1137,21 +1180,19 @@
     padding: 12px 14px;
     border: none;
     border-radius: var(--radius-md);
-    background: #374151;
-    /* Dark gray for contrast with white text */
+    background: var(--color-primary-light);
     color: white;
-    font-size: 0.9rem;
-    font-weight: 600;
+    font-size: 0.8125rem;
+    font-weight: 700;
     cursor: pointer;
-    transition: all var(--transition-fast);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    transition: all var(--transition-fast) var(--ease-out-expo);
+    box-shadow: var(--shadow-sm);
 }
 
 .basketBtn:hover {
-    background: #4B5563;
-    /* Slightly lighter gray */
+    background: var(--color-primary);
     transform: translateY(-2px);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    box-shadow: var(--shadow-md);
 }
 
 .basketBtn:active {
