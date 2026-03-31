@@ -6,15 +6,22 @@
 
 .header {
     padding: 16px;
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-color);
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border-bottom: 1px solid var(--glass-border);
     display: flex;
     justify-content: space-between;
     align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 50;
 }
 
 .header h1 {
     font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
 }
 
 .main {
@@ -39,28 +46,36 @@
 }
 
 @keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
+    to { transform: rotate(360deg); }
 }
 
 /* Section */
 .section {
     margin-bottom: 32px;
+    animation: fadeInUp 0.35s var(--ease-out-expo);
+}
+
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .sectionTitle {
-    font-size: 1rem;
-    color: var(--text-secondary);
-    margin-bottom: 12px;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .empty {
     text-align: center;
-    padding: 32px;
+    padding: 36px;
     background: var(--bg-card);
     border-radius: var(--radius-lg);
     border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-card);
 }
 
 .empty p {
@@ -68,33 +83,42 @@
 }
 
 .hint {
-    font-size: 0.875rem;
-    margin-top: 4px;
+    font-size: 0.8125rem;
+    margin-top: 6px;
 }
 
 /* Match Card */
 .matchCard {
     background: var(--bg-card);
     border-radius: var(--radius-lg);
-    padding: 16px;
+    padding: 18px;
     margin-bottom: 12px;
     border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-card);
+    transition: transform var(--transition-fast) var(--ease-out-expo), box-shadow var(--transition-fast);
+}
+
+.matchCard:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-card-hover);
 }
 
 .matchHeader {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
 }
 
 .matchBadge {
-    padding: 4px 10px;
+    padding: 4px 12px;
     background: var(--post-swap-bg);
     color: var(--post-swap);
     border-radius: var(--radius-full);
-    font-size: 0.75rem;
-    font-weight: 600;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
 }
 
 .matchBadgeAccepted {
@@ -103,18 +127,20 @@
 }
 
 .matchTimer {
-    font-size: 0.75rem;
+    font-size: 0.6875rem;
     color: var(--text-muted);
+    font-weight: 500;
 }
 
 .matchContent {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px;
-    background: var(--bg-tertiary);
+    padding: 14px;
+    background: var(--gradient-subtle);
+    border: 1px solid var(--border-color-subtle);
     border-radius: var(--radius-md);
-    margin-bottom: 12px;
+    margin-bottom: 14px;
 }
 
 .matchSide {
@@ -124,15 +150,17 @@
 
 .matchLabel {
     display: block;
-    font-size: 0.7rem;
+    font-size: 0.625rem;
     text-transform: uppercase;
     color: var(--text-muted);
     margin-bottom: 4px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
 }
 
 .matchSection {
     font-size: 1rem;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--text-primary);
 }
 
@@ -140,6 +168,7 @@
     font-size: 1.5rem;
     color: var(--color-accent);
     margin: 0 12px;
+    flex-shrink: 0;
 }
 
 .matchCourse {
@@ -148,18 +177,18 @@
 
 .courseId {
     font-family: 'JetBrains Mono', monospace;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--text-primary);
     display: block;
 }
 
 .courseName {
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
     color: var(--text-secondary);
 }
 
 .matchUser {
-    padding: 10px 12px;
+    padding: 10px 14px;
     background: var(--bg-tertiary);
     border-radius: var(--radius-md);
     margin-bottom: 12px;
@@ -167,43 +196,67 @@
 
 .userName {
     display: block;
-    font-weight: 500;
+    font-weight: 600;
     color: var(--text-primary);
+    font-size: 0.9375rem;
 }
 
 .userMeta {
-    font-size: 0.75rem;
+    font-size: 0.6875rem;
     color: var(--text-muted);
+    font-weight: 500;
 }
 
 .contactInfo {
-    padding: 12px;
-    background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-light) 100%);
+    padding: 12px 14px;
+    background: var(--gradient-accent-vivid);
     border-radius: var(--radius-md);
     margin-bottom: 12px;
     color: var(--text-inverse);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Subtle shine animation */
+.contactInfo::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+    animation: contactShine 3s ease-in-out infinite;
+}
+
+@keyframes contactShine {
+    0% { left: -100%; }
+    50% { left: 100%; }
+    100% { left: 100%; }
 }
 
 .contactInfo a {
     color: var(--text-inverse);
-    font-weight: 600;
+    font-weight: 700;
     text-decoration: underline;
 }
 
 .matchStatus {
-    padding: 10px;
+    padding: 10px 14px;
     background: var(--post-swap-bg);
     border-radius: var(--radius-md);
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
     margin-bottom: 12px;
 }
 
 .waitingYou {
     color: var(--color-accent);
+    font-weight: 600;
 }
 
 .waitingThem {
     color: var(--post-swap);
+    font-weight: 600;
 }
 
 .matchActions {
@@ -215,34 +268,64 @@
 .acceptBtn {
     flex: 1;
     padding: 12px;
-    background: var(--post-giveaway);
+    background: var(--gradient-accent-vivid);
     color: white;
     border: none;
     border-radius: var(--radius-md);
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
+    transition: all var(--transition-fast) var(--ease-out-expo);
+    box-shadow: var(--shadow-accent);
+    position: relative;
+    overflow: hidden;
+}
+
+.acceptBtn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.12) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+.acceptBtn:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-accent-lg);
 }
 
 .declineBtn {
     flex: 1;
     padding: 12px;
-    background: var(--bg-tertiary);
+    background: transparent;
     color: var(--status-expired);
-    border: 1px solid var(--status-expired);
+    border: 1px solid rgba(239, 68, 68, 0.25);
     border-radius: var(--radius-md);
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.declineBtn:hover {
+    background: rgba(239, 68, 68, 0.08);
+    border-color: var(--status-expired);
 }
 
 .completeBtn {
     width: 100%;
     padding: 12px;
-    background: var(--color-accent);
+    background: var(--gradient-accent-vivid);
     color: var(--text-inverse);
     border: none;
     border-radius: var(--radius-md);
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
+    transition: all var(--transition-fast) var(--ease-out-expo);
+    box-shadow: var(--shadow-accent);
+}
+
+.completeBtn:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-accent-lg);
 }
 
 /* My Posts */
@@ -254,10 +337,17 @@
 
 .postCard {
     background: var(--bg-card);
-    border-radius: var(--radius-md);
-    padding: 12px;
+    border-radius: var(--radius-lg);
+    padding: 14px;
     border: 1px solid var(--border-color);
     border-left-width: 4px;
+    box-shadow: var(--shadow-card);
+    transition: transform var(--transition-fast) var(--ease-out-expo), box-shadow var(--transition-fast);
+}
+
+.postCard:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-card-hover);
 }
 
 .postCardswap {
@@ -276,14 +366,16 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
 }
 
 .postBadge {
-    font-size: 0.75rem;
-    font-weight: 600;
-    padding: 2px 8px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    padding: 3px 10px;
     border-radius: var(--radius-full);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
 }
 
 .postBadgeswap {
@@ -302,10 +394,12 @@
 }
 
 .postStatus {
-    font-size: 0.7rem;
+    font-size: 0.625rem;
     text-transform: uppercase;
-    padding: 2px 6px;
+    padding: 3px 8px;
     border-radius: var(--radius-sm);
+    font-weight: 700;
+    letter-spacing: 0.3px;
 }
 
 .postStatusactive {
@@ -319,53 +413,62 @@
 }
 
 .postDetails {
-    margin-bottom: 8px;
+    margin-bottom: 10px;
 }
 
 .sections {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
     color: var(--text-secondary);
+    margin-top: 4px;
 }
 
 .arrow {
     color: var(--color-accent);
+    font-weight: bold;
 }
 
 .postFooter {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding-top: 8px;
-    border-top: 1px solid var(--border-color);
+    padding-top: 10px;
+    border-top: 1px solid var(--border-color-subtle);
 }
 
 .postExpiry {
-    font-size: 0.75rem;
+    font-size: 0.6875rem;
     color: var(--text-muted);
 }
 
 .postActions {
     display: flex;
-    gap: 4px;
+    gap: 6px;
 }
 
 .completePostBtn,
 .deletePostBtn {
-    padding: 6px 12px;
+    padding: 7px 14px;
     border: none;
     border-radius: var(--radius-sm);
     cursor: pointer;
-    font-size: 0.75rem;
-    font-weight: 500;
+    font-size: 0.6875rem;
+    font-weight: 600;
     white-space: nowrap;
+    transition: all var(--transition-fast) var(--ease-out-expo);
 }
 
 .completePostBtn {
     background: var(--post-giveaway-bg);
     color: var(--post-giveaway);
+}
+
+.completePostBtn:hover {
+    background: var(--post-giveaway);
+    color: white;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
 }
 
 .deletePostBtn {
@@ -374,7 +477,7 @@
 }
 
 .deletePostBtn:hover {
-    background: rgba(239, 68, 68, 0.1);
+    background: rgba(239, 68, 68, 0.08);
     color: #ef4444;
 }
 
@@ -383,7 +486,9 @@
     display: flex;
     padding: 0 16px;
     border-bottom: 1px solid var(--border-color);
-    margin-bottom: 24px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
 }
 
 .tab {
@@ -397,30 +502,31 @@
     border: none;
     border-bottom: 2px solid transparent;
     color: var(--text-secondary);
-    font-size: 0.95rem;
-    font-weight: 500;
+    font-size: 0.875rem;
+    font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.2s var(--ease-out-expo);
 }
 
 .tab:hover {
     color: var(--text-primary);
-    background: var(--bg-tertiary);
 }
 
 .activeTab {
     color: var(--color-accent);
     border-bottom-color: var(--color-accent);
-    font-weight: 600;
+    font-weight: 700;
 }
 
 .countBadge {
-    font-size: 0.7rem;
-    padding: 2px 6px;
+    font-size: 0.625rem;
+    padding: 2px 7px;
     background: var(--bg-tertiary);
     color: var(--text-muted);
     border-radius: 999px;
-    font-weight: 600;
+    font-weight: 700;
+    min-width: 18px;
+    text-align: center;
 }
 
 .activeTab .countBadge {
@@ -434,8 +540,8 @@
 }
 
 .declineCard {
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.3);
+    background: rgba(239, 68, 68, 0.06);
+    border: 1px solid rgba(239, 68, 68, 0.15);
     border-radius: var(--radius-md);
     padding: 12px 16px;
     margin-bottom: 8px;
@@ -443,6 +549,12 @@
     align-items: center;
     justify-content: space-between;
     gap: 12px;
+    animation: fadeInScale 0.25s var(--ease-out-expo);
+}
+
+@keyframes fadeInScale {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
 }
 
 .declineContent {
@@ -460,6 +572,8 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
 }
 
 .declineText strong {
@@ -467,22 +581,25 @@
 }
 
 .declineCourse {
-    font-size: 0.75rem;
+    font-size: 0.6875rem;
     color: var(--text-muted);
+    font-weight: 500;
 }
 
 .dismissBtn {
-    padding: 6px 12px;
+    padding: 6px 14px;
     background: var(--bg-tertiary);
     color: var(--text-secondary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
-    font-size: 0.75rem;
-    font-weight: 500;
+    font-size: 0.6875rem;
+    font-weight: 600;
     cursor: pointer;
     white-space: nowrap;
+    transition: all var(--transition-fast);
 }
 
 .dismissBtn:hover {
     background: var(--bg-secondary);
+    border-color: var(--text-muted);
 }
