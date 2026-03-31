@@ -564,6 +564,10 @@ function ProfileContent() {
                 <button onClick={handleSignOut} className={styles.signOutBtn}>
                     Sign Out
                 </button>
+
+                <p className={styles.contributeText}>
+                    Contribute to the project on our <a href="https://github.com/Karam-Kreidli/CourseMate" target="_blank" rel="noopener noreferrer" className={styles.contributeLink}>GitHub Repository</a>.
+                </p>
             </main>
 
             <BottomNav />

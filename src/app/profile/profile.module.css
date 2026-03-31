@@ -394,3 +394,20 @@
     margin-top: 4px;
     display: block;
 }
+
+.contributeText {
+    text-align: center;
+    margin-top: 32px;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.contributeLink {
+    color: var(--color-accent);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.contributeLink:hover {
+    text-decoration: underline;
+}
