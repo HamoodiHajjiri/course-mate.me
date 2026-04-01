@@ -302,6 +302,7 @@ function PostContent() {
 
     return (
         <div className={styles.page}>
+            <div className={styles.pageInner}>
             <header className={styles.header}>
                 <h1>Create Post</h1>
                 <ThemeToggle />
@@ -398,6 +399,7 @@ function PostContent() {
                     </form>
                 )}
             </main>
+            </div>
 
             <BottomNav />
         </div>
@@ -408,9 +410,7 @@ export default function PostPage() {
     return (
         <Suspense fallback={
             <div className={styles.page}>
-                <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '40vh' }}>
-                    <div className={styles.spinner}></div>
-                </div>
+                <div className={styles.spinner}></div>
             </div>
         }>
             <PostContent />
