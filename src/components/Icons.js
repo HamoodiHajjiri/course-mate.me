@@ -20,12 +20,7 @@ const IconWrapper = ({ children, color, ...props }) => {
     const strokeColor = color || "var(--icon-color, currentColor)";
 
     return (
-        <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            stroke={strokeColor}
-            {...mergedProps}
-        >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke={strokeColor} {...mergedProps}>
             {children}
         </svg>
     );

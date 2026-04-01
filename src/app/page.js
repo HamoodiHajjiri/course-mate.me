@@ -187,26 +187,14 @@ export default function HomePage() {
                     <span className={styles.searchIcon}>
                         <SearchIcon width={20} height={20} />
                     </span>
-                    <input
-                        type="text"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className={styles.searchInput}
-                        placeholder="Search by course ID, name, or CRN..."
-                    />
+                    <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} className={styles.searchInput} placeholder="Search by course ID, name, or CRN..." />
                 </div>
 
                 {/* Filters */}
                 <div className={styles.filters}>
                     {['all', 'swap', 'giveaway', 'request'].map((type) => (
-                        <button
-                            key={type}
-                            onClick={() => setFilter(type)}
-                            className={`${styles.filterBtn} ${filter === type ? styles.filterBtnActive : ''}`}
-                        >
-                            {type === 'all' ? 'All' :
-                                type === 'swap' ? 'Swaps' :
-                                    type === 'giveaway' ? 'Giveaways' : 'Requests'}
+                        <button key={type} onClick={() => setFilter(type)} className={`${styles.filterBtn} ${filter === type ? styles.filterBtnActive : ''}`}>
+                            {type === 'all' ? 'All' : type === 'swap' ? 'Swaps' : type === 'giveaway' ? 'Giveaways' : 'Requests'}
                         </button>
                     ))}
                 </div>
@@ -222,35 +210,15 @@ export default function HomePage() {
                     <div className={styles.empty}>
                         <span className={styles.emptyIcon}>📭</span>
                         <h3>No posts found</h3>
-                        <p>
-                            {search ? 'Try a different search term' : 'Be the first to create a post!'}
-                        </p>
+                        <p>{search ? 'Try a different search term' : 'Be the first to create a post!'}</p>
                     </div>
                 ) : (
                     <div className={styles.postList}>
                         {filteredPosts.map((post) => {
-                            // Find instructor for "have" section
-                            const haveSectionData = sections.find(s =>
-                                s.course_id === post.course_code &&
-                                s.section_num === post.have_section
-                            );
+                            const haveSectionData = sections.find(s => s.course_id === post.course_code && s.section_num === post.have_section);
+                            const wantSectionData = post.want_section ? sections.find(s => s.course_id === post.course_code && s.section_num === post.want_section) : null;
 
-                            // Find instructor for "want" section (if exists)
-                            const wantSectionData = post.want_section ? sections.find(s =>
-                                s.course_id === post.course_code &&
-                                s.section_num === post.want_section
-                            ) : null;
-
-                            return (
-                                <PostCard
-                                    key={post.id}
-                                    post={post}
-                                    courseName={courses[post.course_code]}
-                                    haveInstructor={haveSectionData?.instructor}
-                                    wantInstructor={wantSectionData?.instructor}
-                                    showContact={post.type !== 'swap'}
-                                />
-                            );
+                            return (<PostCard key={post.id} post={post} courseName={courses[post.course_code]} haveInstructor={haveSectionData?.instructor} wantInstructor={wantSectionData?.instructor} showContact={post.type !== 'swap'} />);
                         })}
                     </div>
                 )}

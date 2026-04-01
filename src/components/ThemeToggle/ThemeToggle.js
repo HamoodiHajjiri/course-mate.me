@@ -25,11 +25,7 @@ export default function ThemeToggle() {
     if (!mounted) return null;
 
     return (
-        <button
-            onClick={toggleTheme}
-            className={styles.toggle}
-            aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-        >
+        <button onClick={toggleTheme} className={styles.toggle} aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}>
             <span className={styles.thumb}>
                 {theme === 'light' ? (
                     <svg className={`${styles.icon} ${styles.sunIcon}`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">

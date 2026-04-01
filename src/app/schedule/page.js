@@ -122,7 +122,7 @@ function buildSectionGroups(sections, courseId) {
 
     const result = [];
     const lectures = Object.values(baseMap);
-    
+
     // If no lectures at all (e.g. standalone lab/project), return each section as a standalone option
     if (lectures.length === 0) {
         return courseSecs.map(sec => ({
@@ -160,19 +160,19 @@ function buildSectionGroups(sections, courseId) {
     // Generate combinations of [lecture, tut, lab]
     for (const lec of lectures) {
         const base = lec.section_num;
-        
+
         let tutOptions = tutsByBase[base] || unattachedTuts;
         let labOptions = labsByBase[base] || unattachedLabs;
-        
+
         if (tutOptions.length === 0) tutOptions = [null];
         if (labOptions.length === 0) labOptions = [null];
-        
+
         for (const tut of tutOptions) {
             for (const lab of labOptions) {
                 const combined = [lec];
                 if (tut) combined.push(tut);
                 if (lab) combined.push(lab);
-                
+
                 result.push({
                     sections: combined,
                     slots: combined.flatMap(s => parseClassTime(s.class_time)),
@@ -181,7 +181,7 @@ function buildSectionGroups(sections, courseId) {
             }
         }
     }
-    
+
     return result;
 }
 
@@ -854,15 +854,15 @@ export default function SchedulePage() {
             const base = getBaseSection(s.section_num);
             return s.section_num !== base && !s.section_num.endsWith('T');
         }).sort((a, b) => a.section_num.localeCompare(b.section_num));
-        
+
         if (!pinnedBase) return allLabs;
-        
+
         // If pinnedBase is set, check if it has specifically attached labs
         const attachedLabs = allLabs.filter(s => getBaseSection(s.section_num) === pinnedBase);
         if (attachedLabs.length > 0) {
             return attachedLabs;
         }
-        
+
         // If it doesn't have attached labs, return the "unattached" pool of labs
         const baseSet = new Set(secs.filter(s => s.section_num === getBaseSection(s.section_num)).map(s => s.section_num));
         return allLabs.filter(s => !baseSet.has(getBaseSection(s.section_num)));
@@ -1119,33 +1119,17 @@ export default function SchedulePage() {
                                 <span key={c.course_id} className={styles.compactChip}>{c.course_id}</span>
                             ))}
                         </div>
-                        <button
-                            className={styles.editCoursesBtn}
-                            onClick={() => setResults(null)}
-                        >Edit Courses</button>
+                        <button className={styles.editCoursesBtn} onClick={() => setResults(null)}>Edit Courses</button>
                     </div>
                 ) : (
                     <div className={styles.section}>
                         <div className={styles.sectionTitle}>Select Courses</div>
                         <div className={styles.searchWrapper} onClick={e => e.stopPropagation()}>
-                            <input
-                                type="text"
-                                value={courseSearch}
-                                onChange={(e) => { setCourseSearch(e.target.value); setShowDropdown(true); }}
-                                onFocus={() => setShowDropdown(true)}
-                                className={styles.input}
-                                placeholder="Search by course name or ID..."
-                                autoComplete="off"
-                            />
+                            <input type="text" value={courseSearch} onChange={(e) => { setCourseSearch(e.target.value); setShowDropdown(true); }} onFocus={() => setShowDropdown(true)} className={styles.input} placeholder="Search by course name or ID..." autoComplete="off" />
                             {showDropdown && filteredCourses.length > 0 && (
                                 <div className={styles.dropdown}>
                                     {filteredCourses.map(course => (
-                                        <button
-                                            key={course.course_id}
-                                            type="button"
-                                            className={styles.dropdownItem}
-                                            onClick={() => addCourse(course)}
-                                        >
+                                        <button key={course.course_id} type="button" className={styles.dropdownItem} onClick={() => addCourse(course)}>
                                             <span className={styles.dropdownId}>{course.course_id}</span>
                                             <span className={styles.dropdownName}>{course.name}</span>
                                         </button>
@@ -1166,11 +1150,7 @@ export default function SchedulePage() {
                                             {loadingCourseIds.has(c.course_id) && <span className={styles.spinner} style={{ width: 12, height: 12, borderWidth: 2, marginLeft: 8 }}></span>}
                                         </div>
                                         <div className={styles.courseChipActions}>
-                                            <button
-                                                className={`${styles.xorToggle} ${xorCourseIds.has(c.course_id) ? styles.xorToggleActive : ''}`}
-                                                onClick={() => toggleXor(c.course_id)}
-                                                title="Exclusive Or — only one XOR course will appear per schedule"
-                                            >XOR</button>
+                                            <button className={`${styles.xorToggle} ${xorCourseIds.has(c.course_id) ? styles.xorToggleActive : ''}`} onClick={() => toggleXor(c.course_id)} title="Exclusive Or — only one XOR course will appear per schedule">XOR</button>
                                             <button className={styles.removeBtn} onClick={() => removeCourse(c.course_id)}>×</button>
                                         </div>
                                     </div>
@@ -1188,23 +1168,14 @@ export default function SchedulePage() {
                         )}
 
                         <div className={styles.basketButtons}>
-                            <button
-                                className={styles.basketBtn}
-                                onClick={() => addCourse({ course_id: 'BASKET_1', name: 'University Elective (Basket 1)', is_basket: true, basket_name: 'Basket 1' })}
-                            >
+                            <button className={styles.basketBtn} onClick={() => addCourse({ course_id: 'BASKET_1', name: 'University Elective (Basket 1)', is_basket: true, basket_name: 'Basket 1' })}>
                                 + Group 1 Elective
                             </button>
-                            <button
-                                className={styles.basketBtn}
-                                onClick={() => addCourse({ course_id: 'BASKET_2', name: 'University Elective (Basket 2)', is_basket: true, basket_name: 'Basket 2' })}
-                            >
+                            <button className={styles.basketBtn} onClick={() => addCourse({ course_id: 'BASKET_2', name: 'University Elective (Basket 2)', is_basket: true, basket_name: 'Basket 2' })}>
                                 + Group 2 Elective
                             </button>
                             {majorInfo?.dept_electives_count > 0 && (
-                                <button
-                                    className={`${styles.basketBtn} ${styles.basketBtnFull}`}
-                                    onClick={addDeptElective}
-                                >
+                                <button className={`${styles.basketBtn} ${styles.basketBtnFull}`} onClick={addDeptElective}>
                                     + Department Elective
                                 </button>
                             )}
@@ -1231,11 +1202,7 @@ export default function SchedulePage() {
                                         <span className={styles.prefLabel}>Time Constraints</span>
                                         <div className={styles.timeRow}>
                                             <span className={styles.timeSep}>No classes before</span>
-                                            <select
-                                                className={styles.timeInput}
-                                                value={prefs.noClassesBefore}
-                                                onChange={e => setPrefs(p => ({ ...p, noClassesBefore: e.target.value }))}
-                                            >
+                                            <select className={styles.timeInput} value={prefs.noClassesBefore} onChange={e => setPrefs(p => ({ ...p, noClassesBefore: e.target.value }))}>
                                                 <option value="">Any</option>
                                                 <option value="09:30 AM">9:30 AM</option>
                                                 <option value="11:00 AM">11:00 AM</option>
@@ -1245,11 +1212,7 @@ export default function SchedulePage() {
                                         </div>
                                         <div className={styles.timeRow}>
                                             <span className={styles.timeSep}>No classes after</span>
-                                            <select
-                                                className={styles.timeInput}
-                                                value={prefs.noClassesAfter}
-                                                onChange={e => setPrefs(p => ({ ...p, noClassesAfter: e.target.value }))}
-                                            >
+                                            <select className={styles.timeInput} value={prefs.noClassesAfter} onChange={e => setPrefs(p => ({ ...p, noClassesAfter: e.target.value }))}>
                                                 <option value="">Any</option>
                                                 <option value="02:00 PM">2:00 PM</option>
                                                 <option value="03:15 PM">3:30 PM</option>
@@ -1262,18 +1225,9 @@ export default function SchedulePage() {
                                     <div className={styles.prefGroup}>
                                         <span className={styles.prefLabel}>Section Language</span>
                                         <div className={styles.toggleRow}>
-                                            <button
-                                                className={`${styles.toggleBtn} ${prefs.languagePref === 'any' ? styles.toggleBtnActive : ''}`}
-                                                onClick={() => setPrefs(p => ({ ...p, languagePref: 'any' }))}
-                                            >Any</button>
-                                            <button
-                                                className={`${styles.toggleBtn} ${prefs.languagePref === 'english' ? styles.toggleBtnActive : ''}`}
-                                                onClick={() => setPrefs(p => ({ ...p, languagePref: 'english' }))}
-                                            >English</button>
-                                            <button
-                                                className={`${styles.toggleBtn} ${prefs.languagePref === 'arabic' ? styles.toggleBtnActive : ''}`}
-                                                onClick={() => setPrefs(p => ({ ...p, languagePref: 'arabic' }))}
-                                            >Arabic</button>
+                                            <button className={`${styles.toggleBtn} ${prefs.languagePref === 'any' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, languagePref: 'any' }))}>Any</button>
+                                            <button className={`${styles.toggleBtn} ${prefs.languagePref === 'english' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, languagePref: 'english' }))}>English</button>
+                                            <button className={`${styles.toggleBtn} ${prefs.languagePref === 'arabic' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, languagePref: 'arabic' }))}>Arabic</button>
                                         </div>
                                     </div>
 
@@ -1293,18 +1247,9 @@ export default function SchedulePage() {
                                     <div className={styles.prefGroup}>
                                         <span className={styles.prefLabel}>Gap Preference</span>
                                         <div className={styles.toggleRow}>
-                                            <button
-                                                className={`${styles.toggleBtn} ${prefs.gapPref === 'none' ? styles.toggleBtnActive : ''}`}
-                                                onClick={() => setPrefs(p => ({ ...p, gapPref: 'none' }))}
-                                            >No preference</button>
-                                            <button
-                                                className={`${styles.toggleBtn} ${prefs.gapPref === 'minimize' ? styles.toggleBtnActive : ''}`}
-                                                onClick={() => setPrefs(p => ({ ...p, gapPref: 'minimize' }))}
-                                            >No gaps</button>
-                                            <button
-                                                className={`${styles.toggleBtn} ${prefs.gapPref === 'prefer' ? styles.toggleBtnActive : ''}`}
-                                                onClick={() => setPrefs(p => ({ ...p, gapPref: 'prefer' }))}
-                                            >Prefer gaps</button>
+                                            <button className={`${styles.toggleBtn} ${prefs.gapPref === 'none' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, gapPref: 'none' }))}>No preference</button>
+                                            <button className={`${styles.toggleBtn} ${prefs.gapPref === 'minimize' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, gapPref: 'minimize' }))}>No gaps</button>
+                                            <button className={`${styles.toggleBtn} ${prefs.gapPref === 'prefer' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, gapPref: 'prefer' }))}>Prefer gaps</button>
                                         </div>
                                     </div>
 
@@ -1312,18 +1257,9 @@ export default function SchedulePage() {
                                     <div className={styles.prefGroup}>
                                         <span className={styles.prefLabel}>Day Spread</span>
                                         <div className={styles.toggleRow}>
-                                            <button
-                                                className={`${styles.toggleBtn} ${prefs.compactPref === 'none' ? styles.toggleBtnActive : ''}`}
-                                                onClick={() => setPrefs(p => ({ ...p, compactPref: 'none' }))}
-                                            >No preference</button>
-                                            <button
-                                                className={`${styles.toggleBtn} ${prefs.compactPref === 'fewer' ? styles.toggleBtnActive : ''}`}
-                                                onClick={() => setPrefs(p => ({ ...p, compactPref: 'fewer' }))}
-                                            >Fewer days</button>
-                                            <button
-                                                className={`${styles.toggleBtn} ${prefs.compactPref === 'spread' ? styles.toggleBtnActive : ''}`}
-                                                onClick={() => setPrefs(p => ({ ...p, compactPref: 'spread' }))}
-                                            >Spread out</button>
+                                            <button className={`${styles.toggleBtn} ${prefs.compactPref === 'none' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, compactPref: 'none' }))}>No preference</button>
+                                            <button className={`${styles.toggleBtn} ${prefs.compactPref === 'fewer' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, compactPref: 'fewer' }))}>Fewer days</button>
+                                            <button className={`${styles.toggleBtn} ${prefs.compactPref === 'spread' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, compactPref: 'spread' }))}>Spread out</button>
                                         </div>
                                     </div>
 
@@ -1367,11 +1303,7 @@ export default function SchedulePage() {
                                                         <div className={styles.electiveList}>
                                                             {subCourseIds.map(subId => (
                                                                 <label key={subId} className={styles.electiveItem}>
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={preferred.includes(subId)}
-                                                                        onChange={() => toggleElective(subId)}
-                                                                    />
+                                                                    <input type="checkbox" checked={preferred.includes(subId)} onChange={() => toggleElective(subId)} />
                                                                     <span className={styles.electiveId}>{subId}</span>
                                                                     {extraCourseNames[subId] && (
                                                                         <span className={styles.electiveName}>{extraCourseNames[subId]}</span>
@@ -1382,14 +1314,7 @@ export default function SchedulePage() {
                                                     </div>
                                                     {preferred.length > 0 && (
                                                         <label className={styles.electiveHardFilter}>
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={isHard}
-                                                                onChange={e => setPrefs(p => ({
-                                                                    ...p,
-                                                                    hardElectiveFilter: { ...p.hardElectiveFilter, [prefsKey]: e.target.checked }
-                                                                }))}
-                                                            />
+                                                            <input type="checkbox" checked={isHard} onChange={e => setPrefs(p => ({ ...p, hardElectiveFilter: { ...p.hardElectiveFilter, [prefsKey]: e.target.checked } }))} />
                                                             <span>Only show schedules with selected courses</span>
                                                         </label>
                                                     )}
@@ -1411,14 +1336,7 @@ export default function SchedulePage() {
                                                 {instructors.length > 1 && (
                                                     <div className={styles.prefGroup}>
                                                         <span className={styles.prefLabel}>Preferred Instructor</span>
-                                                        <select
-                                                            className={styles.select}
-                                                            value={prefs.preferredInstructors[c.course_id] || ''}
-                                                            onChange={e => setPrefs(p => ({
-                                                                ...p,
-                                                                preferredInstructors: { ...p.preferredInstructors, [c.course_id]: e.target.value }
-                                                            }))}
-                                                        >
+                                                        <select className={styles.select} value={prefs.preferredInstructors[c.course_id] || ''} onChange={e => setPrefs(p => ({ ...p, preferredInstructors: { ...p.preferredInstructors, [c.course_id]: e.target.value } }))}>
                                                             <option value="">Any instructor</option>
                                                             {instructors.map(i => <option key={i} value={i}>{i}</option>)}
                                                         </select>
@@ -1427,24 +1345,20 @@ export default function SchedulePage() {
                                                 {baseSections.length > 1 && (
                                                     <div className={styles.prefGroup}>
                                                         <span className={styles.prefLabel}>Pin Lecture Section</span>
-                                                        <select
-                                                            className={styles.select}
-                                                            value={pinnedBaseId}
-                                                            onChange={e => {
-                                                                const newVal = e.target.value;
-                                                                setPrefs(p => {
-                                                                    const next = { ...p, pinnedSections: { ...p.pinnedSections, [c.course_id]: newVal } };
-                                                                    // Clear pinned lab if it no longer belongs to the newly pinned lecture
-                                                                    if (newVal && p.pinnedLabs?.[c.course_id]) {
-                                                                        const pl = p.pinnedLabs[c.course_id];
-                                                                        if (getBaseSection(pl) !== newVal) {
-                                                                            delete next.pinnedLabs[c.course_id];
-                                                                        }
+                                                        <select className={styles.select} value={pinnedBaseId} onChange={e => {
+                                                            const newVal = e.target.value;
+                                                            setPrefs(p => {
+                                                                const next = { ...p, pinnedSections: { ...p.pinnedSections, [c.course_id]: newVal } };
+                                                                // Clear pinned lab if it no longer belongs to the newly pinned lecture
+                                                                if (newVal && p.pinnedLabs?.[c.course_id]) {
+                                                                    const pl = p.pinnedLabs[c.course_id];
+                                                                    if (getBaseSection(pl) !== newVal) {
+                                                                        delete next.pinnedLabs[c.course_id];
                                                                     }
-                                                                    return next;
-                                                                });
-                                                            }}
-                                                        >
+                                                                }
+                                                                return next;
+                                                            });
+                                                        }}>
                                                             <option value="">Any lecture</option>
                                                             {baseSections.map(s => {
                                                                 const baseNum = getBaseSection(s.section_num);
@@ -1460,14 +1374,7 @@ export default function SchedulePage() {
                                                 {labSections.length > 1 && (
                                                     <div className={styles.prefGroup}>
                                                         <span className={styles.prefLabel}>Pin Lab Section</span>
-                                                        <select
-                                                            className={styles.select}
-                                                            value={prefs.pinnedLabs?.[c.course_id] || ''}
-                                                            onChange={e => setPrefs(p => ({
-                                                                ...p,
-                                                                pinnedLabs: { ...(p.pinnedLabs || {}), [c.course_id]: e.target.value }
-                                                            }))}
-                                                        >
+                                                        <select className={styles.select} value={prefs.pinnedLabs?.[c.course_id] || ''} onChange={e => setPrefs(p => ({ ...p, pinnedLabs: { ...(p.pinnedLabs || {}), [c.course_id]: e.target.value } }))}>
                                                             <option value="">Any lab</option>
                                                             {labSections.map(s => (
                                                                 <option key={s.section_num} value={s.section_num}>
@@ -1488,12 +1395,7 @@ export default function SchedulePage() {
 
                 {/* Generate Button — hidden when results showing */}
                 {selectedCourses.length > 0 && !results && (
-                    <button
-                        className={styles.generateBtn}
-                        onClick={handleGenerate}
-                        disabled={generating || loadingCourseIds.size > 0}
-                        style={loadingCourseIds.size > 0 ? { opacity: 0.7, cursor: 'not-allowed' } : {}}
-                    >
+                    <button className={styles.generateBtn} onClick={handleGenerate} disabled={generating || loadingCourseIds.size > 0} style={loadingCourseIds.size > 0 ? { opacity: 0.7, cursor: 'not-allowed' } : {}}>
                         {generating ? <span className={styles.spinner}></span> : (loadingCourseIds.size > 0 ? 'Loading course data...' : 'Generate Schedules')}
                     </button>
                 )}
@@ -1504,31 +1406,18 @@ export default function SchedulePage() {
                         {/* Saved schedule display */}
                         {savedScheduleIdx !== null && results[savedScheduleIdx] && (
                             <div className={styles.section}>
-                                <ScheduleCard
-                                    result={results[savedScheduleIdx]}
-                                    rank={savedScheduleIdx + 1}
-                                    courseNameMap={courseNameMap}
-                                    selectedCourses={selectedCourses}
-                                    isSaved={true}
-                                    onUnsave={() => {
-                                        setSavedScheduleIdx(null);
-                                        setShowAlternatives(true);
-                                        localStorage.removeItem('schedule_saved');
-                                    }}
-                                />
+                                <ScheduleCard result={results[savedScheduleIdx]} rank={savedScheduleIdx + 1} courseNameMap={courseNameMap} selectedCourses={selectedCourses} isSaved={true} onUnsave={() => {
+                                    setSavedScheduleIdx(null);
+                                    setShowAlternatives(true);
+                                    localStorage.removeItem('schedule_saved');
+                                }} />
                                 {!showAlternatives && results.length > 1 && (
-                                    <button
-                                        className={styles.showMoreBtn}
-                                        onClick={() => setShowAlternatives(true)}
-                                    >
+                                    <button className={styles.showMoreBtn} onClick={() => setShowAlternatives(true)}>
                                         Browse {results.length - 1} other schedule{results.length - 1 > 1 ? 's' : ''}
                                     </button>
                                 )}
                                 {showAlternatives && (
-                                    <button
-                                        className={styles.showMoreBtn}
-                                        onClick={() => setShowAlternatives(false)}
-                                    >
+                                    <button className={styles.showMoreBtn} onClick={() => setShowAlternatives(false)}>
                                         Hide other schedules
                                     </button>
                                 )}
@@ -1552,40 +1441,21 @@ export default function SchedulePage() {
                                     .filter(({ idx }) => idx !== savedScheduleIdx)
                                     .slice(0, showCount)
                                     .map(({ result, idx }) => (
-                                        <ScheduleCard
-                                            key={idx}
-                                            result={result}
-                                            rank={idx + 1}
-                                            courseNameMap={courseNameMap}
-                                            selectedCourses={selectedCourses}
-                                            onSave={() => {
-                                                setSavedScheduleIdx(idx);
-                                                setShowAlternatives(false);
-                                                localStorage.setItem('schedule_saved', JSON.stringify({
-                                                    courseIds: selectedCourses.map(c => c.course_id),
-                                                    savedIdx: idx,
-                                                }));
-                                            }}
-                                        />
+                                        <ScheduleCard key={idx} result={result} rank={idx + 1} courseNameMap={courseNameMap} selectedCourses={selectedCourses} onSave={() => {
+                                            setSavedScheduleIdx(idx);
+                                            setShowAlternatives(false);
+                                            localStorage.setItem('schedule_saved', JSON.stringify({
+                                                courseIds: selectedCourses.map(c => c.course_id),
+                                                savedIdx: idx,
+                                            }));
+                                        }} />
                                     ))}
 
                                 {(() => {
                                     const remaining = results.filter((_, i) => i !== savedScheduleIdx).length;
                                     return showCount < remaining && (
-                                        <button
-                                            className={styles.showMoreBtn}
-                                            onClick={() => {
-                                                if (showCount >= 9) {
-                                                    setShowCount(remaining + 100); // Show all
-                                                } else {
-                                                    setShowCount(prev => prev + 3);
-                                                }
-                                            }}
-                                        >
-                                            {showCount >= 9
-                                                ? `Show All Remaining (${remaining - showCount} schedules)`
-                                                : `Show More (${Math.min(3, remaining - showCount)} of ${remaining - showCount})`
-                                            }
+                                        <button className={styles.showMoreBtn} onClick={() => (showCount >= 9 ? setShowCount(remaining + 100) : setShowCount(prev => prev + 3))}>
+                                            {showCount >= 9 ? `Show All Remaining (${remaining - showCount} schedules)` : `Show More (${Math.min(3, remaining - showCount)} of ${remaining - showCount})`}
                                         </button>
                                     );
                                 })()}
@@ -1602,19 +1472,10 @@ export default function SchedulePage() {
                             All {selectedCourses.length} courses could not fit into a single schedule without conflicts.
                         </div>
                         <div className={styles.noResultsButtons}>
-                            <button
-                                className={styles.generateBtn}
-                                onClick={handleGenerateBestEffort}
-                                disabled={generating}
-                                style={{ width: 'auto', padding: '10px 20px', marginTop: '12px' }}
-                            >
+                            <button className={styles.generateBtn} onClick={handleGenerateBestEffort} disabled={generating} style={{ width: 'auto', padding: '10px 20px', marginTop: '12px' }}>
                                 {generating ? <span className={styles.spinner}></span> : 'Generate Best Fit'}
                             </button>
-                            <button
-                                className={styles.secondaryBtn}
-                                onClick={() => setResults(null)}
-                                style={{ width: 'auto', padding: '10px 20px', marginTop: '8px' }}
-                            >
+                            <button className={styles.secondaryBtn} onClick={() => setResults(null)} style={{ width: 'auto', padding: '10px 20px', marginTop: '8px' }}>
                                 Modify Preferences
                             </button>
                         </div>
@@ -1717,11 +1578,7 @@ function ScheduleCard({ result, rank, courseNameMap, selectedCourses, onSave, on
                     {/* Time axis labels */}
                     <div className={styles.ttTimeAxis} style={{ height: gridHeight, top: HEADER_HEIGHT }}>
                         {hours.map(h => (
-                            <div
-                                key={h}
-                                className={styles.ttTimeLabel}
-                                style={{ top: (h - startHour) * 60 * PX_PER_MIN }}
-                            >
+                            <div key={h} className={styles.ttTimeLabel} style={{ top: (h - startHour) * 60 * PX_PER_MIN }}>
                                 {formatTimeShort(h * 60)}
                             </div>
                         ))}
@@ -1735,11 +1592,7 @@ function ScheduleCard({ result, rank, courseNameMap, selectedCourses, onSave, on
                                 <div className={styles.ttDayBody} style={{ height: gridHeight }}>
                                     {/* Hour grid lines */}
                                     {hours.slice(0, -1).map(h => (
-                                        <div
-                                            key={h}
-                                            className={styles.ttGridLine}
-                                            style={{ top: (h - startHour) * 60 * PX_PER_MIN }}
-                                        />
+                                        <div key={h} className={styles.ttGridLine} style={{ top: (h - startHour) * 60 * PX_PER_MIN }} />
                                     ))}
 
                                     {/* Class blocks */}
@@ -1749,17 +1602,7 @@ function ScheduleCard({ result, rank, courseNameMap, selectedCourses, onSave, on
                                             const top = (block.start - startHour * 60) * PX_PER_MIN;
                                             const height = (block.end - block.start) * PX_PER_MIN;
                                             return (
-                                                <div
-                                                    key={bi}
-                                                    className={styles.ttBlock}
-                                                    style={{
-                                                        top,
-                                                        height,
-                                                        background: bgColors[block.colorIdx],
-                                                        borderLeftColor: colors[block.colorIdx],
-                                                        color: colors[block.colorIdx],
-                                                    }}
-                                                >
+                                                <div key={bi} className={styles.ttBlock} style={{ top, height, background: bgColors[block.colorIdx], borderLeftColor: colors[block.colorIdx], color: colors[block.colorIdx] }}>
                                                     <span className={styles.ttBlockCourse}>{block.courseId}</span>
                                                     {block.courseName && <span className={styles.ttBlockName}>{block.courseName}</span>}
                                                     <span className={styles.ttBlockSection}>{block.sectionNum}</span>
@@ -1791,12 +1634,7 @@ function ScheduleCard({ result, rank, courseNameMap, selectedCourses, onSave, on
                                     <div className={styles.detailHeader}>
                                         <span className={styles.detailCourseName}>{courseNameMap[sec.course_id] || sec.course_id}</span>
                                         {isSaved && (
-                                            <a
-                                                className={styles.requestLink}
-                                                href={`/post?type=request&course=${sec.course_id}&section=${sec.section_num}`}
-                                            >
-                                                Request
-                                            </a>
+                                            <a className={styles.requestLink} href={`/post?type=request&course=${sec.course_id}&section=${sec.section_num}`}>Request</a>
                                         )}
                                     </div>
                                     <div className={styles.detailMeta}>

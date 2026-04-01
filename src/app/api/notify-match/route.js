@@ -19,18 +19,8 @@ const supabase = createClient(
 
 export async function POST(request) {
     try {
-        const {
-            userAId,
-            userBId,
-            courseCode,
-            courseName,
-            userASection,
-            userBSection,
-            userAName,
-            userBName
-        } = await request.json();
+        const { userAId, userBId, courseCode, courseName, userASection, userBSection, userAName, userBName } = await request.json();
 
-        // Get user emails from profiles
         const { data: profiles, error: profileError } = await supabase
             .from('profiles')
             .select('id, name, email')
@@ -46,7 +36,6 @@ export async function POST(request) {
         const userAEmail = userAProfile?.email;
         const userBEmail = userBProfile?.email;
 
-        // Email HTML template
         const createEmailHtml = (recipientName, theirSection, otherUserName, otherSection) => `
             <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; background-color: #ffffff; color: #333333;">
                 <div style="background-color: #0a2540; padding: 24px; text-align: center; border-radius: 8px 8px 0 0;">
@@ -98,7 +87,6 @@ export async function POST(request) {
         const emailsSent = [];
         const errors = [];
 
-        // Send email to User A
         if (userAEmail && getResend()) {
             try {
                 await getResend().emails.send({
@@ -114,7 +102,6 @@ export async function POST(request) {
             }
         }
 
-        // Send email to User B
         if (userBEmail && getResend()) {
             try {
                 await getResend().emails.send({
@@ -130,14 +117,7 @@ export async function POST(request) {
             }
         }
 
-        return NextResponse.json({
-            success: true,
-            emailsSent,
-            errors,
-            message: emailsSent.length > 0
-                ? `Sent ${emailsSent.length} notification(s)`
-                : 'No emails sent (users may not have emails in profile)'
-        });
+        return NextResponse.json({ success: true, emailsSent, errors, message: emailsSent.length > 0 ? `Sent ${emailsSent.length} notification(s)` : 'No emails sent (users may not have emails in profile)' });
     } catch (error) {
         console.error('Error in notify-match:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });

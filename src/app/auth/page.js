@@ -230,12 +230,7 @@ export default function AuthPage() {
                                 <div className={styles.resetSentText}>
                                     We sent a password reset link to <strong>{email}</strong>. Check your inbox and follow the link to reset your password.
                                 </div>
-                                <button
-                                    type="button"
-                                    className={styles.submitBtn}
-                                    onClick={() => { setIsForgotPassword(false); setResetSent(false); setEmail(''); setError(''); }}
-                                    style={{ marginTop: '16px' }}
-                                >
+                                <button type="button" className={styles.submitBtn} onClick={() => { setIsForgotPassword(false); setResetSent(false); setEmail(''); setError(''); }} style={{ marginTop: '16px' }}>
                                     Back to Sign In
                                 </button>
                             </div>
@@ -246,15 +241,7 @@ export default function AuthPage() {
                                 </div>
                                 <div className={styles.formGroup}>
                                     <label className={styles.label}>Email</label>
-                                    <input
-                                        type="email"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        className={styles.input}
-                                        placeholder="Enter your email"
-                                        required
-                                        disabled={loading}
-                                    />
+                                    <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={styles.input} placeholder="Enter your email" required disabled={loading} />
                                 </div>
 
                                 {error && <div className={styles.error}>{error}</div>}
@@ -279,36 +266,14 @@ export default function AuthPage() {
                         <form onSubmit={handleSubmit} className={styles.form}>
                             <div className={styles.formGroup}>
                                 <label className={styles.label}>Email</label>
-                                <input
-                                    type="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className={styles.input}
-                                    placeholder="Enter your email"
-                                    required
-                                    disabled={loading}
-                                />
+                                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={styles.input} placeholder="Enter your email" required disabled={loading} />
                             </div>
 
                             <div className={styles.formGroup}>
                                 <label className={styles.label}>Password</label>
                                 <div className={styles.passwordWrapper}>
-                                    <input
-                                        type={showPassword ? 'text' : 'password'}
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        className={`${styles.input} ${styles.inputPassword}`}
-                                        placeholder="Enter password"
-                                        required
-                                        disabled={loading}
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowPassword(!showPassword)}
-                                        className={styles.passwordToggle}
-                                        aria-label={showPassword ? "Hide password" : "Show password"}
-                                        tabIndex={-1}
-                                    >
+                                    <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} className={`${styles.input} ${styles.inputPassword}`} placeholder="Enter password" required disabled={loading} />
+                                    <button type="button" onClick={() => setShowPassword(!showPassword)} className={styles.passwordToggle} aria-label={showPassword ? "Hide password" : "Show password"} tabIndex={-1}>
                                         {showPassword ? <EyeIcon width={20} height={20} /> : <EyeOffIcon width={20} height={20} />}
                                     </button>
                                 </div>
@@ -318,22 +283,8 @@ export default function AuthPage() {
                                 <div className={styles.formGroup}>
                                     <label className={styles.label}>Confirm Password</label>
                                     <div className={styles.passwordWrapper}>
-                                        <input
-                                            type={showConfirmPassword ? 'text' : 'password'}
-                                            value={confirmPassword}
-                                            onChange={(e) => setConfirmPassword(e.target.value)}
-                                            className={`${styles.input} ${styles.inputPassword}`}
-                                            placeholder="Confirm password"
-                                            required
-                                            disabled={loading}
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                            className={styles.passwordToggle}
-                                            aria-label={showConfirmPassword ? "Hide password" : "Show password"}
-                                            tabIndex={-1}
-                                        >
+                                        <input type={showConfirmPassword ? 'text' : 'password'} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className={`${styles.input} ${styles.inputPassword}`} placeholder="Confirm password" required disabled={loading} />
+                                        <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className={styles.passwordToggle} aria-label={showConfirmPassword ? "Hide password" : "Show password"} tabIndex={-1}>
                                             {showConfirmPassword ? <EyeIcon width={20} height={20} /> : <EyeOffIcon width={20} height={20} />}
                                         </button>
                                     </div>
@@ -345,52 +296,22 @@ export default function AuthPage() {
                                 <>
                                     <div className={styles.formGroup}>
                                         <label className={styles.label}>Full Name</label>
-                                        <input
-                                            type="text"
-                                            value={name}
-                                            onChange={(e) => setName(e.target.value)}
-                                            className={styles.input}
-                                            placeholder="Enter your full name"
-                                            required
-                                            disabled={loading}
-                                        />
+                                        <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={styles.input} placeholder="Enter your full name" required disabled={loading} />
                                     </div>
 
                                     <div className={styles.formGroup}>
                                         <label className={styles.label}>University ID</label>
-                                        <input
-                                            type="text"
-                                            value={studentId}
-                                            onChange={(e) => setStudentId(e.target.value.toUpperCase())}
-                                            className={styles.input}
-                                            placeholder="e.g., U24101234"
-                                            required
-                                            disabled={loading}
-                                        />
+                                        <input type="text" value={studentId} onChange={(e) => setStudentId(e.target.value.toUpperCase())} className={styles.input} placeholder="e.g., U24101234" required disabled={loading} />
                                     </div>
 
                                     <div className={styles.formGroup}>
                                         <label className={styles.label}>Phone Number</label>
-                                        <input
-                                            type="tel"
-                                            value={phone}
-                                            onChange={(e) => setPhone(e.target.value)}
-                                            className={styles.input}
-                                            placeholder="Enter your phone number"
-                                            required
-                                            disabled={loading}
-                                        />
+                                        <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={styles.input} placeholder="Enter your phone number" required disabled={loading} />
                                     </div>
 
                                     <div className={styles.formGroup}>
                                         <label className={styles.label}>Major</label>
-                                        <select
-                                            value={major}
-                                            onChange={(e) => setMajor(e.target.value)}
-                                            className={styles.input}
-                                            required
-                                            disabled={loading}
-                                        >
+                                        <select value={major} onChange={(e) => setMajor(e.target.value)} className={styles.input} required disabled={loading}>
                                             <option value="">Select your major</option>
                                             {majors.map(m => (
                                                 <option key={m.code} value={m.code}>{m.name}</option>
@@ -400,13 +321,7 @@ export default function AuthPage() {
 
                                     <div className={styles.formGroup}>
                                         <label className={styles.label}>Gender</label>
-                                        <select
-                                            value={gender}
-                                            onChange={(e) => setGender(e.target.value)}
-                                            className={styles.input}
-                                            required
-                                            disabled={loading}
-                                        >
+                                        <select value={gender} onChange={(e) => setGender(e.target.value)} className={styles.input} required disabled={loading}>
                                             <option value="">Select your gender</option>
                                             <option value="male">Male</option>
                                             <option value="female">Female</option>
@@ -417,12 +332,7 @@ export default function AuthPage() {
 
                             {isLogin && (
                                 <div className={styles.forgotPassword}>
-                                    <button
-                                        type="button"
-                                        onClick={() => { setIsForgotPassword(true); setError(''); }}
-                                        className={styles.forgotBtn}
-                                        disabled={loading}
-                                    >
+                                    <button type="button" onClick={() => { setIsForgotPassword(true); setError(''); }} className={styles.forgotBtn} disabled={loading}>
                                         Forgot Password?
                                     </button>
                                 </div>

@@ -74,11 +74,10 @@ export default function MatchesPage() {
     const fetchMatches = async (userId) => {
         const { data } = await supabase
             .from('matches')
-            .select(`
-        *,
-        post_a:posts!matches_post_a_id_fkey(*, profile:profiles!posts_user_id_fkey(id, name, student_id)),
-        post_b:posts!matches_post_b_id_fkey(*, profile:profiles!posts_user_id_fkey(id, name, student_id))
-      `)
+            .select(`*,
+                post_a:posts!matches_post_a_id_fkey(*, profile:profiles!posts_user_id_fkey(id, name, student_id)),
+                post_b:posts!matches_post_b_id_fkey(*, profile:profiles!posts_user_id_fkey(id, name, student_id))
+            `)
             .or(`user_a_id.eq.${userId},user_b_id.eq.${userId}`)
             .in('status', ['pending', 'accepted'])
             .order('created_at', { ascending: false });
@@ -333,10 +332,7 @@ export default function MatchesPage() {
             </header>
 
             <div className={styles.tabs}>
-                <button
-                    className={`${styles.tab} ${activeTab === 'matches' ? styles.activeTab : ''}`}
-                    onClick={() => setActiveTab('matches')}
-                >
+                <button className={`${styles.tab} ${activeTab === 'matches' ? styles.activeTab : ''}`} onClick={() => setActiveTab('matches')}>
                     Matches
                     {matches.filter(m => m.status === 'pending' && ((m.user_a_id === user?.id && !m.user_a_accepted) || (m.user_b_id === user?.id && !m.user_b_accepted))).length > 0 && (
                         <span className={styles.countBadge}>
@@ -344,10 +340,7 @@ export default function MatchesPage() {
                         </span>
                     )}
                 </button>
-                <button
-                    className={`${styles.tab} ${activeTab === 'posts' ? styles.activeTab : ''}`}
-                    onClick={() => setActiveTab('posts')}
-                >
+                <button className={`${styles.tab} ${activeTab === 'posts' ? styles.activeTab : ''}`} onClick={() => setActiveTab('posts')}>
                     Posts
                     {myPosts.length > 0 && <span className={styles.countBadge}>{myPosts.length}</span>}
                 </button>
@@ -379,12 +372,7 @@ export default function MatchesPage() {
                                                     </span>
                                                 </div>
                                             </div>
-                                            <button
-                                                onClick={() => dismissDecline(match.id)}
-                                                className={styles.dismissBtn}
-                                            >
-                                                Dismiss
-                                            </button>
+                                            <button onClick={() => dismissDecline(match.id)} className={styles.dismissBtn}>Dismiss</button>
                                         </div>
                                     );
                                 })}
@@ -478,28 +466,13 @@ export default function MatchesPage() {
                                                     {/* Actions */}
                                                     {!myAccepted && match.status === 'pending' && (
                                                         <div className={styles.matchActions}>
-                                                            <button
-                                                                onClick={() => handleAccept(match.id, isUserA)}
-                                                                className={styles.acceptBtn}
-                                                            >
-                                                                Accept
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDecline(match.id)}
-                                                                className={styles.declineBtn}
-                                                            >
-                                                                Decline
-                                                            </button>
+                                                            <button onClick={() => handleAccept(match.id, isUserA)} className={styles.acceptBtn}>Accept</button>
+                                                            <button onClick={() => handleDecline(match.id)} className={styles.declineBtn}>Decline</button>
                                                         </div>
                                                     )}
 
                                                     {bothAccepted && (
-                                                        <button
-                                                            onClick={() => handleComplete(myPost.id)}
-                                                            className={styles.completeBtn}
-                                                        >
-                                                            Mark as Completed
-                                                        </button>
+                                                        <button onClick={() => handleComplete(myPost.id)} className={styles.completeBtn}>Mark as Completed</button>
                                                     )}
                                                 </div>
                                             );
@@ -549,20 +522,8 @@ export default function MatchesPage() {
 
                                                 <div className={styles.postFooter}>
                                                     <div className={styles.postActions}>
-                                                        <button
-                                                            onClick={() => handleComplete(post.id)}
-                                                            className={styles.completePostBtn}
-                                                            title="Mark this post as completed/swapped"
-                                                        >
-                                                            Swapped
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDelete(post.id)}
-                                                            className={styles.deletePostBtn}
-                                                            title="Cancel and remove this post"
-                                                        >
-                                                            Cancel
-                                                        </button>
+                                                        <button onClick={() => handleComplete(post.id)} className={styles.completePostBtn} title="Mark this post as completed/swapped">Swapped</button>
+                                                        <button onClick={() => handleDelete(post.id)} className={styles.deletePostBtn} title="Cancel and remove this post">Cancel</button>
                                                     </div>
                                                 </div>
                                             </div>

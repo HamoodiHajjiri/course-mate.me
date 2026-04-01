@@ -174,18 +174,10 @@ export default function PostCard({
 
                 {showActions && isOwn && post.status === 'active' && (
                     <div className={styles.actions}>
-                        <button
-                            onClick={() => onComplete?.(post.id)}
-                            className={`${styles.actionBtn} ${styles.completeBtn}`}
-                            title="Mark this swap as completed"
-                        >
+                        <button onClick={() => onComplete?.(post.id)} className={`${styles.actionBtn} ${styles.completeBtn}`} title="Mark this swap as completed">
                             Mark as Swapped
                         </button>
-                        <button
-                            onClick={() => onDelete?.(post.id)}
-                            className={`${styles.actionBtn} ${styles.deleteBtn}`}
-                            title="Cancel and remove this post"
-                        >
+                        <button onClick={() => onDelete?.(post.id)} className={`${styles.actionBtn} ${styles.deleteBtn}`} title="Cancel and remove this post">
                             Cancel Post
                         </button>
                     </div>

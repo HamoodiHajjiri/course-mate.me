@@ -322,12 +322,7 @@ function PostContent() {
                         {/* Post Type Selection */}
                         <div className={styles.typeSelection}>
                             {POST_TYPES.map((type) => (
-                                <button
-                                    key={type.value}
-                                    type="button"
-                                    onClick={() => setPostType(type.value)}
-                                    className={`${styles.typeBtn} ${postType === type.value ? styles[`typeBtn${type.value}`] : ''}`}
-                                >
+                                <button key={type.value} type="button" onClick={() => setPostType(type.value)} className={`${styles.typeBtn} ${postType === type.value ? styles[`typeBtn${type.value}`] : ''}`}>
                                     <span className={styles.typeLabel}>{type.label}</span>
                                     <span className={styles.typeDesc}>{type.description}</span>
                                 </button>
@@ -339,28 +334,15 @@ function PostContent() {
                             <div className={styles.formGroup}>
                                 <label className={styles.label}>Course *</label>
                                 <div className={styles.searchWrapper}>
-                                    <input
-                                        type="text"
-                                        value={courseSearch}
-                                        onChange={(e) => {
-                                            setCourseSearch(e.target.value);
-                                            setCourseId('');
-                                            setShowCourseDropdown(true);
-                                        }}
-                                        onFocus={() => setShowCourseDropdown(true)}
-                                        className={styles.input}
-                                        placeholder="Search by course name or enter ID..."
-                                        autoComplete="off"
-                                    />
+                                    <input type="text" value={courseSearch} onChange={(e) => {
+                                        setCourseSearch(e.target.value);
+                                        setCourseId('');
+                                        setShowCourseDropdown(true);
+                                    }} onFocus={() => setShowCourseDropdown(true)} className={styles.input} placeholder="Search by course name or enter ID..." autoComplete="off" />
                                     {showCourseDropdown && filteredCourses.length > 0 && (
                                         <div className={styles.dropdown}>
                                             {filteredCourses.map(course => (
-                                                <button
-                                                    key={course.course_id}
-                                                    type="button"
-                                                    className={styles.dropdownItem}
-                                                    onClick={() => selectCourse(course)}
-                                                >
+                                                <button key={course.course_id} type="button" className={styles.dropdownItem} onClick={() => selectCourse(course)}>
                                                     <span className={styles.dropdownId}>{course.course_id}</span>
                                                     <span className={styles.dropdownName}>{course.name}</span>
                                                 </button>
@@ -372,15 +354,9 @@ function PostContent() {
 
                             <div className={styles.formGroup}>
                                 <label className={styles.label}>
-                                    {postType === 'giveaway' ? 'Section to Give Away *' :
-                                        postType === 'request' ? 'Section Needed *' : 'Section You Have *'}
+                                    {postType === 'giveaway' ? 'Section to Give Away *' : postType === 'request' ? 'Section Needed *' : 'Section You Have *'}
                                 </label>
-                                <select
-                                    value={haveSection}
-                                    onChange={(e) => setHaveSection(e.target.value)}
-                                    className={`${styles.input} ${styles.select}`}
-                                    required
-                                >
+                                <select value={haveSection} onChange={(e) => setHaveSection(e.target.value)} className={`${styles.input} ${styles.select}`} required>
                                     <option value="">Select section</option>
                                     {sections.map(s => (
                                         <option key={s.section_num} value={s.section_num}>
@@ -393,12 +369,7 @@ function PostContent() {
                             {postType === 'swap' && (
                                 <div className={styles.formGroup}>
                                     <label className={styles.label}>Section You Want *</label>
-                                    <select
-                                        value={wantSection}
-                                        onChange={(e) => setWantSection(e.target.value)}
-                                        className={`${styles.input} ${styles.select}`}
-                                        required
-                                    >
+                                    <select value={wantSection} onChange={(e) => setWantSection(e.target.value)} className={`${styles.input} ${styles.select}`} required>
                                         <option value="">Select section</option>
                                         {sections.filter(s => s.section_num !== haveSection).map(s => (
                                             <option key={s.section_num} value={s.section_num}>
@@ -412,11 +383,7 @@ function PostContent() {
 
                         {/* Info Notice */}
                         <div className={styles.infoNotice}>
-                            {postType === 'swap' ? (
-                                <>Contact info will only be shared after both parties accept the match</>
-                            ) : (
-                                <>Your phone number will be visible to everyone</>
-                            )}
+                            {postType === 'swap' ? (<>Contact info will only be shared after both parties accept the match</>) : (<>Your phone number will be visible to everyone</>)}
                         </div>
 
                         {error && <div className={styles.error}>{error}</div>}

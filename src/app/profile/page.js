@@ -351,12 +351,7 @@ function ProfileContent() {
                         {needsMajor && (
                             <div className={styles.formGroup}>
                                 <label className={styles.label}>Major</label>
-                                <select
-                                    value={selectedMajor}
-                                    onChange={(e) => setSelectedMajor(e.target.value)}
-                                    className={styles.select}
-                                    disabled={saving}
-                                >
+                                <select value={selectedMajor} onChange={(e) => setSelectedMajor(e.target.value)} className={styles.select} disabled={saving}>
                                     <option value="">Select your major</option>
                                     {majors.map(m => (
                                         <option key={m.code} value={m.code}>{m.name}</option>
@@ -368,12 +363,7 @@ function ProfileContent() {
                         {needsGender && (
                             <div className={styles.formGroup}>
                                 <label className={styles.label}>Gender</label>
-                                <select
-                                    value={selectedGender}
-                                    onChange={(e) => setSelectedGender(e.target.value)}
-                                    className={styles.select}
-                                    disabled={saving}
-                                >
+                                <select value={selectedGender} onChange={(e) => setSelectedGender(e.target.value)} className={styles.select} disabled={saving}>
                                     <option value="">Select your gender</option>
                                     <option value="male">Male</option>
                                     <option value="female">Female</option>
@@ -381,11 +371,7 @@ function ProfileContent() {
                             </div>
                         )}
 
-                        <button
-                            onClick={handleSaveSetup}
-                            className={styles.saveBtn}
-                            disabled={!canContinue || saving}
-                        >
+                        <button onClick={handleSaveSetup} className={styles.saveBtn} disabled={!canContinue || saving}>
                             {saving ? 'Saving...' : 'Continue'}
                         </button>
                     </div>
@@ -407,12 +393,7 @@ function ProfileContent() {
                     <div className={styles.cardHeader}>
                         <h2 className={styles.cardTitle}>Personal Information</h2>
                         {!isEditing && canEdit && (
-                            <button
-                                onClick={handleStartEdit}
-                                className={styles.editBtn}
-                            >
-                                Edit
-                            </button>
+                            <button onClick={handleStartEdit} className={styles.editBtn}>Edit</button>
                         )}
                     </div>
 
@@ -421,56 +402,34 @@ function ProfileContent() {
                         <div className={styles.editForm}>
                             <div className={styles.formGroup}>
                                 <label className={styles.label}>Full Name</label>
-                                <input
-                                    type="text"
-                                    value={editForm.name}
-                                    onChange={(e) => {
-                                        setEditForm({ ...editForm, name: e.target.value });
-                                        if (errors.name) setErrors({ ...errors, name: false });
-                                    }}
-                                    className={`${styles.input} ${errors.name ? styles.inputError : ''}`}
-                                    placeholder="Enter your full name"
-                                />
+                                <input type="text" value={editForm.name} onChange={(e) => {
+                                    setEditForm({ ...editForm, name: e.target.value });
+                                    if (errors.name) setErrors({ ...errors, name: false });
+                                }} className={`${styles.input} ${errors.name ? styles.inputError : ''}`} placeholder="Enter your full name" />
                                 {errors.name && <span className={styles.fieldError}>Name cannot be empty</span>}
                             </div>
                             <div className={styles.formGroup}>
                                 <label className={styles.label}>University ID</label>
-                                <input
-                                    type="text"
-                                    value={editForm.student_id}
-                                    onChange={(e) => {
-                                        setEditForm({ ...editForm, student_id: e.target.value });
-                                        if (errors.student_id) setErrors({ ...errors, student_id: false });
-                                    }}
-                                    className={`${styles.input} ${errors.student_id ? styles.inputError : ''}`}
-                                    placeholder="Enter your student ID"
-                                />
+                                <input type="text" value={editForm.student_id} onChange={(e) => {
+                                    setEditForm({ ...editForm, student_id: e.target.value });
+                                    if (errors.student_id) setErrors({ ...errors, student_id: false });
+                                }} className={`${styles.input} ${errors.student_id ? styles.inputError : ''}`} placeholder="Enter your student ID" />
                                 {errors.student_id && <span className={styles.fieldError}>{typeof errors.student_id === 'string' ? errors.student_id : 'Student ID cannot be empty'}</span>}
                             </div>
                             <div className={styles.formGroup}>
                                 <label className={styles.label}>Phone Number</label>
-                                <input
-                                    type="tel"
-                                    value={editForm.phone}
-                                    onChange={(e) => {
-                                        setEditForm({ ...editForm, phone: e.target.value });
-                                        if (errors.phone) setErrors({ ...errors, phone: false });
-                                    }}
-                                    className={`${styles.input} ${errors.phone ? styles.inputError : ''}`}
-                                    placeholder="Enter your phone number"
-                                />
+                                <input type="tel" value={editForm.phone} onChange={(e) => {
+                                    setEditForm({ ...editForm, phone: e.target.value });
+                                    if (errors.phone) setErrors({ ...errors, phone: false });
+                                }} className={`${styles.input} ${errors.phone ? styles.inputError : ''}`} placeholder="Enter your phone number" />
                                 {errors.phone && <span className={styles.fieldError}>Phone number cannot be empty</span>}
                             </div>
                             <div className={styles.formGroup}>
                                 <label className={styles.label}>Major</label>
-                                <select
-                                    value={editForm.major}
-                                    onChange={(e) => {
-                                        setEditForm({ ...editForm, major: e.target.value });
-                                        if (errors.major) setErrors({ ...errors, major: false });
-                                    }}
-                                    className={`${styles.select} ${errors.major ? styles.inputError : ''}`}
-                                >
+                                <select value={editForm.major} onChange={(e) => {
+                                    setEditForm({ ...editForm, major: e.target.value });
+                                    if (errors.major) setErrors({ ...errors, major: false });
+                                }} className={`${styles.select} ${errors.major ? styles.inputError : ''}`}>
                                     <option value="">Select your major</option>
                                     {majors.map(m => (
                                         <option key={m.code} value={m.code}>{m.name}</option>
@@ -480,14 +439,10 @@ function ProfileContent() {
                             </div>
                             <div className={styles.formGroup}>
                                 <label className={styles.label}>Gender</label>
-                                <select
-                                    value={editForm.gender}
-                                    onChange={(e) => {
-                                        setEditForm({ ...editForm, gender: e.target.value });
-                                        if (errors.gender) setErrors({ ...errors, gender: false });
-                                    }}
-                                    className={`${styles.select} ${errors.gender ? styles.inputError : ''}`}
-                                >
+                                <select value={editForm.gender} onChange={(e) => {
+                                    setEditForm({ ...editForm, gender: e.target.value });
+                                    if (errors.gender) setErrors({ ...errors, gender: false });
+                                }} className={`${styles.select} ${errors.gender ? styles.inputError : ''}`}>
                                     <option value="">Select your gender</option>
                                     <option value="male">Male</option>
                                     <option value="female">Female</option>
@@ -495,20 +450,8 @@ function ProfileContent() {
                                 {errors.gender && <span className={styles.fieldError}>Please select a gender</span>}
                             </div>
                             <div className={styles.editActions}>
-                                <button
-                                    onClick={handleCancelEdit}
-                                    className={styles.cancelBtn}
-                                    disabled={saving}
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleSaveProfile}
-                                    className={styles.saveBtn}
-                                    disabled={saving}
-                                >
-                                    {saving ? 'Saving...' : 'Save Changes'}
-                                </button>
+                                <button onClick={handleCancelEdit} className={styles.cancelBtn} disabled={saving}>Cancel</button>
+                                <button onClick={handleSaveProfile} className={styles.saveBtn} disabled={saving}>{saving ? 'Saving...' : 'Save Changes'}</button>
                             </div>
                         </div>
                     ) : (

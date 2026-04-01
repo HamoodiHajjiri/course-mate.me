@@ -22,13 +22,8 @@ export default function BottomNav() {
             {navItems.map((item) => {
                 const isActive = pathname === item.href;
                 return (
-                    <Link
-                        key={item.href}
-                        href={item.href}
-                        className={`${styles.navItem} ${isActive ? styles.active : ''}`}
-                    >
+                    <Link key={item.href} href={item.href} className={`${styles.navItem} ${isActive ? styles.active : ''}`}>
                         <span className={styles.navIcon}>
-                            {/* Clone element to pass active color props if needed, or rely on CSS */}
                             {item.icon}
                         </span>
                         <span className={styles.navLabel}>{item.label}</span>

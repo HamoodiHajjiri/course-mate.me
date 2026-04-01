@@ -14,9 +14,7 @@ export function createClient() {
         return createMockClient();
     }
 
-    if (!supabaseClient) {
-        supabaseClient = createBrowserClient(supabaseUrl, supabaseKey);
-    }
+    if (!supabaseClient) supabaseClient = createBrowserClient(supabaseUrl, supabaseKey);
 
     return supabaseClient;
 }

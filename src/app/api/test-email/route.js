@@ -5,15 +5,11 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const targetEmail = searchParams.get('email');
 
-    if (!targetEmail) {
-        return NextResponse.json({ error: 'Please provide email parameter: /api/test-email?email=your@email.com' }, { status: 400 });
-    }
+    if (!targetEmail) return NextResponse.json({ error: 'Please provide email parameter: /api/test-email?email=your@email.com' }, { status: 400 });
 
     const apiKey = process.env.RESEND_API_KEY;
 
-    if (!apiKey) {
-        return NextResponse.json({ error: 'RESEND_API_KEY is missing in environment variables' }, { status: 500 });
-    }
+    if (!apiKey) return NextResponse.json({ error: 'RESEND_API_KEY is missing in environment variables' }, { status: 500 });
 
     try {
         const resend = new Resend(apiKey);
