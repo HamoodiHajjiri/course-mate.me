@@ -134,7 +134,7 @@
     box-shadow: var(--shadow-md);
     border: 1px solid var(--glass-border);
     position: relative;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .card::before {
