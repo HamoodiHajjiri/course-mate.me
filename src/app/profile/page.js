@@ -26,7 +26,6 @@ function ProfileContent() {
         student_id: '',
         phone: '',
         major: '',
-        major: '',
         gender: ''
     });
     const [errors, setErrors] = useState({});
@@ -146,8 +145,6 @@ function ProfileContent() {
                 validMajorCourseIds.has(id) && validCampusCourseIds.has(id)
             );
 
-            // Update localStorage
-            // Always unsave (savedIdx: null) because changing major/gender invalidates the specific schedule permutation
             const newData = {
                 courseIds: validCourseIds,
                 savedIdx: null
@@ -170,12 +167,10 @@ function ProfileContent() {
             .eq('id', user.id);
 
         if (!error) {
-            // Refresh profile and redirect
             const majorData = majors.find(m => m.code === selectedMajor);
             setMajorName(majorData?.name || selectedMajor);
             setProfile({ ...profile, major: selectedMajor });
 
-            // Clean up schedule
             await validateAndCleanSchedule(selectedMajor, profile.gender);
 
             setShowMajorSelect(false);
@@ -212,7 +207,6 @@ function ProfileContent() {
     const handleSaveProfile = async () => {
         if (!canEdit) return;
 
-        // Validation: Verify no fields are empty
         const newErrors = {};
         if (!editForm.name.trim()) newErrors.name = true;
         if (!editForm.student_id.trim()) newErrors.student_id = true;
@@ -228,13 +222,12 @@ function ProfileContent() {
         setSaving(true);
         const { data: { user } } = await supabase.auth.getUser();
 
-        // Check for duplicate student ID
         if (editForm.student_id !== profile.student_id) {
             const { data: existing } = await supabase
                 .from('profiles')
                 .select('id')
                 .eq('student_id', editForm.student_id)
-                .neq('id', user.id) // Exclude self
+                .neq('id', user.id)
                 .single();
 
             if (existing) {
@@ -256,7 +249,6 @@ function ProfileContent() {
             .eq('id', user.id);
 
         if (!error) {
-            // Update local state
             setProfile({
                 ...profile,
                 name: editForm.name,
@@ -266,11 +258,9 @@ function ProfileContent() {
                 gender: editForm.gender
             });
 
-            // Update major name
             const majorData = majors.find(m => m.code === editForm.major);
             setMajorName(majorData?.name || editForm.major);
 
-            // Clean up schedule
             await validateAndCleanSchedule(editForm.major, editForm.gender);
 
             setIsEditing(false);
@@ -295,8 +285,6 @@ function ProfileContent() {
         );
     }
 
-    // Show major/gender selection modal if needed
-
     const handleSaveSetup = async () => {
         const updates = {};
         if (!profile?.major && selectedMajor) updates.major = selectedMajor;
@@ -318,7 +306,6 @@ function ProfileContent() {
             }
             setProfile({ ...profile, ...updates });
 
-            // Clean up schedule
             const finalMajor = updates.major || profile.major;
             const finalGender = updates.gender || profile.gender;
             await validateAndCleanSchedule(finalMajor, finalGender);
@@ -336,182 +323,187 @@ function ProfileContent() {
         const canContinue = (!needsMajor || selectedMajor) && (!needsGender || selectedGender);
         return (
             <div className={styles.page}>
-                <header className={styles.header}>
-                    <h1>Complete Your Profile</h1>
-                    <ThemeToggle />
-                </header>
+                <div className={styles.pageInner}>
+                    <header className={styles.header}>
+                        <h1>Complete Your Profile</h1>
+                        <ThemeToggle />
+                    </header>
 
-                <main className={styles.main}>
-                    <div className={styles.card}>
-                        <h2 className={styles.cardTitle}>Complete Your Profile</h2>
-                        <p className={styles.cardDesc}>
-                            Please fill in the missing information to continue.
-                        </p>
+                    <main className={styles.main}>
+                        <div className={styles.card}>
+                            <h2 className={styles.cardTitle}>Complete Your Profile</h2>
+                            <p className={styles.cardDesc}>
+                                Please fill in the missing information to continue.
+                            </p>
 
-                        {needsMajor && (
-                            <div className={styles.formGroup}>
-                                <label className={styles.label}>Major</label>
-                                <select value={selectedMajor} onChange={(e) => setSelectedMajor(e.target.value)} className={styles.select} disabled={saving}>
-                                    <option value="">Select your major</option>
-                                    {majors.map(m => (
-                                        <option key={m.code} value={m.code}>{m.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        )}
+                            {needsMajor && (
+                                <div className={styles.formGroup}>
+                                    <label className={styles.label}>Major</label>
+                                    <select value={selectedMajor} onChange={(e) => setSelectedMajor(e.target.value)} className={styles.select} disabled={saving}>
+                                        <option value="">Select your major</option>
+                                        {majors.map(m => (
+                                            <option key={m.code} value={m.code}>{m.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
 
-                        {needsGender && (
-                            <div className={styles.formGroup}>
-                                <label className={styles.label}>Gender</label>
-                                <select value={selectedGender} onChange={(e) => setSelectedGender(e.target.value)} className={styles.select} disabled={saving}>
-                                    <option value="">Select your gender</option>
-                                    <option value="male">Male</option>
-                                    <option value="female">Female</option>
-                                </select>
-                            </div>
-                        )}
+                            {needsGender && (
+                                <div className={styles.formGroup}>
+                                    <label className={styles.label}>Gender</label>
+                                    <select value={selectedGender} onChange={(e) => setSelectedGender(e.target.value)} className={styles.select} disabled={saving}>
+                                        <option value="">Select your gender</option>
+                                        <option value="male">Male</option>
+                                        <option value="female">Female</option>
+                                    </select>
+                                </div>
+                            )}
 
-                        <button onClick={handleSaveSetup} className={styles.saveBtn} disabled={!canContinue || saving}>
-                            {saving ? 'Saving...' : 'Continue'}
-                        </button>
-                    </div>
-                </main>
+                            <button onClick={handleSaveSetup} className={styles.saveBtn} disabled={!canContinue || saving}>
+                                {saving ? 'Saving...' : 'Continue'}
+                            </button>
+                        </div>
+                    </main>
+                </div>
+                <BottomNav />
             </div>
         );
     }
 
     return (
         <div className={styles.page}>
-            <header className={styles.header}>
-                <h1>Profile</h1>
-                <ThemeToggle />
-            </header>
+            <div className={styles.pageInner}>
+                <header className={styles.header}>
+                    <h1>Profile</h1>
+                    <ThemeToggle />
+                </header>
 
-            <main className={styles.main}>
-                {/* Profile Info */}
-                <div className={styles.card}>
-                    <div className={styles.cardHeader}>
-                        <h2 className={styles.cardTitle}>Personal Information</h2>
-                        {!isEditing && canEdit && (
-                            <button onClick={handleStartEdit} className={styles.editBtn}>Edit</button>
+                <main className={styles.main}>
+                    {/* Profile Info */}
+                    <div className={styles.card}>
+                        <div className={styles.cardHeader}>
+                            <h2 className={styles.cardTitle}>Personal Information</h2>
+                            {!isEditing && canEdit && (
+                                <button onClick={handleStartEdit} className={styles.editBtn}>Edit</button>
+                            )}
+                        </div>
+
+                        {isEditing ? (
+                            /* Edit Mode */
+                            <div className={styles.editForm}>
+                                <div className={styles.formGroup}>
+                                    <label className={styles.label}>Full Name</label>
+                                    <input type="text" value={editForm.name} onChange={(e) => {
+                                        setEditForm({ ...editForm, name: e.target.value });
+                                        if (errors.name) setErrors({ ...errors, name: false });
+                                    }} className={`${styles.input} ${errors.name ? styles.inputError : ''}`} placeholder="Enter your full name" />
+                                    {errors.name && <span className={styles.fieldError}>Name cannot be empty</span>}
+                                </div>
+                                <div className={styles.formGroup}>
+                                    <label className={styles.label}>University ID</label>
+                                    <input type="text" value={editForm.student_id} onChange={(e) => {
+                                        setEditForm({ ...editForm, student_id: e.target.value });
+                                        if (errors.student_id) setErrors({ ...errors, student_id: false });
+                                    }} className={`${styles.input} ${errors.student_id ? styles.inputError : ''}`} placeholder="Enter your student ID" />
+                                    {errors.student_id && <span className={styles.fieldError}>{typeof errors.student_id === 'string' ? errors.student_id : 'Student ID cannot be empty'}</span>}
+                                </div>
+                                <div className={styles.formGroup}>
+                                    <label className={styles.label}>Phone Number</label>
+                                    <input type="tel" value={editForm.phone} onChange={(e) => {
+                                        setEditForm({ ...editForm, phone: e.target.value });
+                                        if (errors.phone) setErrors({ ...errors, phone: false });
+                                    }} className={`${styles.input} ${errors.phone ? styles.inputError : ''}`} placeholder="Enter your phone number" />
+                                    {errors.phone && <span className={styles.fieldError}>Phone number cannot be empty</span>}
+                                </div>
+                                <div className={styles.formGroup}>
+                                    <label className={styles.label}>Major</label>
+                                    <select value={editForm.major} onChange={(e) => {
+                                        setEditForm({ ...editForm, major: e.target.value });
+                                        if (errors.major) setErrors({ ...errors, major: false });
+                                    }} className={`${styles.select} ${errors.major ? styles.inputError : ''}`}>
+                                        <option value="">Select your major</option>
+                                        {majors.map(m => (
+                                            <option key={m.code} value={m.code}>{m.name}</option>
+                                        ))}
+                                    </select>
+                                    {errors.major && <span className={styles.fieldError}>Please select a major</span>}
+                                </div>
+                                <div className={styles.formGroup}>
+                                    <label className={styles.label}>Gender</label>
+                                    <select value={editForm.gender} onChange={(e) => {
+                                        setEditForm({ ...editForm, gender: e.target.value });
+                                        if (errors.gender) setErrors({ ...errors, gender: false });
+                                    }} className={`${styles.select} ${errors.gender ? styles.inputError : ''}`}>
+                                        <option value="">Select your gender</option>
+                                        <option value="male">Male</option>
+                                        <option value="female">Female</option>
+                                    </select>
+                                    {errors.gender && <span className={styles.fieldError}>Please select a gender</span>}
+                                </div>
+                                <div className={styles.editActions}>
+                                    <button onClick={handleCancelEdit} className={styles.cancelBtn} disabled={saving}>Cancel</button>
+                                    <button onClick={handleSaveProfile} className={styles.saveBtn} disabled={saving}>{saving ? 'Saving...' : 'Save Changes'}</button>
+                                </div>
+                            </div>
+                        ) : (
+                            /* View Mode */
+                            <div className={styles.profileInfo}>
+                                <div className={styles.infoRow}>
+                                    <span className={styles.infoLabel}>Full Name</span>
+                                    <span className={styles.infoValue}>{profile?.name || 'Not set'}</span>
+                                </div>
+                                <div className={styles.infoRow}>
+                                    <span className={styles.infoLabel}>University ID</span>
+                                    <span className={styles.infoValue}>{profile?.student_id || 'Not set'}</span>
+                                </div>
+                                <div className={styles.infoRow}>
+                                    <span className={styles.infoLabel}>Phone Number</span>
+                                    <span className={styles.infoValue}>{profile?.phone || 'Not set'}</span>
+                                </div>
+                                <div className={styles.infoRow}>
+                                    <span className={styles.infoLabel}>Major</span>
+                                    <span className={styles.infoValue}>{majorName || 'Not set'}</span>
+                                </div>
+                                <div className={styles.infoRow}>
+                                    <span className={styles.infoLabel}>Gender</span>
+                                    <span className={styles.infoValue}>{profile?.gender ? (profile.gender === 'male' ? 'Male' : 'Female') : 'Not set'}</span>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Show warning if user has posts */}
+                        {!canEdit && !isEditing && (
+                            <div className={styles.editWarning}>
+                                Complete or cancel your active posts to edit your profile
+                            </div>
                         )}
                     </div>
 
-                    {isEditing ? (
-                        /* Edit Mode */
-                        <div className={styles.editForm}>
-                            <div className={styles.formGroup}>
-                                <label className={styles.label}>Full Name</label>
-                                <input type="text" value={editForm.name} onChange={(e) => {
-                                    setEditForm({ ...editForm, name: e.target.value });
-                                    if (errors.name) setErrors({ ...errors, name: false });
-                                }} className={`${styles.input} ${errors.name ? styles.inputError : ''}`} placeholder="Enter your full name" />
-                                {errors.name && <span className={styles.fieldError}>Name cannot be empty</span>}
+                    {/* Stats */}
+                    <div className={styles.statsCard}>
+                        <h3>Your Activity</h3>
+                        <div className={styles.stats}>
+                            <div className={styles.stat}>
+                                <span className={styles.statValue}>{myPosts.length}</span>
+                                <span className={styles.statLabel}>Active Posts</span>
                             </div>
-                            <div className={styles.formGroup}>
-                                <label className={styles.label}>University ID</label>
-                                <input type="text" value={editForm.student_id} onChange={(e) => {
-                                    setEditForm({ ...editForm, student_id: e.target.value });
-                                    if (errors.student_id) setErrors({ ...errors, student_id: false });
-                                }} className={`${styles.input} ${errors.student_id ? styles.inputError : ''}`} placeholder="Enter your student ID" />
-                                {errors.student_id && <span className={styles.fieldError}>{typeof errors.student_id === 'string' ? errors.student_id : 'Student ID cannot be empty'}</span>}
+                            <div className={styles.stat}>
+                                <span className={styles.statValue}>{5 - myPosts.length}</span>
+                                <span className={styles.statLabel}>Posts Left</span>
                             </div>
-                            <div className={styles.formGroup}>
-                                <label className={styles.label}>Phone Number</label>
-                                <input type="tel" value={editForm.phone} onChange={(e) => {
-                                    setEditForm({ ...editForm, phone: e.target.value });
-                                    if (errors.phone) setErrors({ ...errors, phone: false });
-                                }} className={`${styles.input} ${errors.phone ? styles.inputError : ''}`} placeholder="Enter your phone number" />
-                                {errors.phone && <span className={styles.fieldError}>Phone number cannot be empty</span>}
-                            </div>
-                            <div className={styles.formGroup}>
-                                <label className={styles.label}>Major</label>
-                                <select value={editForm.major} onChange={(e) => {
-                                    setEditForm({ ...editForm, major: e.target.value });
-                                    if (errors.major) setErrors({ ...errors, major: false });
-                                }} className={`${styles.select} ${errors.major ? styles.inputError : ''}`}>
-                                    <option value="">Select your major</option>
-                                    {majors.map(m => (
-                                        <option key={m.code} value={m.code}>{m.name}</option>
-                                    ))}
-                                </select>
-                                {errors.major && <span className={styles.fieldError}>Please select a major</span>}
-                            </div>
-                            <div className={styles.formGroup}>
-                                <label className={styles.label}>Gender</label>
-                                <select value={editForm.gender} onChange={(e) => {
-                                    setEditForm({ ...editForm, gender: e.target.value });
-                                    if (errors.gender) setErrors({ ...errors, gender: false });
-                                }} className={`${styles.select} ${errors.gender ? styles.inputError : ''}`}>
-                                    <option value="">Select your gender</option>
-                                    <option value="male">Male</option>
-                                    <option value="female">Female</option>
-                                </select>
-                                {errors.gender && <span className={styles.fieldError}>Please select a gender</span>}
-                            </div>
-                            <div className={styles.editActions}>
-                                <button onClick={handleCancelEdit} className={styles.cancelBtn} disabled={saving}>Cancel</button>
-                                <button onClick={handleSaveProfile} className={styles.saveBtn} disabled={saving}>{saving ? 'Saving...' : 'Save Changes'}</button>
-                            </div>
-                        </div>
-                    ) : (
-                        /* View Mode */
-                        <div className={styles.profileInfo}>
-                            <div className={styles.infoRow}>
-                                <span className={styles.infoLabel}>Full Name</span>
-                                <span className={styles.infoValue}>{profile?.name || 'Not set'}</span>
-                            </div>
-                            <div className={styles.infoRow}>
-                                <span className={styles.infoLabel}>University ID</span>
-                                <span className={styles.infoValue}>{profile?.student_id || 'Not set'}</span>
-                            </div>
-                            <div className={styles.infoRow}>
-                                <span className={styles.infoLabel}>Phone Number</span>
-                                <span className={styles.infoValue}>{profile?.phone || 'Not set'}</span>
-                            </div>
-                            <div className={styles.infoRow}>
-                                <span className={styles.infoLabel}>Major</span>
-                                <span className={styles.infoValue}>{majorName || 'Not set'}</span>
-                            </div>
-                            <div className={styles.infoRow}>
-                                <span className={styles.infoLabel}>Gender</span>
-                                <span className={styles.infoValue}>{profile?.gender ? (profile.gender === 'male' ? 'Male' : 'Female') : 'Not set'}</span>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Show warning if user has posts */}
-                    {!canEdit && !isEditing && (
-                        <div className={styles.editWarning}>
-                            Complete or cancel your active posts to edit your profile
-                        </div>
-                    )}
-                </div>
-
-                {/* Stats */}
-                <div className={styles.statsCard}>
-                    <h3>Your Activity</h3>
-                    <div className={styles.stats}>
-                        <div className={styles.stat}>
-                            <span className={styles.statValue}>{myPosts.length}</span>
-                            <span className={styles.statLabel}>Active Posts</span>
-                        </div>
-                        <div className={styles.stat}>
-                            <span className={styles.statValue}>{5 - myPosts.length}</span>
-                            <span className={styles.statLabel}>Posts Left</span>
                         </div>
                     </div>
-                </div>
 
-                {/* Sign Out */}
-                <button onClick={handleSignOut} className={styles.signOutBtn}>
-                    Sign Out
-                </button>
+                    {/* Sign Out */}
+                    <button onClick={handleSignOut} className={styles.signOutBtn}>
+                        Sign Out
+                    </button>
 
-                <p className={styles.contributeText}>
-                    Contribute to the project on our <a href="https://github.com/Karam-Kreidli/CourseMate" target="_blank" rel="noopener noreferrer" className={styles.contributeLink}>GitHub Repository</a>.
-                </p>
-            </main>
+                    <p className={styles.contributeText}>
+                        Contribute to the project on our <a href="https://github.com/Karam-Kreidli/CourseMate" target="_blank" rel="noopener noreferrer" className={styles.contributeLink}>GitHub Repository</a>.
+                    </p>
+                </main>
+            </div>
 
             <BottomNav />
         </div>
