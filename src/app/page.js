@@ -186,18 +186,25 @@ export default function HomePage() {
                     {/* Logo card */}
                     <div className={styles.sidebarCard}>
                         <div className={styles.logoContainer}>
-                            <div className={styles.logoFrame}>
-                                <Image src="/logo.png" alt="CourseMate" width={256} height={256} className={styles.logoImage} />
+                            <div className={styles.logoWrapper}>
+                                <div className={styles.logoFrame}>
+                                    <Image src="/logo.png" alt="CourseMate" width={256} height={256} className={styles.logoImage} />
+                                </div>
+                                <div>
+                                    <span className={styles.logoText}>CourseMate</span>
+                                    <p className={styles.logoSubtitle}>Course section exchange</p>
+                                </div>
                             </div>
-                            <div>
-                                <span className={styles.logoText}>CourseMate</span>
-                                <p className={styles.logoSubtitle}>Course section exchange</p>
+                            <div className={styles.mobileThemeToggle}>
+                                <ThemeToggle />
                             </div>
                         </div>
-                        <div className={styles.themeToggleArea}>
-                            <span className={styles.themeLabel}>Theme</span>
-                            <ThemeToggle />
-                        </div>
+                    </div>
+
+                    {/* Desktop Theme card */}
+                    <div className={styles.themeToggleArea}>
+                        <span className={styles.themeLabel}>Theme</span>
+                        <ThemeToggle />
                     </div>
 
                     {/* Filter card */}
