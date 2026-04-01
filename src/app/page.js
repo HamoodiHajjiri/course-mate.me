@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
@@ -21,12 +21,20 @@ export default function HomePage() {
     const [user, setUser] = useState(null);
     const [userMajor, setUserMajor] = useState(null);
     const [userGender, setUserGender] = useState(null);
+    const [transitioning, setTransitioning] = useState(false);
     const router = useRouter();
     const supabase = createClient();
 
     useEffect(() => {
         initializePage();
     }, []);
+
+    const navigateWithTransition = (path) => {
+        setTransitioning(true);
+        setTimeout(() => {
+            router.push(path);
+        }, 420);
+    };
 
     const initializePage = async () => {
         // Handle auth callback code (e.g., from password reset email)
@@ -40,7 +48,7 @@ export default function HomePage() {
 
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
-            router.push('/auth');
+            navigateWithTransition('/auth');
             return;
         }
         setUser(user);
@@ -65,22 +73,13 @@ export default function HomePage() {
             setMajorCourses(courseIds);
         } else {
             // User has no major set - redirect to profile to select one
-            router.push('/profile?selectMajor=true');
+            navigateWithTransition('/profile?selectMajor=true');
             return;
         }
 
         fetchCourses();
         fetchSections(profile?.gender);
         fetchPosts();
-    };
-
-    const checkAuth = async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-            router.push('/auth');
-            return;
-        }
-        setUser(user);
     };
 
     const fetchCourses = async () => {
@@ -169,60 +168,99 @@ export default function HomePage() {
         return true;
     });
 
+    const filterLabels = {
+        all: 'All Posts',
+        swap: 'Swaps',
+        giveaway: 'Giveaways',
+        request: 'Requests',
+    };
+
     return (
         <div className={styles.page}>
-            <header className={styles.header}>
-                <div className={styles.headerTop}>
-                    <div className={styles.logoContainer}>
-                        <div className={styles.logoFrame}>
-                            <Image src="/logo.png" alt="CourseMate" width={256} height={256} className={styles.logoImage} />
+            {/* Transition overlay */}
+            <div className={`${styles.transitionOverlay} ${transitioning ? styles.active : ''}`} />
+
+            <div className={styles.pageInner}>
+                {/* ===== Sidebar ===== */}
+                <aside className={styles.sidebar}>
+                    {/* Logo card */}
+                    <div className={styles.sidebarCard}>
+                        <div className={styles.logoContainer}>
+                            <div className={styles.logoFrame}>
+                                <Image src="/logo.png" alt="CourseMate" width={256} height={256} className={styles.logoImage} />
+                            </div>
+                            <div>
+                                <span className={styles.logoText}>CourseMate</span>
+                                <p className={styles.logoSubtitle}>Course section exchange</p>
+                            </div>
                         </div>
-                        <span className={styles.logoText}>CourseMate</span>
+                        <div className={styles.themeToggleArea}>
+                            <span className={styles.themeLabel}>Theme</span>
+                            <ThemeToggle />
+                        </div>
                     </div>
-                    <ThemeToggle />
-                </div>
 
-                {/* Search */}
-                <div className={styles.searchWrapper}>
-                    <span className={styles.searchIcon}>
-                        <SearchIcon width={20} height={20} />
-                    </span>
-                    <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} className={styles.searchInput} placeholder="Search by course ID, name, or CRN..." />
-                </div>
-
-                {/* Filters */}
-                <div className={styles.filters}>
-                    {['all', 'swap', 'giveaway', 'request'].map((type) => (
-                        <button key={type} onClick={() => setFilter(type)} className={`${styles.filterBtn} ${filter === type ? styles.filterBtnActive : ''}`}>
-                            {type === 'all' ? 'All' : type === 'swap' ? 'Swaps' : type === 'giveaway' ? 'Giveaways' : 'Requests'}
-                        </button>
-                    ))}
-                </div>
-            </header>
-
-            <main className={styles.main}>
-                {loading ? (
-                    <div className={styles.loading}>
-                        <div className={styles.spinner}></div>
-                        <p>Loading posts...</p>
+                    {/* Filter card */}
+                    <div className={styles.filtersCard}>
+                        <p className={styles.filtersTitle}>Filter by type</p>
+                        <div className={styles.filters}>
+                            {['all', 'swap', 'giveaway', 'request'].map((type) => (
+                                <button
+                                    key={type}
+                                    onClick={() => setFilter(type)}
+                                    className={`${styles.filterBtn} ${filter === type ? styles.filterBtnActive : ''}`}
+                                >
+                                    {filterLabels[type]}
+                                </button>
+                            ))}
+                        </div>
                     </div>
-                ) : filteredPosts.length === 0 ? (
-                    <div className={styles.empty}>
-                        <span className={styles.emptyIcon}>📭</span>
-                        <h3>No posts found</h3>
-                        <p>{search ? 'Try a different search term' : 'Be the first to create a post!'}</p>
-                    </div>
-                ) : (
-                    <div className={styles.postList}>
-                        {filteredPosts.map((post) => {
-                            const haveSectionData = sections.find(s => s.course_id === post.course_code && s.section_num === post.have_section);
-                            const wantSectionData = post.want_section ? sections.find(s => s.course_id === post.course_code && s.section_num === post.want_section) : null;
+                </aside>
 
-                            return (<PostCard key={post.id} post={post} courseName={courses[post.course_code]} haveInstructor={haveSectionData?.instructor} wantInstructor={wantSectionData?.instructor} showContact={post.type !== 'swap'} />);
-                        })}
+                {/* ===== Main Feed ===== */}
+                <main className={styles.mainContent}>
+                    {/* Search */}
+                    <div className={styles.searchCard}>
+                        <div className={styles.searchWrapper}>
+                            <span className={styles.searchIcon}>
+                                <SearchIcon width={20} height={20} />
+                            </span>
+                            <input
+                                type="text"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className={styles.searchInput}
+                                placeholder="Search by course ID, name, or CRN..."
+                            />
+                        </div>
                     </div>
-                )}
-            </main>
+
+                    {/* Posts */}
+                    <div className={styles.feedCard}>
+                        {loading ? (
+                            <div className={styles.loading}>
+                                <div className={styles.spinner}></div>
+                                <p>Loading posts...</p>
+                            </div>
+                        ) : filteredPosts.length === 0 ? (
+                            <div className={styles.empty}>
+                                <span className={styles.emptyIcon}>📭</span>
+                                <h3>No posts found</h3>
+                                <p>{search ? 'Try a different search term' : 'Be the first to create a post!'}</p>
+                            </div>
+                        ) : (
+                            <div className={styles.postList}>
+                                {filteredPosts.map((post) => {
+                                    const haveSectionData = sections.find(s => s.course_id === post.course_code && s.section_num === post.have_section);
+                                    const wantSectionData = post.want_section ? sections.find(s => s.course_id === post.course_code && s.section_num === post.want_section) : null;
+
+                                    return (<PostCard key={post.id} post={post} courseName={courses[post.course_code]} haveInstructor={haveSectionData?.instructor} wantInstructor={wantSectionData?.instructor} showContact={post.type !== 'swap'} />);
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </main>
+            </div>
 
             <BottomNav />
         </div>

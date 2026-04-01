@@ -91,6 +91,11 @@
 
     /* Nav Height */
     --nav-height: 68px;
+
+    /* Auth/App Page Background (light mode) */
+    --auth-bg: #EFF3F8;
+    --auth-grid-color: rgba(0, 195, 137, 0.09);
+    --auth-orb-color: rgba(0, 195, 137, 0.10);
 }
 
 /* ===== Dark Mode ===== */
@@ -144,6 +149,11 @@
     --shadow-accent: 0 4px 20px rgba(46, 219, 163, 0.2);
     --shadow-accent-lg: 0 8px 40px rgba(46, 219, 163, 0.25);
     --shadow-inner: inset 0 1px 3px rgba(0,0,0,0.3);
+
+    /* Auth/App Page Background (dark mode) */
+    --auth-bg: #061829;
+    --auth-grid-color: rgba(0, 195, 137, 0.07);
+    --auth-orb-color: rgba(0, 195, 137, 0.12);
 }
 
 /* ===== Base Styles ===== */
