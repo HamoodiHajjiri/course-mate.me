@@ -1094,6 +1094,7 @@ export default function SchedulePage() {
         return (
             <div className={styles.page}>
                 <div className={styles.spinner} style={{ margin: '60px auto' }}></div>
+                <BottomNav />
             </div>
         );
     }

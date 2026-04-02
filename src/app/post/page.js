@@ -410,7 +410,10 @@ export default function PostPage() {
     return (
         <Suspense fallback={
             <div className={styles.page}>
-                <div className={styles.spinner}></div>
+                <div className={styles.pageInner} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexGrow: 1 }}>
+                    <div className={styles.spinner}></div>
+                </div>
+                <BottomNav />
             </div>
         }>
             <PostContent />
