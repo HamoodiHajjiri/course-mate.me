@@ -239,6 +239,13 @@ function generateSchedules(courseGroups, prefs, courseNames) {
                 );
             }
 
+            // Mixed sections filter
+            if (prefs.hideMixedSections) {
+                groups = groups.filter(g =>
+                    g.sections.every(s => s.campus !== 'main')
+                );
+            }
+
             // Hard elective filter for basket courses
             if (cid.startsWith('BASKET_')) {
                 const prefsKey = cid.startsWith('BASKET_DEPT_') ? 'BASKET_DEPT' : cid;
@@ -485,14 +492,17 @@ export default function SchedulePage() {
         languagePref: 'any',
         preferredElectives: {},    // { BASKET_1: ['CS101', ...], BASKET_2: [] }
         hardElectiveFilter: {},    // { BASKET_1: false, BASKET_2: true }
+        hideMixedSections: false,
     });
     const [generating, setGenerating] = useState(false);
     const [results, setResults] = useState(null);
     const [extraCourseNames, setExtraCourseNames] = useState({});
+    const [extraCourseCredits, setExtraCourseCredits] = useState({});
     const [loadingCourseIds, setLoadingCourseIds] = useState(new Set());
     const [showCount, setShowCount] = useState(3);
     const [error, setError] = useState('');
     const [savedScheduleIdx, setSavedScheduleIdx] = useState(null);
+    const [dbSavedSchedules, setDbSavedSchedules] = useState([]);
     const [showAlternatives, setShowAlternatives] = useState(false);
     const [restoringFromSave, setRestoringFromSave] = useState(false);
     const [xorCourseIds, setXorCourseIds] = useState(new Set());
@@ -528,60 +538,146 @@ export default function SchedulePage() {
         setProfile(profileData);
         fetchCourses(profileData.major);
 
-        // Restore: prioritize saved schedule, then just selected courses
-        const hasSavedSchedule = localStorage.getItem('schedule_saved');
-        if (hasSavedSchedule) {
-            restoreSavedSchedule(profileData);
-        } else {
-            restoreSelectedCourses(profileData);
-        }
+        // Fetch Database Saved Schedules properly reconstructing the CRNs
+        await fetchDbSavedSchedules(profileData);
+
+        // Always restore the user's active "draft" selected courses cart
+        restoreSelectedCourses(profileData);
     };
 
-    const restoreSavedSchedule = async (prof) => {
-        try {
-            const saved = localStorage.getItem('schedule_saved');
-            if (!saved) return;
-            const { courseIds, savedIdx } = JSON.parse(saved);
-            if (!courseIds?.length) return;
+    const fetchDbSavedSchedules = async (prof) => {
+        const { data: savedData, error: savedError } = await supabase
+            .from('saved_schedules')
+            .select('*')
+            .eq('user_id', prof.id)
+            .order('created_at', { ascending: true });
 
-            // Fetch course info
-            const { data: courseData } = await supabase
-                .from('courses').select('course_id, course_name').in('course_id', courseIds);
-            if (!courseData?.length) return;
-
-            const restoredCourses = courseData.map(c => ({ course_id: c.course_id, name: c.course_name }));
-            setSelectedCourses(restoredCourses);
-            setRestoringFromSave(true);
-
-            // Fetch sections for all courses
-            const allowedCampuses = prof?.gender === 'male' ? ['main', 'men'] : ['main', 'women'];
-            const sectionMap = {};
-            for (const cid of courseIds) {
-                const { data } = await supabase
-                    .from('sections').select('*').eq('course_id', cid)
-                    .in('campus', allowedCampuses).order('section_num');
-                sectionMap[cid] = mapSectionsData(data) || [];
-            }
-            setAllSections(sectionMap);
-
-            // Auto-generate
-            const courseGroups = {};
-            const courseNames = {};
-            for (const c of restoredCourses) {
-                courseNames[c.course_id] = c.name;
-                courseGroups[c.course_id] = buildSectionGroups(sectionMap[c.course_id] || [], c.course_id);
-            }
-
-            const scored = generateSchedules(courseGroups, prefs, courseNames);
-            setResults(scored);
-            if (typeof savedIdx === 'number' && savedIdx < scored.length) {
-                setSavedScheduleIdx(savedIdx);
-            }
-            setRestoringFromSave(false);
-        } catch (e) {
-            console.error('Error restoring saved schedule:', e);
-            setRestoringFromSave(false);
+        if (savedError || !savedData || savedData.length === 0) {
+            setDbSavedSchedules([]);
+            return;
         }
+
+        // Gather all unique CRNs and courseIDs to fetch
+        const allCrns = new Set();
+        const allCourseIds = new Set();
+        savedData.forEach(dbObj => {
+            const { courseGroups, selectedCourses: rawSelected } = dbObj.schedule_data;
+            courseGroups.forEach(g => {
+                if (g.sections) g.sections.forEach(crn => allCrns.add(crn));
+            });
+            rawSelected.forEach(c => allCourseIds.add(c.course_id));
+        });
+
+        // Fetch live section data
+        const { data: liveSections } = await supabase
+            .from('sections')
+            .select('*')
+            .in('crn', Array.from(allCrns));
+
+        // Fetch courses to update names/credits
+        const { data: coursesData } = await supabase
+            .from('courses')
+            .select('course_id, course_name, credit_hours')
+            .in('course_id', Array.from(allCourseIds));
+
+        if (coursesData) {
+            const newNames = {};
+            const newCredits = {};
+            coursesData.forEach(c => {
+                newNames[c.course_id] = c.course_name;
+                newCredits[c.course_id] = c.credit_hours;
+            });
+            setExtraCourseNames(prev => ({ ...prev, ...newNames }));
+            setExtraCourseCredits(prev => ({ ...prev, ...newCredits }));
+        }
+
+        const sectionMap = {};
+        if (liveSections) {
+            liveSections.forEach(sec => { sectionMap[sec.crn] = sec; });
+        }
+
+        // Reconstruct
+        const computedSchedules = [];
+        savedData.forEach(dbObj => {
+            const { score, warnings, courseGroups, selectedCourses: rawSelected } = dbObj.schedule_data;
+            let missingFlag = false;
+
+            const reconstructedGroups = courseGroups.map(g => {
+                const mappedSections = g.sections.map(crn => {
+                    if (sectionMap[crn]) return sectionMap[crn];
+                    missingFlag = true;
+                    return {
+                        crn,
+                        course_id: g.courseId,
+                        section_num: 'CLOSED',
+                        class_time: 'MISSING',
+                        instructor: 'Section Unavailable',
+                        isMissing: true,
+                        campus: 'main'
+                    };
+                });
+                return {
+                    courseId: g.courseId,
+                    originalCourseId: g.originalCourseId,
+                    sections: mappedSections,
+                    slots: mappedSections.filter(s => !s.isMissing).flatMap(s => parseClassTime(s.class_time))
+                };
+            });
+
+            const updatedWarnings = [...(warnings || [])];
+            if (missingFlag) {
+                updatedWarnings.unshift("⚠️ One or more sections in this schedule are now CLOSED or DELETED from the catalogue.");
+            }
+
+            computedSchedules.push({
+                dbId: dbObj.id,
+                schedule: reconstructedGroups,
+                score,
+                warnings: updatedWarnings,
+                storedSelectedCourses: rawSelected
+            });
+        });
+
+        setDbSavedSchedules(computedSchedules);
+    };
+
+    const handleSaveSchedule = async (resultToSave) => {
+        if (dbSavedSchedules.length >= 3) {
+            setError('You can only store up to 3 saved schedules at a time. Please delete one first.');
+            return;
+        }
+
+        const { schedule, score, warnings } = resultToSave;
+        const scheduleData = {
+            score,
+            warnings,
+            courseGroups: schedule.map(g => ({
+                courseId: g.courseId,
+                originalCourseId: g.originalCourseId,
+                sections: g.sections.map(s => s.crn)
+            })),
+            selectedCourses: selectedCourses.map(c => ({ course_id: c.course_id, name: c.name }))
+        };
+
+        const { error: saveError } = await supabase
+            .from('saved_schedules')
+            .insert([{ user_id: profile.id, schedule_data: scheduleData }]);
+
+        if (saveError) {
+            setError('Database Error: ' + saveError.message);
+            return;
+        }
+
+        await fetchDbSavedSchedules(profile);
+    };
+
+    const handleDeleteSavedSchedule = async (dbId) => {
+        const { error: delError } = await supabase.from('saved_schedules').delete().eq('id', dbId);
+        if (delError) {
+            setError('Failed to delete schedule: ' + delError.message);
+            return;
+        }
+        setDbSavedSchedules(prev => prev.filter(s => s.dbId !== dbId));
     };
 
     const restoreSelectedCourses = async (prof) => {
@@ -599,10 +695,10 @@ export default function SchedulePage() {
 
             if (realCourseIds.length > 0) {
                 const { data: courseData } = await supabase
-                    .from('courses').select('course_id, course_name').in('course_id', realCourseIds);
+                    .from('courses').select('course_id, course_name, credit_hours').in('course_id', realCourseIds);
                 if (courseData) {
                     restoredCourses = restoredCourses.concat(
-                        courseData.map(c => ({ course_id: c.course_id, name: c.course_name }))
+                        courseData.map(c => ({ course_id: c.course_id, name: c.course_name, credit_hours: c.credit_hours || 0 }))
                     );
                 }
             }
@@ -645,8 +741,8 @@ export default function SchedulePage() {
         if (!majorCourses?.length) return;
         const courseIds = majorCourses.map(mc => mc.course_id);
         const { data } = await supabase
-            .from('courses').select('course_id, course_name').in('course_id', courseIds).order('course_id');
-        setCourses((data || []).map(c => ({ course_id: c.course_id, name: c.course_name })));
+            .from('courses').select('course_id, course_name, credit_hours').in('course_id', courseIds).order('course_id');
+        setCourses((data || []).map(c => ({ course_id: c.course_id, name: c.course_name, credit_hours: c.credit_hours || 0 })));
     };
 
     const fetchSectionsForCourse = async (courseId, profileOverride) => {
@@ -679,13 +775,18 @@ export default function SchedulePage() {
                 // Need course names for the dropdown/display
                 const { data: courseData } = await supabase
                     .from('courses')
-                    .select('course_id, course_name')
+                    .select('course_id, course_name, credit_hours')
                     .in('course_id', electiveIds);
 
                 const newExtraNames = {};
+                const newExtraCredits = {};
                 if (courseData) {
-                    courseData.forEach(c => newExtraNames[c.course_id] = c.course_name);
+                    courseData.forEach(c => {
+                        newExtraNames[c.course_id] = c.course_name;
+                        newExtraCredits[c.course_id] = c.credit_hours || 0;
+                    });
                     setExtraCourseNames(prev => ({ ...prev, ...newExtraNames }));
+                    setExtraCourseCredits(prev => ({ ...prev, ...newExtraCredits }));
                 }
 
                 // 2. Get sections for these courses
@@ -723,13 +824,18 @@ export default function SchedulePage() {
 
                 const { data: courseData } = await supabase
                     .from('courses')
-                    .select('course_id, course_name')
+                    .select('course_id, course_name, credit_hours')
                     .in('course_id', electiveIds);
 
                 const newExtraNames = {};
+                const newExtraCredits = {};
                 if (courseData) {
-                    courseData.forEach(c => newExtraNames[c.course_id] = c.course_name);
+                    courseData.forEach(c => {
+                        newExtraNames[c.course_id] = c.course_name;
+                        newExtraCredits[c.course_id] = c.credit_hours || 0;
+                    });
                     setExtraCourseNames(prev => ({ ...prev, ...newExtraNames }));
+                    setExtraCourseCredits(prev => ({ ...prev, ...newExtraCredits }));
                 }
 
                 const { data } = await supabase
@@ -749,7 +855,7 @@ export default function SchedulePage() {
                 // 1. Get courses in this basket
                 const { data: basketCourses } = await supabase
                     .from('courses')
-                    .select('course_id, course_name')
+                    .select('course_id, course_name, credit_hours')
                     .eq('university_elective_basket', basketName);
 
                 if (!basketCourses?.length) {
@@ -758,8 +864,13 @@ export default function SchedulePage() {
                 }
 
                 const newExtraNames = {};
-                basketCourses.forEach(c => newExtraNames[c.course_id] = c.course_name);
+                const newExtraCredits = {};
+                basketCourses.forEach(c => {
+                    newExtraNames[c.course_id] = c.course_name;
+                    newExtraCredits[c.course_id] = c.credit_hours || 0;
+                });
                 setExtraCourseNames(prev => ({ ...prev, ...newExtraNames }));
+                setExtraCourseCredits(prev => ({ ...prev, ...newExtraCredits }));
 
                 const courseIds = basketCourses.map(c => c.course_id);
 
@@ -1170,6 +1281,12 @@ export default function SchedulePage() {
         return m;
     }, [selectedCourses, extraCourseNames]);
 
+    const courseCreditsMap = useMemo(() => {
+        const m = { ...extraCourseCredits };
+        selectedCourses.forEach(c => { m[c.course_id] = c.credit_hours || 0; });
+        return m;
+    }, [selectedCourses, extraCourseCredits]);
+
     // Close dropdown on outside click
     useEffect(() => {
         const handler = () => setShowDropdown(false);
@@ -1196,403 +1313,400 @@ export default function SchedulePage() {
     return (
         <div className={styles.page}>
             <div className={styles.pageInner}>
-            <header className={styles.header}>
-                <h1>Schedule Builder</h1>
-                <ThemeToggle />
-            </header>
+                <header className={styles.header}>
+                    <h1>Schedule Builder</h1>
+                    <ThemeToggle />
+                </header>
 
-            <main className={styles.main}>
-                {error && <div className={styles.error}>{error}</div>}
+                <main className={styles.main}>
+                    {error && <div className={styles.error}>{error}</div>}
 
-                {/* Step 1: Course Selection — compact when results exist */}
-                {results && results.length > 0 ? (
-                    <div className={styles.compactBar}>
-                        <div className={styles.compactCourses}>
-                            {selectedCourses.map(c => (
-                                <span key={c.course_id} className={styles.compactChip}>{c.course_id}</span>
+                    {/* SAVED SCHEDULES WIDGET */}
+                    {dbSavedSchedules.length > 0 && (
+                        <div className={styles.section}>
+                            <div className={styles.sectionHeader}>
+                                <h2 className={styles.sectionTitle}>Your Saved Schedules ({dbSavedSchedules.length}/3)</h2>
+                            </div>
+                            {dbSavedSchedules.map((savedObj, i) => (
+                                <ScheduleCard 
+                                    key={savedObj.dbId} 
+                                    result={savedObj} 
+                                    rank={i + 1} 
+                                    courseNameMap={courseNameMap} 
+                                    courseCreditsMap={courseCreditsMap} 
+                                    selectedCourses={savedObj.storedSelectedCourses} 
+                                    onSave={null} 
+                                    onUnsave={() => handleDeleteSavedSchedule(savedObj.dbId)} 
+                                    isSaved={true} 
+                                    initiallyCollapsed={true}
+                                />
                             ))}
                         </div>
-                        <button className={styles.editCoursesBtn} onClick={() => setResults(null)}>Edit Courses</button>
-                    </div>
-                ) : (
-                    <div className={`${styles.card} ${styles.section}`}>
-                        <div className={styles.sectionTitle}>Select Courses</div>
-                        <div className={styles.searchWrapper} onClick={e => e.stopPropagation()}>
-                            <input type="text" value={courseSearch} onChange={(e) => { setCourseSearch(e.target.value); setShowDropdown(true); }} onFocus={() => setShowDropdown(true)} className={styles.input} placeholder="Search by course name or ID..." autoComplete="off" />
-                            {showDropdown && filteredCourses.length > 0 && (
-                                <div className={styles.dropdown}>
-                                    {filteredCourses.map(course => (
-                                        <button key={course.course_id} type="button" className={styles.dropdownItem} onClick={() => addCourse(course)}>
-                                            <span className={styles.dropdownId}>{course.course_id}</span>
-                                            <span className={styles.dropdownName}>{course.name}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
+                    )}
 
-
-
-                        {selectedCourses.length > 0 ? (
-                            <div className={styles.selectedCourses}>
+                    {/* Step 1: Course Selection — compact when results exist */}
+                    {results && results.length > 0 ? (
+                        <div className={styles.compactBar}>
+                            <div className={styles.compactCourses}>
                                 {selectedCourses.map(c => (
-                                    <div key={c.course_id} className={`${styles.courseChip} ${xorCourseIds.has(c.course_id) ? styles.courseChipXor : ''}`}>
-                                        <div className={styles.courseChipInfo}>
-                                            <span className={styles.courseChipId}>{c.course_id}</span>
-                                            <span className={styles.courseChipName}>{c.name}</span>
-                                            {loadingCourseIds.has(c.course_id) && <span className={styles.spinner} style={{ width: 12, height: 12, borderWidth: 2, marginLeft: 8 }}></span>}
-                                        </div>
-                                        <div className={styles.courseChipActions}>
-                                            <button className={`${styles.xorToggle} ${xorCourseIds.has(c.course_id) ? styles.xorToggleActive : ''}`} onClick={() => toggleXor(c.course_id)} title="Exclusive Or — only one XOR course will appear per schedule">XOR</button>
-                                            <button className={styles.removeBtn} onClick={() => removeCourse(c.course_id)}>×</button>
-                                        </div>
-                                    </div>
+                                    <span key={c.course_id} className={styles.compactChip}>{c.course_id}</span>
                                 ))}
-                                {xorCourseIds.size >= 1 && (
-                                    <div className={styles.xorInfo}>
-                                        Schedules will include only one of the XOR courses at a time.
+                            </div>
+                            <button className={styles.editCoursesBtn} onClick={() => setResults(null)}>Edit Courses</button>
+                        </div>
+                    ) : (
+                        <div className={`${styles.card} ${styles.section}`}>
+                            <div className={styles.sectionTitle}>Select Courses</div>
+                            <div className={styles.searchWrapper} onClick={e => e.stopPropagation()}>
+                                <input type="text" value={courseSearch} onChange={(e) => { setCourseSearch(e.target.value); setShowDropdown(true); }} onFocus={() => setShowDropdown(true)} className={styles.input} placeholder="Search by course name or ID..." autoComplete="off" />
+                                {showDropdown && filteredCourses.length > 0 && (
+                                    <div className={styles.dropdown}>
+                                        {filteredCourses.map(course => (
+                                            <button key={course.course_id} type="button" className={styles.dropdownItem} onClick={() => addCourse(course)}>
+                                                <span className={styles.dropdownId}>{course.course_id}</span>
+                                                <span className={styles.dropdownName}>{course.name}</span>
+                                            </button>
+                                        ))}
                                     </div>
                                 )}
                             </div>
-                        ) : (
-                            <div className={styles.emptyCourses}>
-                                Add courses to build your schedule
-                            </div>
-                        )}
 
-                        <div className={styles.basketButtons}>
-                            <button className={styles.basketBtn} onClick={() => addCourse({ course_id: 'BASKET_1', name: 'University Elective (Basket 1)', is_basket: true, basket_name: 'Basket 1' })}>
-                                + Group 1 Elective
-                            </button>
-                            <button className={styles.basketBtn} onClick={() => addCourse({ course_id: 'BASKET_2', name: 'University Elective (Basket 2)', is_basket: true, basket_name: 'Basket 2' })}>
-                                + Group 2 Elective
-                            </button>
-                            {majorInfo?.dept_electives_count > 0 && majorInfo?.support_electives_count > 0 ? (
-                                <>
-                                    <button className={styles.basketBtn} onClick={addDeptElective}>
-                                        + Major Elective
-                                    </button>
-                                    <button className={styles.basketBtn} onClick={addSupportElective}>
-                                        + Support Elective
-                                    </button>
-                                </>
-                            ) : majorInfo?.dept_electives_count > 0 ? (
-                                <button className={`${styles.basketBtn} ${styles.basketBtnFull}`} onClick={addDeptElective}>
-                                    + Department Elective
+
+
+                            {selectedCourses.length > 0 ? (
+                                <div className={styles.selectedCourses}>
+                                    {selectedCourses.map(c => (
+                                        <div key={c.course_id} className={`${styles.courseChip} ${xorCourseIds.has(c.course_id) ? styles.courseChipXor : ''}`}>
+                                            <div className={styles.courseChipInfo}>
+                                                <span className={styles.courseChipId}>{c.course_id}</span>
+                                                <span className={styles.courseChipName}>{c.name}</span>
+                                                {loadingCourseIds.has(c.course_id) && <span className={styles.spinner} style={{ width: 12, height: 12, borderWidth: 2, marginLeft: 8 }}></span>}
+                                            </div>
+                                            <div className={styles.courseChipActions}>
+                                                <button className={`${styles.xorToggle} ${xorCourseIds.has(c.course_id) ? styles.xorToggleActive : ''}`} onClick={() => toggleXor(c.course_id)} title="Exclusive Or — only one XOR course will appear per schedule">XOR</button>
+                                                <button className={styles.removeBtn} onClick={() => removeCourse(c.course_id)}>×</button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {xorCourseIds.size >= 1 && (
+                                        <div className={styles.xorInfo}>
+                                            Schedules will include only one of the XOR courses at a time.
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className={styles.emptyCourses}>
+                                    Add courses to build your schedule
+                                </div>
+                            )}
+
+                            <div className={styles.basketButtons}>
+                                <button className={styles.basketBtn} onClick={() => addCourse({ course_id: 'BASKET_1', name: 'University Elective (Basket 1)', is_basket: true, basket_name: 'Basket 1' })}>
+                                    + Group 1 Elective
                                 </button>
-                            ) : null}
-                        </div>
-                    </div>
-                )}
-
-                {/* Step 2: Preferences — hidden when results showing */}
-                {selectedCourses.length > 0 && !results && (
-                    <div className={styles.section}>
-                        <div className={styles.prefsCard}>
-                            <div className={styles.prefsHeader} onClick={() => setPrefsOpen(!prefsOpen)}>
-                                <span className={styles.prefsHeaderTitle}>Preferences</span>
-                                <span className={`${styles.prefsChevron} ${prefsOpen ? styles.prefsChevronOpen : ''}`}>
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="m6 9 6 6 6-6" />
-                                    </svg>
-                                </span>
+                                <button className={styles.basketBtn} onClick={() => addCourse({ course_id: 'BASKET_2', name: 'University Elective (Basket 2)', is_basket: true, basket_name: 'Basket 2' })}>
+                                    + Group 2 Elective
+                                </button>
+                                {majorInfo?.dept_electives_count > 0 && majorInfo?.support_electives_count > 0 ? (
+                                    <>
+                                        <button className={styles.basketBtn} onClick={addDeptElective}>
+                                            + Major Elective
+                                        </button>
+                                        <button className={styles.basketBtn} onClick={addSupportElective}>
+                                            + Support Elective
+                                        </button>
+                                    </>
+                                ) : majorInfo?.dept_electives_count > 0 ? (
+                                    <button className={`${styles.basketBtn} ${styles.basketBtnFull}`} onClick={addDeptElective}>
+                                        + Department Elective
+                                    </button>
+                                ) : null}
                             </div>
-                            {prefsOpen && (
-                                <div className={styles.prefsBody}>
-                                    {/* Time Constraints */}
-                                    <div className={styles.prefGroup}>
-                                        <span className={styles.prefLabel}>Time Constraints</span>
-                                        <div className={styles.timeRow}>
-                                            <span className={styles.timeSep}>No classes before</span>
-                                            <select className={styles.timeInput} value={prefs.noClassesBefore} onChange={e => setPrefs(p => ({ ...p, noClassesBefore: e.target.value }))}>
-                                                <option value="">Any</option>
-                                                <option value="09:30 AM">9:30 AM</option>
-                                                <option value="11:00 AM">11:00 AM</option>
-                                                <option value="12:30 PM">12:30 PM</option>
-                                                <option value="02:00 PM">2:00 PM</option>
-                                            </select>
+                        </div>
+                    )}
+
+                    {/* Step 2: Preferences — hidden when results showing */}
+                    {selectedCourses.length > 0 && !results && (
+                        <div className={styles.section}>
+                            <div className={styles.prefsCard}>
+                                <div className={styles.prefsHeader} onClick={() => setPrefsOpen(!prefsOpen)}>
+                                    <span className={styles.prefsHeaderTitle}>Preferences</span>
+                                    <span className={`${styles.prefsChevron} ${prefsOpen ? styles.prefsChevronOpen : ''}`}>
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="m6 9 6 6 6-6" />
+                                        </svg>
+                                    </span>
+                                </div>
+                                {prefsOpen && (
+                                    <div className={styles.prefsBody}>
+                                        {/* Time Constraints */}
+                                        <div className={styles.prefGroup}>
+                                            <span className={styles.prefLabel}>Time Constraints</span>
+                                            <div className={styles.timeRow}>
+                                                <span className={styles.timeSep}>No classes before</span>
+                                                <select className={styles.timeInput} value={prefs.noClassesBefore} onChange={e => setPrefs(p => ({ ...p, noClassesBefore: e.target.value }))}>
+                                                    <option value="">Any</option>
+                                                    <option value="09:30 AM">9:30 AM</option>
+                                                    <option value="11:00 AM">11:00 AM</option>
+                                                    <option value="12:30 PM">12:30 PM</option>
+                                                    <option value="02:00 PM">2:00 PM</option>
+                                                </select>
+                                            </div>
+                                            <div className={styles.timeRow}>
+                                                <span className={styles.timeSep}>No classes after</span>
+                                                <select className={styles.timeInput} value={prefs.noClassesAfter} onChange={e => setPrefs(p => ({ ...p, noClassesAfter: e.target.value }))}>
+                                                    <option value="">Any</option>
+                                                    <option value="02:00 PM">2:00 PM</option>
+                                                    <option value="03:15 PM">3:30 PM</option>
+                                                    <option value="05:00 PM">5:00 PM</option>
+                                                    <option value="06:30 PM">6:30 PM</option>
+                                                </select>
+                                            </div>
                                         </div>
-                                        <div className={styles.timeRow}>
-                                            <span className={styles.timeSep}>No classes after</span>
-                                            <select className={styles.timeInput} value={prefs.noClassesAfter} onChange={e => setPrefs(p => ({ ...p, noClassesAfter: e.target.value }))}>
-                                                <option value="">Any</option>
-                                                <option value="02:00 PM">2:00 PM</option>
-                                                <option value="03:15 PM">3:30 PM</option>
-                                                <option value="05:00 PM">5:00 PM</option>
-                                                <option value="06:30 PM">6:30 PM</option>
-                                            </select>
+
+                                        <div className={styles.prefGroup}>
+                                            <span className={styles.prefLabel}>Section Language</span>
+                                            <div className={styles.toggleRow}>
+                                                <button className={`${styles.toggleBtn} ${prefs.languagePref === 'any' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, languagePref: 'any' }))}>Any</button>
+                                                <button className={`${styles.toggleBtn} ${prefs.languagePref === 'english' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, languagePref: 'english' }))}>English</button>
+                                                <button className={`${styles.toggleBtn} ${prefs.languagePref === 'arabic' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, languagePref: 'arabic' }))}>Arabic</button>
+                                            </div>
                                         </div>
-                                    </div>
 
-                                    <div className={styles.prefGroup}>
-                                        <span className={styles.prefLabel}>Section Language</span>
-                                        <div className={styles.toggleRow}>
-                                            <button className={`${styles.toggleBtn} ${prefs.languagePref === 'any' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, languagePref: 'any' }))}>Any</button>
-                                            <button className={`${styles.toggleBtn} ${prefs.languagePref === 'english' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, languagePref: 'english' }))}>English</button>
-                                            <button className={`${styles.toggleBtn} ${prefs.languagePref === 'arabic' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, languagePref: 'arabic' }))}>Arabic</button>
+                                        <div className={styles.prefGroup}>
+                                            <label className={styles.checkboxLabel} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={prefs.strictTime}
+                                                    onChange={e => setPrefs(p => ({ ...p, strictTime: e.target.checked }))}
+                                                    style={{ width: '16px', height: '16px' }}
+                                                />
+                                                Strict time constraints (don't show alternatives)
+                                            </label>
                                         </div>
-                                    </div>
 
-                                    <div className={styles.prefGroup}>
-                                        <label className={styles.checkboxLabel} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                                            <input
-                                                type="checkbox"
-                                                checked={prefs.strictTime}
-                                                onChange={e => setPrefs(p => ({ ...p, strictTime: e.target.checked }))}
-                                                style={{ width: '16px', height: '16px' }}
-                                            />
-                                            Strict time constraints (don't show alternatives)
-                                        </label>
-                                    </div>
-
-                                    {/* Gap Preference */}
-                                    <div className={styles.prefGroup}>
-                                        <span className={styles.prefLabel}>Gap Preference</span>
-                                        <div className={styles.toggleRow}>
-                                            <button className={`${styles.toggleBtn} ${prefs.gapPref === 'none' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, gapPref: 'none' }))}>No preference</button>
-                                            <button className={`${styles.toggleBtn} ${prefs.gapPref === 'minimize' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, gapPref: 'minimize' }))}>No gaps</button>
-                                            <button className={`${styles.toggleBtn} ${prefs.gapPref === 'prefer' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, gapPref: 'prefer' }))}>Prefer gaps</button>
+                                        <div className={styles.prefGroup}>
+                                            <label className={styles.checkboxLabel} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={prefs.hideMixedSections}
+                                                    onChange={e => setPrefs(p => ({ ...p, hideMixedSections: e.target.checked }))}
+                                                    style={{ width: '16px', height: '16px' }}
+                                                />
+                                                Hide mixed sections (main campus)
+                                            </label>
                                         </div>
-                                    </div>
 
-                                    {/* Compactness */}
-                                    <div className={styles.prefGroup}>
-                                        <span className={styles.prefLabel}>Day Spread</span>
-                                        <div className={styles.toggleRow}>
-                                            <button className={`${styles.toggleBtn} ${prefs.compactPref === 'none' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, compactPref: 'none' }))}>No preference</button>
-                                            <button className={`${styles.toggleBtn} ${prefs.compactPref === 'fewer' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, compactPref: 'fewer' }))}>Fewer days</button>
-                                            <button className={`${styles.toggleBtn} ${prefs.compactPref === 'spread' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, compactPref: 'spread' }))}>Spread out</button>
+                                        {/* Gap Preference */}
+                                        <div className={styles.prefGroup}>
+                                            <span className={styles.prefLabel}>Gap Preference</span>
+                                            <div className={styles.toggleRow}>
+                                                <button className={`${styles.toggleBtn} ${prefs.gapPref === 'none' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, gapPref: 'none' }))}>No preference</button>
+                                                <button className={`${styles.toggleBtn} ${prefs.gapPref === 'minimize' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, gapPref: 'minimize' }))}>No gaps</button>
+                                                <button className={`${styles.toggleBtn} ${prefs.gapPref === 'prefer' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, gapPref: 'prefer' }))}>Prefer gaps</button>
+                                            </div>
                                         </div>
-                                    </div>
 
-                                    {/* Per-course preferences */}
-                                    {selectedCourses.map(c => {
-                                        const isBasket = c.course_id.startsWith('BASKET_');
-                                        const isDeptBasket = c.course_id.startsWith('BASKET_DEPT_');
-                                        const isSupportBasket = c.course_id.startsWith('BASKET_SUPPORT_');
+                                        {/* Compactness */}
+                                        <div className={styles.prefGroup}>
+                                            <span className={styles.prefLabel}>Day Spread</span>
+                                            <div className={styles.toggleRow}>
+                                                <button className={`${styles.toggleBtn} ${prefs.compactPref === 'none' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, compactPref: 'none' }))}>No preference</button>
+                                                <button className={`${styles.toggleBtn} ${prefs.compactPref === 'fewer' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, compactPref: 'fewer' }))}>Fewer days</button>
+                                                <button className={`${styles.toggleBtn} ${prefs.compactPref === 'spread' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, compactPref: 'spread' }))}>Spread out</button>
+                                            </div>
+                                        </div>
 
-                                        // If it's a department basket, only show preferences for the FIRST one added
-                                        if (isDeptBasket) {
-                                            const firstDeptBasket = selectedCourses.find(sc => sc.course_id.startsWith('BASKET_DEPT_'));
-                                            if (c.course_id !== firstDeptBasket.course_id) return null;
-                                        }
-                                        if (isSupportBasket) {
-                                            const firstSupportBasket = selectedCourses.find(sc => sc.course_id.startsWith('BASKET_SUPPORT_'));
-                                            if (c.course_id !== firstSupportBasket.course_id) return null;
-                                        }
+                                        {/* Per-course preferences */}
+                                        {selectedCourses.map(c => {
+                                            const isBasket = c.course_id.startsWith('BASKET_');
+                                            const isDeptBasket = c.course_id.startsWith('BASKET_DEPT_');
+                                            const isSupportBasket = c.course_id.startsWith('BASKET_SUPPORT_');
 
-                                        if (isBasket) {
-                                            const prefsKey = isDeptBasket ? 'BASKET_DEPT' : isSupportBasket ? 'BASKET_SUPPORT' : c.course_id;
-                                            const displayName = isDeptBasket ? (majorInfo?.support_electives_count > 0 ? 'Major Electives' : 'Department Electives') : isSupportBasket ? 'Support Electives' : c.name;
+                                            // If it's a department basket, only show preferences for the FIRST one added
+                                            if (isDeptBasket) {
+                                                const firstDeptBasket = selectedCourses.find(sc => sc.course_id.startsWith('BASKET_DEPT_'));
+                                                if (c.course_id !== firstDeptBasket.course_id) return null;
+                                            }
+                                            if (isSupportBasket) {
+                                                const firstSupportBasket = selectedCourses.find(sc => sc.course_id.startsWith('BASKET_SUPPORT_'));
+                                                if (c.course_id !== firstSupportBasket.course_id) return null;
+                                            }
 
-                                            const basketSections = allSections[c.course_id] || [];
-                                            const subCourseIds = [...new Set(basketSections.map(s => s.course_id))].sort();
-                                            if (subCourseIds.length === 0) return null;
+                                            if (isBasket) {
+                                                const prefsKey = isDeptBasket ? 'BASKET_DEPT' : isSupportBasket ? 'BASKET_SUPPORT' : c.course_id;
+                                                const displayName = isDeptBasket ? (majorInfo?.support_electives_count > 0 ? 'Major Electives' : 'Department Electives') : isSupportBasket ? 'Support Electives' : c.name;
 
-                                            const preferred = prefs.preferredElectives?.[prefsKey] || [];
-                                            const isHard = prefs.hardElectiveFilter?.[prefsKey] || false;
+                                                const basketSections = allSections[c.course_id] || [];
+                                                const subCourseIds = [...new Set(basketSections.map(s => s.course_id))].sort();
+                                                if (subCourseIds.length === 0) return null;
 
-                                            const toggleElective = (subId) => {
-                                                setPrefs(p => {
-                                                    const current = p.preferredElectives?.[prefsKey] || [];
-                                                    const next = current.includes(subId)
-                                                        ? current.filter(x => x !== subId)
-                                                        : [...current, subId];
-                                                    return { ...p, preferredElectives: { ...p.preferredElectives, [prefsKey]: next } };
-                                                });
-                                            };
+                                                const preferred = prefs.preferredElectives?.[prefsKey] || [];
+                                                const isHard = prefs.hardElectiveFilter?.[prefsKey] || false;
+
+                                                const toggleElective = (subId) => {
+                                                    setPrefs(p => {
+                                                        const current = p.preferredElectives?.[prefsKey] || [];
+                                                        const next = current.includes(subId)
+                                                            ? current.filter(x => x !== subId)
+                                                            : [...current, subId];
+                                                        return { ...p, preferredElectives: { ...p.preferredElectives, [prefsKey]: next } };
+                                                    });
+                                                };
+
+                                                return (
+                                                    <div key={prefsKey} className={styles.prefCourseItem}>
+                                                        <div className={styles.prefCourseName}>{displayName}</div>
+                                                        <div className={styles.prefGroup}>
+                                                            <span className={styles.prefLabel}>Preferred Courses</span>
+                                                            <div className={styles.electiveList}>
+                                                                {subCourseIds.map(subId => (
+                                                                    <label key={subId} className={styles.electiveItem}>
+                                                                        <input type="checkbox" checked={preferred.includes(subId)} onChange={() => toggleElective(subId)} />
+                                                                        <span className={styles.electiveId}>{subId}</span>
+                                                                        {extraCourseNames[subId] && (
+                                                                            <span className={styles.electiveName}>{extraCourseNames[subId]}</span>
+                                                                        )}
+                                                                    </label>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                        {preferred.length > 0 && (
+                                                            <label className={styles.electiveHardFilter}>
+                                                                <input type="checkbox" checked={isHard} onChange={e => setPrefs(p => ({ ...p, hardElectiveFilter: { ...p.hardElectiveFilter, [prefsKey]: e.target.checked } }))} />
+                                                                <span>Only show schedules with selected courses</span>
+                                                            </label>
+                                                        )}
+                                                    </div>
+                                                );
+                                            }
+
+                                            // Regular (non-basket) course
+                                            const instructors = getInstructors(c.course_id);
+                                            const baseSections = getBaseSections(c.course_id);
+                                            const pinnedBaseId = prefs.pinnedSections[c.course_id] || '';
+                                            const labSections = getLabSections(c.course_id, pinnedBaseId);
+
+                                            if (instructors.length === 0 && baseSections.length === 0 && labSections.length === 0) return null;
 
                                             return (
-                                                <div key={prefsKey} className={styles.prefCourseItem}>
-                                                    <div className={styles.prefCourseName}>{displayName}</div>
-                                                    <div className={styles.prefGroup}>
-                                                        <span className={styles.prefLabel}>Preferred Courses</span>
-                                                        <div className={styles.electiveList}>
-                                                            {subCourseIds.map(subId => (
-                                                                <label key={subId} className={styles.electiveItem}>
-                                                                    <input type="checkbox" checked={preferred.includes(subId)} onChange={() => toggleElective(subId)} />
-                                                                    <span className={styles.electiveId}>{subId}</span>
-                                                                    {extraCourseNames[subId] && (
-                                                                        <span className={styles.electiveName}>{extraCourseNames[subId]}</span>
-                                                                    )}
-                                                                </label>
-                                                            ))}
+                                                <div key={c.course_id} className={styles.prefCourseItem}>
+                                                    <div className={styles.prefCourseName}>{c.course_id} — {c.name}</div>
+                                                    {instructors.length > 1 && (
+                                                        <div className={styles.prefGroup}>
+                                                            <span className={styles.prefLabel}>Preferred Instructor</span>
+                                                            <select className={styles.select} value={prefs.preferredInstructors[c.course_id] || ''} onChange={e => setPrefs(p => ({ ...p, preferredInstructors: { ...p.preferredInstructors, [c.course_id]: e.target.value } }))}>
+                                                                <option value="">Any instructor</option>
+                                                                {instructors.map(i => <option key={i} value={i}>{i}</option>)}
+                                                            </select>
                                                         </div>
-                                                    </div>
-                                                    {preferred.length > 0 && (
-                                                        <label className={styles.electiveHardFilter}>
-                                                            <input type="checkbox" checked={isHard} onChange={e => setPrefs(p => ({ ...p, hardElectiveFilter: { ...p.hardElectiveFilter, [prefsKey]: e.target.checked } }))} />
-                                                            <span>Only show schedules with selected courses</span>
-                                                        </label>
+                                                    )}
+                                                    {baseSections.length > 1 && (
+                                                        <div className={styles.prefGroup}>
+                                                            <span className={styles.prefLabel}>Pin Lecture Section</span>
+                                                            <select className={styles.select} value={pinnedBaseId} onChange={e => {
+                                                                const newVal = e.target.value;
+                                                                setPrefs(p => {
+                                                                    const next = { ...p, pinnedSections: { ...p.pinnedSections, [c.course_id]: newVal } };
+                                                                    // Clear pinned lab if it no longer belongs to the newly pinned lecture
+                                                                    if (newVal && p.pinnedLabs?.[c.course_id]) {
+                                                                        const pl = p.pinnedLabs[c.course_id];
+                                                                        if (getBaseSection(pl) !== newVal) {
+                                                                            delete next.pinnedLabs[c.course_id];
+                                                                        }
+                                                                    }
+                                                                    return next;
+                                                                });
+                                                            }}>
+                                                                <option value="">Any lecture</option>
+                                                                {baseSections.map(s => {
+                                                                    const baseNum = getBaseSection(s.section_num);
+                                                                    return (
+                                                                        <option key={baseNum} value={baseNum}>
+                                                                            Section {baseNum}{s.class_time ? ` — ${s.class_time}` : ''}{s.instructor ? ` — ${s.instructor}` : ''}
+                                                                        </option>
+                                                                    );
+                                                                })}
+                                                            </select>
+                                                        </div>
+                                                    )}
+                                                    {labSections.length > 1 && (
+                                                        <div className={styles.prefGroup}>
+                                                            <span className={styles.prefLabel}>Pin Lab Section</span>
+                                                            <select className={styles.select} value={prefs.pinnedLabs?.[c.course_id] || ''} onChange={e => setPrefs(p => ({ ...p, pinnedLabs: { ...(p.pinnedLabs || {}), [c.course_id]: e.target.value } }))}>
+                                                                <option value="">Any lab</option>
+                                                                {labSections.map(s => (
+                                                                    <option key={s.section_num} value={s.section_num}>
+                                                                        Lab {s.section_num}{s.class_time ? ` — ${s.class_time}` : ''}{s.instructor ? ` — ${s.instructor}` : ''}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
                                                     )}
                                                 </div>
                                             );
-                                        }
-
-                                        // Regular (non-basket) course
-                                        const instructors = getInstructors(c.course_id);
-                                        const baseSections = getBaseSections(c.course_id);
-                                        const pinnedBaseId = prefs.pinnedSections[c.course_id] || '';
-                                        const labSections = getLabSections(c.course_id, pinnedBaseId);
-
-                                        if (instructors.length === 0 && baseSections.length === 0 && labSections.length === 0) return null;
-
-                                        return (
-                                            <div key={c.course_id} className={styles.prefCourseItem}>
-                                                <div className={styles.prefCourseName}>{c.course_id} — {c.name}</div>
-                                                {instructors.length > 1 && (
-                                                    <div className={styles.prefGroup}>
-                                                        <span className={styles.prefLabel}>Preferred Instructor</span>
-                                                        <select className={styles.select} value={prefs.preferredInstructors[c.course_id] || ''} onChange={e => setPrefs(p => ({ ...p, preferredInstructors: { ...p.preferredInstructors, [c.course_id]: e.target.value } }))}>
-                                                            <option value="">Any instructor</option>
-                                                            {instructors.map(i => <option key={i} value={i}>{i}</option>)}
-                                                        </select>
-                                                    </div>
-                                                )}
-                                                {baseSections.length > 1 && (
-                                                    <div className={styles.prefGroup}>
-                                                        <span className={styles.prefLabel}>Pin Lecture Section</span>
-                                                        <select className={styles.select} value={pinnedBaseId} onChange={e => {
-                                                            const newVal = e.target.value;
-                                                            setPrefs(p => {
-                                                                const next = { ...p, pinnedSections: { ...p.pinnedSections, [c.course_id]: newVal } };
-                                                                // Clear pinned lab if it no longer belongs to the newly pinned lecture
-                                                                if (newVal && p.pinnedLabs?.[c.course_id]) {
-                                                                    const pl = p.pinnedLabs[c.course_id];
-                                                                    if (getBaseSection(pl) !== newVal) {
-                                                                        delete next.pinnedLabs[c.course_id];
-                                                                    }
-                                                                }
-                                                                return next;
-                                                            });
-                                                        }}>
-                                                            <option value="">Any lecture</option>
-                                                            {baseSections.map(s => {
-                                                                const baseNum = getBaseSection(s.section_num);
-                                                                return (
-                                                                    <option key={baseNum} value={baseNum}>
-                                                                        Section {baseNum}{s.class_time ? ` — ${s.class_time}` : ''}{s.instructor ? ` — ${s.instructor}` : ''}
-                                                                    </option>
-                                                                );
-                                                            })}
-                                                        </select>
-                                                    </div>
-                                                )}
-                                                {labSections.length > 1 && (
-                                                    <div className={styles.prefGroup}>
-                                                        <span className={styles.prefLabel}>Pin Lab Section</span>
-                                                        <select className={styles.select} value={prefs.pinnedLabs?.[c.course_id] || ''} onChange={e => setPrefs(p => ({ ...p, pinnedLabs: { ...(p.pinnedLabs || {}), [c.course_id]: e.target.value } }))}>
-                                                            <option value="">Any lab</option>
-                                                            {labSections.map(s => (
-                                                                <option key={s.section_num} value={s.section_num}>
-                                                                    Lab {s.section_num}{s.class_time ? ` — ${s.class_time}` : ''}{s.instructor ? ` — ${s.instructor}` : ''}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {/* Generate Button — hidden when results showing */}
-                {selectedCourses.length > 0 && !results && (
-                    <button className={styles.generateBtn} onClick={handleGenerate} disabled={generating || loadingCourseIds.size > 0} style={loadingCourseIds.size > 0 ? { opacity: 0.7, cursor: 'not-allowed' } : {}}>
-                        {generating ? <span className={styles.spinner}></span> : (loadingCourseIds.size > 0 ? 'Loading course data...' : 'Generate Schedules')}
-                    </button>
-                )}
-
-                {/* Results */}
-                {results && results.length > 0 && (
-                    <>
-                        {/* Saved schedule display */}
-                        {savedScheduleIdx !== null && results[savedScheduleIdx] && (
-                            <div className={styles.section}>
-                                <ScheduleCard result={results[savedScheduleIdx]} rank={savedScheduleIdx + 1} courseNameMap={courseNameMap} selectedCourses={selectedCourses} isSaved={true} onUnsave={() => {
-                                    setSavedScheduleIdx(null);
-                                    setShowAlternatives(true);
-                                    localStorage.removeItem('schedule_saved');
-                                }} />
-                                {!showAlternatives && results.length > 1 && (
-                                    <button className={styles.showMoreBtn} onClick={() => setShowAlternatives(true)}>
-                                        Browse {results.length - 1} other schedule{results.length - 1 > 1 ? 's' : ''}
-                                    </button>
-                                )}
-                                {showAlternatives && (
-                                    <button className={styles.showMoreBtn} onClick={() => setShowAlternatives(false)}>
-                                        Hide other schedules
-                                    </button>
+                                        })}
+                                    </div>
                                 )}
                             </div>
-                        )}
-
-                        {/* Alternative schedules */}
-                        {(savedScheduleIdx === null || showAlternatives) && (
-                            <>
-                                <div className={styles.resultsHeader}>
-                                    <span className={styles.resultsTitle}>
-                                        {savedScheduleIdx !== null ? 'Other Schedules' : 'Generated Schedules'}
-                                    </span>
-                                    <span className={styles.resultsCount}>
-                                        {savedScheduleIdx !== null ? results.length - 1 : results.length} found
-                                    </span>
-                                </div>
-
-                                {results
-                                    .map((result, idx) => ({ result, idx }))
-                                    .filter(({ idx }) => idx !== savedScheduleIdx)
-                                    .slice(0, showCount)
-                                    .map(({ result, idx }) => (
-                                        <ScheduleCard key={idx} result={result} rank={idx + 1} courseNameMap={courseNameMap} selectedCourses={selectedCourses} onSave={() => {
-                                            setSavedScheduleIdx(idx);
-                                            setShowAlternatives(false);
-                                            localStorage.setItem('schedule_saved', JSON.stringify({
-                                                courseIds: selectedCourses.map(c => c.course_id),
-                                                savedIdx: idx,
-                                            }));
-                                        }} />
-                                    ))}
-
-                                {(() => {
-                                    const remaining = results.filter((_, i) => i !== savedScheduleIdx).length;
-                                    return showCount < remaining && (
-                                        <button className={styles.showMoreBtn} onClick={() => (showCount >= 9 ? setShowCount(remaining + 100) : setShowCount(prev => prev + 3))}>
-                                            {showCount >= 9 ? `Show All Remaining (${remaining - showCount} schedules)` : `Show More (${Math.min(3, remaining - showCount)} of ${remaining - showCount})`}
-                                        </button>
-                                    );
-                                })()}
-                            </>
-                        )}
-                    </>
-                )}
-
-                {results && results.length === 0 && (
-                    <div className={styles.noResults}>
-                        <div className={styles.noResultsIcon}></div>
-                        <div className={styles.noResultsTitle}>No valid schedules found</div>
-                        <div className={styles.noResultsText}>
-                            All {selectedCourses.length} courses could not fit into a single schedule without conflicts.
                         </div>
-                        <div className={styles.noResultsButtons}>
-                            <button className={styles.generateBtn} onClick={handleGenerateBestEffort} disabled={generating} style={{ width: 'auto', padding: '10px 20px', marginTop: '12px' }}>
-                                {generating ? <span className={styles.spinner}></span> : 'Generate Best Fit'}
-                            </button>
-                            <button className={styles.secondaryBtn} onClick={() => setResults(null)} style={{ width: 'auto', padding: '10px 20px', marginTop: '8px' }}>
-                                Modify Preferences
-                            </button>
+                    )}
+
+                    {/* Generate Button — hidden when results showing */}
+                    {selectedCourses.length > 0 && !results && (
+                        <button className={styles.generateBtn} onClick={handleGenerate} disabled={generating || loadingCourseIds.size > 0} style={loadingCourseIds.size > 0 ? { opacity: 0.7, cursor: 'not-allowed' } : {}}>
+                            {generating ? <span className={styles.spinner}></span> : (loadingCourseIds.size > 0 ? 'Loading course data...' : 'Generate Schedules')}
+                        </button>
+                    )}
+
+                    {/* Results */}
+                    {results && results.length > 0 && (
+                        <div className={styles.section}>
+                            <div className={styles.resultsHeader}>
+                                <span className={styles.resultsTitle}>Generated Schedules</span>
+                                <span className={styles.resultsCount}>{results.length} found</span>
+                            </div>
+                            {results
+                                .slice(0, showCount)
+                                .map((result, idx) => (
+                                    <ScheduleCard key={idx} result={result} rank={idx + 1} courseNameMap={courseNameMap} courseCreditsMap={courseCreditsMap} selectedCourses={selectedCourses} onSave={() => {
+                                        handleSaveSchedule(result);
+                                    }} />
+                                ))}
+
+                            {(() => {
+                                const remaining = results.length;
+                                return showCount < remaining && (
+                                    <button className={styles.showMoreBtn} onClick={() => (showCount >= 9 ? setShowCount(remaining + 100) : setShowCount(prev => prev + 3))}>
+                                        {showCount >= 9 ? `Show All Remaining (${remaining - showCount} schedules)` : `Show More (${Math.min(3, remaining - showCount)} of ${remaining - showCount})`}
+                                    </button>
+                                );
+                            })()}
                         </div>
-                        <div className={styles.noResultsHint}>
-                            Best Fit will generate schedules with as many courses as possible,
-                            excluding the ones that cause conflicts.
+                    )}
+
+                    {results && results.length === 0 && (
+                        <div className={styles.noResults}>
+                            <div className={styles.noResultsIcon}></div>
+                            <div className={styles.noResultsTitle}>No valid schedules found</div>
+                            <div className={styles.noResultsText}>
+                                All {selectedCourses.length} courses could not fit into a single schedule without conflicts.
+                            </div>
+                            <div className={styles.noResultsButtons}>
+                                <button className={styles.generateBtn} onClick={handleGenerateBestEffort} disabled={generating} style={{ width: 'auto', padding: '10px 20px', marginTop: '12px' }}>
+                                    {generating ? <span className={styles.spinner}></span> : 'Generate Best Fit'}
+                                </button>
+                                <button className={styles.secondaryBtn} onClick={() => setResults(null)} style={{ width: 'auto', padding: '10px 20px', marginTop: '8px' }}>
+                                    Modify Preferences
+                                </button>
+                            </div>
+                            <div className={styles.noResultsHint}>
+                                Best Fit will generate schedules with as many courses as possible,
+                                excluding the ones that cause conflicts.
+                            </div>
                         </div>
-                    </div>
-                )}
-            </main>
+                    )}
+                </main>
             </div>
 
             <BottomNav />
@@ -1602,9 +1716,16 @@ export default function SchedulePage() {
 
 // ===== SCHEDULE CARD COMPONENT =====
 
-function ScheduleCard({ result, rank, courseNameMap, selectedCourses, onSave, onUnsave, isSaved }) {
+function ScheduleCard({ result, rank, courseNameMap, courseCreditsMap, selectedCourses, onSave, onUnsave, isSaved, initiallyCollapsed = false }) {
     const { schedule, score, warnings } = result;
     const [detailsOpen, setDetailsOpen] = useState(false);
+    const [cardOpen, setCardOpen] = useState(!initiallyCollapsed);
+
+    // Compute total credit hours for this schedule
+    const totalCredits = schedule.reduce((sum, group) => {
+        // Use group.courseId to get the actual course selected (bypassing the basket generic ID)
+        return sum + (courseCreditsMap[group.courseId] || 0);
+    }, 0);
 
     // Collect all time blocks for the timetable
     const blocks = [];
@@ -1652,131 +1773,143 @@ function ScheduleCard({ result, rank, courseNameMap, selectedCourses, onSave, on
 
     return (
         <div className={styles.scheduleCard}>
-            <div className={styles.scheduleCardHeader}>
-                <span className={styles.scheduleRank}>Schedule #{rank}</span>
-                <span className={styles.scheduleScore}>Score: {Math.round(score)}</span>
-            </div>
-
-            {result.xorSelected && (() => {
-                let displayName = result.xorSelected.name;
-                let displayId = result.xorSelected.id;
-                // For baskets, find the actual course from the schedule
-                if (result.xorSelected.id.startsWith('BASKET_')) {
-                    const basketGroup = schedule.find(g => g.originalCourseId === result.xorSelected.id);
-                    if (basketGroup) {
-                        displayId = basketGroup.courseId;
-                        displayName = courseNameMap[basketGroup.courseId] || displayId;
-                    }
-                }
-                return (
-                    <div className={styles.xorSelectedInfo}>
-                        Includes: {displayName} ({displayId})
-                    </div>
-                );
-            })()}
-
-            {warnings.length > 0 && (
-                <div className={styles.prefWarnings}>
-                    {warnings.map((w, i) => <span key={i} className={styles.prefWarning}>{w}</span>)}
-                </div>
-            )}
-
-            <div className={styles.timetable}>
-                <div className={styles.ttContainer} style={{ height: gridHeight + HEADER_HEIGHT }}>
-                    {/* Time axis labels */}
-                    <div className={styles.ttTimeAxis} style={{ height: gridHeight, top: HEADER_HEIGHT }}>
-                        {hours.map(h => (
-                            <div key={h} className={styles.ttTimeLabel} style={{ top: (h - startHour) * 60 * PX_PER_MIN }}>
-                                {formatTimeShort(h * 60)}
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Day columns */}
-                    <div className={styles.ttColumns}>
-                        {days.map(day => (
-                            <div key={day} className={styles.ttColumn}>
-                                <div className={styles.ttDayHeader}>{day}</div>
-                                <div className={styles.ttDayBody} style={{ height: gridHeight }}>
-                                    {/* Hour grid lines */}
-                                    {hours.slice(0, -1).map(h => (
-                                        <div key={h} className={styles.ttGridLine} style={{ top: (h - startHour) * 60 * PX_PER_MIN }} />
-                                    ))}
-
-                                    {/* Class blocks */}
-                                    {blocks
-                                        .filter(b => b.day === day)
-                                        .map((block, bi) => {
-                                            const top = (block.start - startHour * 60) * PX_PER_MIN;
-                                            const height = (block.end - block.start) * PX_PER_MIN;
-                                            return (
-                                                <div key={bi} className={styles.ttBlock} style={{ top, height, background: bgColors[block.colorIdx], borderLeftColor: colors[block.colorIdx], color: colors[block.colorIdx] }}>
-                                                    <span className={styles.ttBlockCourse}>{block.courseId}</span>
-                                                    {block.courseName && <span className={styles.ttBlockName}>{block.courseName}</span>}
-                                                    <span className={styles.ttBlockSection}>{block.sectionNum}</span>
-                                                </div>
-                                            );
-                                        })}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+            <div className={styles.scheduleCardHeader} onClick={() => setCardOpen(!cardOpen)} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                <span className={styles.scheduleRank}>
+                    <span style={{ display: 'inline-block', width: '16px', textAlign: 'center', marginRight: '6px', transform: cardOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s', fontSize: '12px' }}>
+                        ▶
+                    </span>
+                    {Number.isInteger(rank) ? `Schedule #${rank}` : rank}
+                </span>
+                <div className={styles.scheduleCardMeta}>
+                    {totalCredits > 0 && <span className={styles.scheduleCredits}>{totalCredits} cr</span>}
+                    <span className={styles.scheduleScore}>Score: {Math.round(score)}</span>
                 </div>
             </div>
 
-            {/* Section details (collapsible) */}
-            <div
-                className={styles.detailsToggle}
-                onClick={() => setDetailsOpen(prev => !prev)}
-            >
-                {detailsOpen ? 'Hide details' : 'Show details'}
-            </div>
-            {detailsOpen && (
-                <div className={styles.scheduleDetails}>
-                    {schedule.map((group) => {
-                        const courseIdx = selectedCourses.findIndex(c => c.course_id === (group.originalCourseId || group.courseId));
-                        return group.sections.map((sec, secIdx) => (
-                            <div key={sec.crn || `${sec.course_id}-${sec.section_num}-${secIdx}`} className={styles.detailRow}>
-                                <div className={styles.detailColorBar} style={{ background: colors[courseIdx % 8] }}></div>
-                                <div className={styles.detailContent}>
-                                    <div className={styles.detailHeader}>
-                                        <span className={styles.detailCourseName}>{courseNameMap[sec.course_id] || sec.course_id}</span>
-                                        {isSaved && (
-                                            <a className={styles.requestLink} href={`/post?type=request&course=${sec.course_id}&section=${sec.section_num}`}>Request</a>
-                                        )}
+            {cardOpen && (
+                <>
+                    {result.xorSelected && (() => {
+                        let displayName = result.xorSelected.name;
+                        let displayId = result.xorSelected.id;
+                        // For baskets, find the actual course from the schedule
+                        if (result.xorSelected.id.startsWith('BASKET_')) {
+                            const basketGroup = schedule.find(g => g.originalCourseId === result.xorSelected.id);
+                            if (basketGroup) {
+                                displayId = basketGroup.courseId;
+                                displayName = courseNameMap[basketGroup.courseId] || displayId;
+                            }
+                        }
+                        return (
+                            <div className={styles.xorSelectedInfo}>
+                                Includes: {displayName} ({displayId})
+                            </div>
+                        );
+                    })()}
+
+                    {warnings.length > 0 && (
+                        <div className={styles.prefWarnings}>
+                            {warnings.map((w, i) => <span key={i} className={styles.prefWarning}>{w}</span>)}
+                        </div>
+                    )}
+
+                    <div className={styles.timetable}>
+                        <div className={styles.ttContainer} style={{ height: gridHeight + HEADER_HEIGHT }}>
+                            {/* Time axis labels */}
+                            <div className={styles.ttTimeAxis} style={{ height: gridHeight, top: HEADER_HEIGHT }}>
+                                {hours.map(h => (
+                                    <div key={h} className={styles.ttTimeLabel} style={{ top: (h - startHour) * 60 * PX_PER_MIN }}>
+                                        {formatTimeShort(h * 60)}
                                     </div>
-                                    <div className={styles.detailMeta}>
-                                        <span className={styles.detailSection}>{sec.section_num}</span>
-                                        <span className={styles.detailSep}>•</span>
-                                        <span className={styles.detailTime}>{sec.class_time}</span>
-                                        {sec.instructor && (
-                                            <>
+                                ))}
+                            </div>
+
+                            {/* Day columns */}
+                            <div className={styles.ttColumns}>
+                                {days.map(day => (
+                                    <div key={day} className={styles.ttColumn}>
+                                        <div className={styles.ttDayHeader}>{day}</div>
+                                        <div className={styles.ttDayBody} style={{ height: gridHeight }}>
+                                            {/* Hour grid lines */}
+                                            {hours.slice(0, -1).map(h => (
+                                                <div key={h} className={styles.ttGridLine} style={{ top: (h - startHour) * 60 * PX_PER_MIN }} />
+                                            ))}
+
+                                            {/* Class blocks */}
+                                            {blocks
+                                                .filter(b => b.day === day)
+                                                .map((block, bi) => {
+                                                    const top = (block.start - startHour * 60) * PX_PER_MIN;
+                                                    const height = (block.end - block.start) * PX_PER_MIN;
+                                                    return (
+                                                        <div key={bi} className={styles.ttBlock} style={{ top, height, background: bgColors[block.colorIdx], borderLeftColor: colors[block.colorIdx], color: colors[block.colorIdx] }}>
+                                                            <span className={styles.ttBlockCourse}>{block.courseId}</span>
+                                                            {block.courseName && <span className={styles.ttBlockName}>{block.courseName}</span>}
+                                                            <span className={styles.ttBlockSection}>{block.sectionNum}</span>
+                                                        </div>
+                                                    );
+                                                })}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section details (collapsible) */}
+                    <div
+                        className={styles.detailsToggle}
+                        onClick={() => setDetailsOpen(prev => !prev)}
+                    >
+                        {detailsOpen ? 'Hide details' : 'Show details'}
+                    </div>
+                    {detailsOpen && (
+                        <div className={styles.scheduleDetails}>
+                            {schedule.map((group) => {
+                                const courseIdx = selectedCourses.findIndex(c => c.course_id === (group.originalCourseId || group.courseId));
+                                return group.sections.map((sec, secIdx) => (
+                                    <div key={sec.crn || `${sec.course_id}-${sec.section_num}-${secIdx}`} className={styles.detailRow}>
+                                        <div className={styles.detailColorBar} style={{ background: colors[courseIdx % 8] }}></div>
+                                        <div className={styles.detailContent}>
+                                            <div className={styles.detailHeader}>
+                                                <span className={styles.detailCourseName}>{courseNameMap[sec.course_id] || sec.course_id}</span>
+                                                {isSaved && (
+                                                    <a className={styles.requestLink} href={`/post?type=request&course=${sec.course_id}&section=${sec.section_num}`}>Request</a>
+                                                )}
+                                            </div>
+                                            <div className={styles.detailMeta}>
+                                                <span className={styles.detailSection}>{sec.section_num}</span>
                                                 <span className={styles.detailSep}>•</span>
-                                                <span className={styles.detailProf}>{sec.instructor}</span>
-                                            </>
-                                        )}
+                                                <span className={styles.detailTime}>{sec.class_time}</span>
+                                                {sec.instructor && (
+                                                    <>
+                                                        <span className={styles.detailSep}>•</span>
+                                                        <span className={styles.detailProf}>{sec.instructor}</span>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                            </div>
-                        ));
-                    })}
-                </div>
-            )}
+                                ));
+                            })}
+                        </div>
+                    )}
 
-            {onSave && !isSaved && (
-                <div className={styles.saveFooter}>
-                    <button className={styles.saveBtn} onClick={onSave}>
-                        Save
-                    </button>
-                </div>
-            )}
+                    {onSave && !isSaved && (
+                        <div className={styles.saveFooter}>
+                            <button className={styles.saveBtn} onClick={onSave}>
+                                Save
+                            </button>
+                        </div>
+                    )}
 
-            {isSaved && onUnsave && (
-                <div className={styles.saveFooter}>
-                    <button className={styles.unsaveBtn} onClick={onUnsave}>
-                        Unsave
-                    </button>
-                </div>
+                    {isSaved && onUnsave && (
+                        <div className={styles.saveFooter}>
+                            <button className={styles.unsaveBtn} onClick={onUnsave}>
+                                Unsave
+                            </button>
+                        </div>
+                    )}
+                </>
             )}
         </div>
     );
