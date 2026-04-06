@@ -642,9 +642,30 @@ export default function SchedulePage() {
         setDbSavedSchedules(computedSchedules);
     };
 
+    const getScheduleSignature = (schedule) => {
+        return schedule
+            .map(g => g.sections.map(s => s.crn || s.section_num).sort().join('-'))
+            .sort()
+            .join('|');
+    };
+
+    const savedSignatures = useMemo(() => {
+        const map = new Map();
+        dbSavedSchedules.forEach(savedObj => {
+            map.set(getScheduleSignature(savedObj.schedule), savedObj.dbId);
+        });
+        return map;
+    }, [dbSavedSchedules]);
+
     const handleSaveSchedule = async (resultToSave) => {
         if (isSavingSchedule) return;
         
+        const newSig = getScheduleSignature(resultToSave.schedule);
+        if (savedSignatures.has(newSig)) {
+            setError('This exact schedule is already saved.');
+            return;
+        }
+
         if (dbSavedSchedules.length >= 3) {
             setError('You can only store up to 3 saved schedules at a time. Please delete one first.');
             return;
@@ -1689,11 +1710,26 @@ export default function SchedulePage() {
                             </div>
                             {results
                                 .slice(0, showCount)
-                                .map((result, idx) => (
-                                    <ScheduleCard key={idx} result={result} rank={idx + 1} courseNameMap={courseNameMap} courseCreditsMap={courseCreditsMap} selectedCourses={selectedCourses} onSave={() => {
-                                        handleSaveSchedule(result);
-                                    }} />
-                                ))}
+                                .map((result, idx) => {
+                                    const sig = getScheduleSignature(result.schedule);
+                                    const isSaved = savedSignatures.has(sig);
+                                    const dbId = savedSignatures.get(sig);
+                                    return (
+                                        <ScheduleCard 
+                                            key={idx} 
+                                            result={result} 
+                                            rank={idx + 1} 
+                                            courseNameMap={courseNameMap} 
+                                            courseCreditsMap={courseCreditsMap} 
+                                            selectedCourses={selectedCourses} 
+                                            onSave={isSaved ? null : () => handleSaveSchedule(result)} 
+                                            onUnsave={isSaved ? () => handleDeleteSavedSchedule(dbId) : null}
+                                            isSaved={isSaved}
+                                            initiallyCollapsed={false}
+                                            isSavingSchedule={isSavingSchedule}
+                                        />
+                                    );
+                                })}
 
                             {(() => {
                                 const remaining = results.length;
@@ -1915,15 +1951,16 @@ function ScheduleCard({ result, rank, courseNameMap, courseCreditsMap, selectedC
             {onSave && !isSaved && (
                 <div className={styles.saveFooter}>
                     <button className={styles.saveBtn} onClick={onSave} disabled={isSavingSchedule}>
-                        Save
+                        {isSavingSchedule ? <span className={styles.spinner} style={{ width: 14, height: 14, borderWidth: 2, borderColor: '#fff', borderTopColor: 'transparent' }}></span> : 'Save Schedule'}
                     </button>
                 </div>
             )}
 
             {isSaved && onUnsave && (
                 <div className={styles.saveFooter}>
-                    <button className={styles.unsaveBtn} onClick={onUnsave} disabled={isSavingSchedule}>
-                        Unsave
+                    <button className={styles.unsaveBtn} onClick={onUnsave} disabled={isSavingSchedule} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        Saved
                     </button>
                 </div>
             )}
