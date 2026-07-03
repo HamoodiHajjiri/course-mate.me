@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useSemester } from '@/lib/SemesterContext';
+import { isPushSupported, getPushState, subscribeToPush, unsubscribeFromPush } from '@/lib/push/client';
 import BottomNav from '@/components/BottomNav';
 import ThemeToggle from '@/components/ThemeToggle';
 import styles from './profile.module.css';
@@ -19,6 +20,12 @@ function ProfileContent() {
     const [myPosts, setMyPosts] = useState([]);
     const [showMajorSelect, setShowMajorSelect] = useState(false);
     const [selectedGender, setSelectedGender] = useState('');
+
+    // Web Push (per-device) state
+    const [pushSupported, setPushSupported] = useState(false);
+    const [pushEnabled, setPushEnabled] = useState(false);
+    const [pushBusy, setPushBusy] = useState(false);
+    const [pushError, setPushError] = useState('');
 
     // Edit mode state
     const [isEditing, setIsEditing] = useState(false);
@@ -274,6 +281,46 @@ function ProfileContent() {
         setSaving(false);
     };
 
+    // Detect push support and whether this device is already subscribed.
+    useEffect(() => {
+        let active = true;
+        (async () => {
+            const supported = isPushSupported();
+            if (!active) return;
+            setPushSupported(supported);
+            if (supported) {
+                try {
+                    const state = await getPushState();
+                    if (active) setPushEnabled(state);
+                } catch {
+                    /* ignore */
+                }
+            }
+        })();
+        return () => { active = false; };
+    }, []);
+
+    const togglePush = async () => {
+        if (pushBusy) return;
+        setPushError('');
+        setPushBusy(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+            if (pushEnabled) {
+                await unsubscribeFromPush(supabase);
+                setPushEnabled(false);
+            } else {
+                await subscribeToPush(supabase, user.id);
+                setPushEnabled(true);
+            }
+        } catch (e) {
+            setPushError(e?.message || 'Could not update push notifications.');
+        } finally {
+            setPushBusy(false);
+        }
+    };
+
     const isPrefOn = (field) => profile?.[field] !== false;
 
     const togglePref = async (field) => {
@@ -512,12 +559,34 @@ function ProfileContent() {
                             <h2 className={styles.cardTitle}>Preferences</h2>
                         </div>
                         <p className={styles.prefCaption}>
-                            Choose which emails you receive. In-app notifications always stay on.
+                            Choose which alerts you receive by email and push. In-app notifications always stay on.
                         </p>
+                        <div className={styles.settingRow}>
+                            <div className={styles.settingText}>
+                                <div className={styles.settingLabel}>Push notifications</div>
+                                <div className={styles.settingSub}>
+                                    {pushSupported
+                                        ? 'Get match, interest, and section alerts on this device'
+                                        : "Not available in this browser (on iPhone, add CourseMate to your Home Screen first)"}
+                                </div>
+                                {pushError && <div className={styles.fieldError}>{pushError}</div>}
+                            </div>
+                            <button
+                                type="button"
+                                role="switch"
+                                aria-checked={pushEnabled}
+                                disabled={!pushSupported || pushBusy}
+                                className={`${styles.toggle} ${pushEnabled ? styles.toggleOn : ''}`}
+                                onClick={togglePush}
+                                title={!pushSupported ? 'Unsupported' : pushEnabled ? 'On' : 'Off'}
+                            >
+                                <span className={styles.toggleKnob} />
+                            </button>
+                        </div>
                         {[
-                            { field: 'email_match_alerts', label: 'Swap match emails', sub: 'When a swap match is found for you' },
-                            { field: 'email_interest_alerts', label: 'Interest emails', sub: "When someone's interested in your giveaway or request" },
-                            { field: 'email_watch_alerts', label: 'Section alert emails', sub: "When a section you're watching becomes available" },
+                            { field: 'email_match_alerts', label: 'Swap match alerts', sub: 'When a swap match is found for you' },
+                            { field: 'email_interest_alerts', label: 'Interest alerts', sub: "When someone's interested in your giveaway or request" },
+                            { field: 'email_watch_alerts', label: 'Section alerts', sub: "When a section you're watching becomes available" },
                         ].map(p => (
                             <div key={p.field} className={styles.settingRow}>
                                 <div className={styles.settingText}>

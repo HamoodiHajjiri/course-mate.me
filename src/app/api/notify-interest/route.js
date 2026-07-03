@@ -2,6 +2,7 @@ import { Resend } from 'resend';
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
+import { sendPushToUsers } from '@/lib/push/server';
 
 let resend = null;
 const getResend = () => {
@@ -150,6 +151,17 @@ export async function POST(request) {
             .select('name, email, email_interest_alerts')
             .eq('id', post.user_id)
             .single();
+
+        // Push to the poster's devices (best-effort), respecting the same
+        // "Interest alerts" preference as email.
+        if (poster?.email_interest_alerts !== false) {
+            await sendPushToUsers(admin, [post.user_id], {
+                title: 'Someone is interested',
+                body: `${me.name || 'A student'} is interested in your ${post.type} for ${post.course_code} (Section ${post.have_section}).`,
+                url: '/browse',
+                tag: `interest-${post.id}`,
+            });
+        }
 
         const mailer = getResend();
         if (mailer && poster?.email && poster?.email_interest_alerts !== false) {
