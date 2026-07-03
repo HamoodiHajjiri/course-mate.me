@@ -229,11 +229,13 @@ export default function MatchesPage() {
     };
 
     const handleDelete = async (postId) => {
-        await supabase
-            .from('posts')
-            .delete()
-            .eq('id', postId);
-
+        // Goes through cancel_post so stale match_participant rows are cleaned up
+        // (the FK used to silently block the delete) and live matches are guarded.
+        const { error } = await supabase.rpc('cancel_post', { p_post_id: postId });
+        if (error) {
+            alert(error.message || 'Failed to cancel this post.');
+            return;
+        }
         fetchMyPosts(user.id);
     };
 
