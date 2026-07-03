@@ -83,7 +83,7 @@ export default function MatchesPage() {
         return [...new Set((data || []).map(d => d.match_id))];
     };
 
-    const MATCH_SELECT = `id, size, status, expires_at, created_at, declined_seen_by,
+    const MATCH_SELECT = `id, size, status, expires_at, created_at, declined_seen_by, declined_by,
         participants:match_participants(
             position, user_id, accepted, gives_section, gets_section,
             post:posts!match_participants_post_id_fkey(id, course_code, course_name, have_section, want_section, status),
@@ -165,7 +165,11 @@ export default function MatchesPage() {
             .in('id', ids)
             .eq('status', 'declined');
 
-        const unseen = (data || []).filter(m => !(m.declined_seen_by || []).includes(userId));
+        // Don't alert the person who declined — they made the decision. Only
+        // the other participants need to know their pending match fell through.
+        const unseen = (data || []).filter(m =>
+            m.declined_by !== userId && !(m.declined_seen_by || []).includes(userId)
+        );
         setDeclinedMatches(unseen);
     };
 
@@ -326,14 +330,18 @@ export default function MatchesPage() {
                                         const parts = sortedParts(match);
                                         const mine = parts.find(p => p.user_id === user?.id);
                                         const others = parts.filter(p => p.user_id !== user?.id);
-                                        const otherNames = others.map(o => o.profile?.name || 'Someone').join(', ');
+                                        // Prefer the actual decliner's name; fall back to listing
+                                        // the others (e.g. legacy matches with no declined_by).
+                                        const decliner = parts.find(p => p.user_id === match.declined_by);
+                                        const declinerName = decliner?.profile?.name
+                                            || others.map(o => o.profile?.name || 'Someone').join(', ');
 
                                         return (
                                             <div key={match.id} className={styles.declineCard}>
                                                 <div className={styles.declineContent}>
                                                     <span className={styles.declineIcon}>⚠️</span>
                                                     <div className={styles.declineText}>
-                                                        <span><strong>{otherNames}</strong> declined your {match.size > 2 ? `${match.size}-way ` : ''}swap request</span>
+                                                        <span><strong>{declinerName}</strong> declined your {match.size > 2 ? `${match.size}-way ` : ''}swap request</span>
                                                         <span className={styles.declineCourse}>
                                                             {mine?.post?.course_code} • give {mine?.gives_section} ↔ get {mine?.gets_section}
                                                         </span>
