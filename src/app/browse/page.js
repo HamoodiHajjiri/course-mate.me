@@ -159,9 +159,11 @@ export default function BrowsePage() {
 
     const handleDeletePost = async (postId) => {
         if (!confirm('Cancel this post? It will be removed for everyone.')) return;
-        const { error } = await supabase.from('posts').delete().eq('id', postId);
+        // cancel_post cleans up stale match_participant rows (the FK used to
+        // silently block the delete) and refuses posts tied to a live match.
+        const { error } = await supabase.rpc('cancel_post', { p_post_id: postId });
         if (error) {
-            alert('Failed to cancel post.');
+            alert(error.message || 'Failed to cancel post.');
             return;
         }
         setPosts(prev => prev.filter(p => p.id !== postId));
