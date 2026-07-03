@@ -118,7 +118,7 @@ function Timetable({ schedule, courseMap }) {
                                             {courseMap[block.courseId].name}
                                         </div>
                                     )}
-                                    <div style={{ fontSize: 9 }}>§{block.sectionNum}</div>
+                                    <div style={{ fontSize: 9 }}>{block.sectionNum}</div>
                                 </div>
                             ))}
                         </div>
@@ -213,7 +213,7 @@ export default function UserSchedulesModal({ user, onClose }) {
                                     <div key={`${g.courseId}-${sec.crn || idx}`} style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                                         <strong style={{ color: 'var(--text-primary)' }}>{sec.course_id || g.courseId}</strong>
                                         {courseMap[sec.course_id || g.courseId]?.name && ` · ${courseMap[sec.course_id || g.courseId].name}`}
-                                        {' · §'}{sec.section_num}
+                                        {' · '}{sec.section_num}
                                         {sec.class_time && ` · ${sec.class_time}`}
                                         {sec.instructor && ` · ${sec.instructor}`}
                                         {sec.isMissing && ' ⚠️'}

@@ -516,6 +516,11 @@
     flex-shrink: 0;
 }
 
+.cycleNum {
+    color: var(--text-primary);
+    font-weight: 800;
+}
+
 .cycleArrow {
     color: var(--color-accent);
     font-weight: 800;
