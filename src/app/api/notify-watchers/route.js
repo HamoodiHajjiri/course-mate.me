@@ -2,6 +2,7 @@ import { Resend } from 'resend';
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
+import { sendPushToUsers } from '@/lib/push/server';
 
 let resend = null;
 const getResend = () => {
@@ -112,15 +113,27 @@ export async function POST(request) {
         }));
         await admin.from('notifications').insert(rows);
 
+        // Load recipients once (used for both push and email) and respect the
+        // per-category "Section alerts" preference for both channels.
+        const { data: recipients } = await admin
+            .from('profiles')
+            .select('id, name, email, email_watch_alerts')
+            .in('id', watcherIds);
+        const optedIn = (recipients || []).filter(r => r.email_watch_alerts !== false);
+
+        // Push to opted-in watchers' devices (best-effort).
+        await sendPushToUsers(admin, optedIn.map(r => r.id), {
+            title,
+            body: message,
+            url: '/browse',
+            tag: `watch-${post.id}`,
+        });
+
         // Best-effort emails.
         const mailer = getResend();
         if (mailer) {
             const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-            const { data: recipients } = await admin
-                .from('profiles')
-                .select('id, name, email, email_watch_alerts')
-                .in('id', watcherIds);
-            await Promise.all((recipients || []).filter(r => r.email && r.email_watch_alerts !== false).map(r =>
+            await Promise.all(optedIn.filter(r => r.email).map(r =>
                 mailer.emails.send({
                     from: 'CourseMate <noreply@course-mate.me>',
                     to: r.email,

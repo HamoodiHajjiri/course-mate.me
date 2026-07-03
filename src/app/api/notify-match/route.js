@@ -2,6 +2,7 @@ import { Resend } from 'resend';
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
+import { sendPushToUsers } from '@/lib/push/server';
 
 let resend = null;
 const getResend = () => {
@@ -125,6 +126,21 @@ export async function POST(request) {
         const courseLine = courseName ? `${courseCode} - ${courseName}` : courseCode;
         const isCycle = (match.size || participants.length) > 2;
         const swapLabel = isCycle ? `A ${match.size || participants.length}-way swap` : 'A swap match';
+
+        // Web Push — one personalized push per participant, to all their
+        // devices. Respects the same "Swap match alerts" preference as email.
+        await Promise.all(
+            participants
+                .filter(p => p.profile?.email_match_alerts !== false)
+                .map(p =>
+                    sendPushToUsers(admin, [p.user_id], {
+                        title: `${swapLabel} found`,
+                        body: `${courseLine || courseCode}: you give Section ${p.gives_section}, you get Section ${p.gets_section}.`,
+                        url: '/matches',
+                        tag: `match-${matchId}`,
+                    })
+                )
+        );
 
         const mailer = getResend();
         if (!mailer) return NextResponse.json({ success: true, emailsSent: 0, skipped: true });
