@@ -210,6 +210,20 @@ export default function MatchesPage() {
         fetchHistory(user.id);
     };
 
+    // Completing from an accepted match goes through the RPC so the whole match
+    // closes (status + completed_at) once every member has marked their leg done.
+    const handleCompleteMatch = async (match) => {
+        const { error } = await supabase.rpc('complete_match_leg', { p_match_id: match.id });
+        if (error) {
+            console.error('Complete error:', error);
+            alert('Failed to complete: ' + error.message);
+            return;
+        }
+        setMatches(prev => prev.filter(m => m.id !== match.id));
+        fetchMyPosts(user.id);
+        fetchHistory(user.id);
+    };
+
     const handleDelete = async (postId) => {
         await supabase
             .from('posts')
@@ -321,7 +335,7 @@ export default function MatchesPage() {
                                                     <div className={styles.declineText}>
                                                         <span><strong>{otherNames}</strong> declined your {match.size > 2 ? `${match.size}-way ` : ''}swap request</span>
                                                         <span className={styles.declineCourse}>
-                                                            {mine?.post?.course_code} • give §{mine?.gives_section} ↔ get §{mine?.gets_section}
+                                                            {mine?.post?.course_code} • give {mine?.gives_section} ↔ get {mine?.gets_section}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -379,7 +393,7 @@ export default function MatchesPage() {
                                                                     return (
                                                                         <div key={p.position} className={`${styles.cycleStep} ${isMe ? styles.cycleStepMe : ''}`}>
                                                                             <span className={styles.cycleName}>{isMe ? 'You' : p.profile?.name}</span>
-                                                                            <span className={styles.cycleFlow}>give §{p.gives_section} <span className={styles.cycleArrow}>→</span> get §{p.gets_section}</span>
+                                                                            <span className={styles.cycleFlow}>give <b className={styles.cycleNum}>{p.gives_section}</b> <span className={styles.cycleArrow}>→</span> get <b className={styles.cycleNum}>{p.gets_section}</b></span>
                                                                         </div>
                                                                     );
                                                                 })}
@@ -388,12 +402,12 @@ export default function MatchesPage() {
                                                             <div className={styles.matchContent}>
                                                                 <div className={styles.matchSide}>
                                                                     <span className={styles.matchLabel}>You give</span>
-                                                                    <span className={styles.matchSection}>§{me.gives_section}</span>
+                                                                    <span className={styles.matchSection}>{me.gives_section}</span>
                                                                 </div>
                                                                 <span className={styles.matchArrow}>⇄</span>
                                                                 <div className={styles.matchSide}>
                                                                     <span className={styles.matchLabel}>You get</span>
-                                                                    <span className={styles.matchSection}>§{me.gets_section}</span>
+                                                                    <span className={styles.matchSection}>{me.gets_section}</span>
                                                                 </div>
                                                             </div>
                                                         )}
@@ -444,7 +458,7 @@ export default function MatchesPage() {
                                                         )}
 
                                                         {allAccepted && (
-                                                            <button onClick={() => handleComplete(me.post.id)} className={styles.completeBtn}>Mark as Completed</button>
+                                                            <button onClick={() => handleCompleteMatch(match)} className={styles.completeBtn}>Mark as Completed</button>
                                                         )}
                                                     </div>
                                                 );

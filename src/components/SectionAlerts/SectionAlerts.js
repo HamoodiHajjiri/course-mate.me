@@ -192,7 +192,7 @@ export default function SectionAlerts({ term, courses, sections = [], majorCours
                     watches.map(w => (
                         <div key={w.id} className={styles.watch}>
                             <span className={styles.watchText}>
-                                {w.course_code}{w.want_section ? ` · §${w.want_section}` : ' · any section'}
+                                {w.course_code}{w.want_section ? ` · ${w.want_section}` : ' · any section'}
                             </span>
                             <button className={styles.removeBtn} onClick={() => remove(w.id)} title="Remove alert">×</button>
                         </div>

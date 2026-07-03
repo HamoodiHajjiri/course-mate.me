@@ -7,6 +7,10 @@
         {
             "path": "/api/expire-posts",
             "schedule": "15 3 * * *"
+        },
+        {
+            "path": "/api/remind-matches",
+            "schedule": "0 8 * * *"
         }
     ]
 }
