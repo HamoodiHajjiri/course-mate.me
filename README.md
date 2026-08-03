@@ -103,4 +103,4 @@ CourseMate handles sensitive data carefully. Here is exactly **why** we collect 
 
 ## 📜 Copyright and License
 
-This project is open-source and licensed under the **MIT License**.
+This project is open-source and licensed under the **GNU Affero General Public License v3.0**.
