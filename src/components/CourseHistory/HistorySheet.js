@@ -1,15 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { createClient } from '@/lib/supabase/client';
 import { useSemester } from '@/lib/SemesterContext';
 import { historyTerms, fetchCourseHistory } from '@/lib/courseHistory';
+import { courseColor } from '@/lib/courseColor';
+import { Button, CourseSwatch, Dialog, Skeleton } from '@/components/ui';
+import { ArrowRightIcon } from '@/components/Icons';
 import styles from './CourseHistory.module.css';
 
 /**
  * Quick look at a course's past terms, opened from its clock button in the
- * build tab. Slides up over the page so the schedule being built stays put;
+ * build tab. A sheet over the page so the schedule being built stays put;
  * "See every section" hands over to the History tab.
  */
 export default function HistorySheet({ course, onClose, onSeeAll }) {
@@ -27,84 +29,81 @@ export default function HistorySheet({ course, onClose, onSeeAll }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [course.course_id, selectedTerm]);
 
-    useEffect(() => {
-        const onKey = (e) => { if (e.key === 'Escape') onClose(); };
-        document.addEventListener('keydown', onKey);
-        return () => document.removeEventListener('keydown', onKey);
-    }, [onClose]);
-
     const newestOffered = history?.terms.find(t => t.offered);
+    const maxSections = history ? Math.max(1, ...history.terms.map(t => t.sections.length)) : 1;
 
-    return createPortal(
-        <div className={styles.sheetBackdrop} onClick={onClose}>
-            <div
-                className={styles.sheet}
-                role="dialog"
-                aria-modal="true"
-                aria-label={`Past terms for ${course.name || course.course_id}`}
-                onClick={e => e.stopPropagation()}
-            >
-                <div className={styles.sheetHandle}></div>
-                <div className={styles.courseHead}>
-                    <div className={styles.courseTitle}>
-                        <span className={styles.courseId}>{course.course_id}</span>
-                        <span className={styles.courseName}>{course.name}</span>
-                    </div>
-                    <button type="button" className={styles.iconBtn} onClick={onClose} aria-label="Close">×</button>
+    return (
+        <Dialog
+            open
+            onClose={onClose}
+            size="md"
+            title={(
+                <span className={styles.sheetTitle}>
+                    <CourseSwatch courseId={course.course_id} />
+                    <span>
+                        {course.name || course.course_id}
+                        <small className={styles.mono}>{course.course_id}</small>
+                    </span>
+                </span>
+            )}
+            footer={newestOffered ? (
+                <Button variant="primary" trailingIcon={<ArrowRightIcon />} onClick={() => onSeeAll(newestOffered.code)}>
+                    See every section
+                </Button>
+            ) : null}
+        >
+            {!history && !failed && (
+                <div className={styles.sheetLoading}>
+                    <Skeleton height={96} radius={12} />
+                    <Skeleton height={14} width="40%" />
+                    <Skeleton height={40} radius={10} />
+                    <Skeleton height={40} radius={10} />
                 </div>
+            )}
+            {failed && <p className={styles.sheetEmpty}>Couldn&rsquo;t load this course&rsquo;s history. Try again in a moment.</p>}
 
-                {!history && !failed && <div className={styles.spinner}></div>}
-                {failed && <div className={styles.empty}>Couldn&rsquo;t load this course&rsquo;s history.</div>}
+            {history && (
+                <div className={styles.sheetBody} style={{ '--c': courseColor(course.course_id) }}>
+                    {/* Oldest on the left, so the bars read like a timeline. */}
+                    <div className={styles.bars} style={{ gridTemplateColumns: `repeat(${history.terms.length}, minmax(0, 1fr))` }}>
+                        {history.terms.slice().reverse().map(t => (
+                            <div key={t.code} className={`${styles.barCol} ${t.offered ? '' : styles.barOff}`}>
+                                <span className={styles.barCount}>{t.offered ? t.sections.length : '–'}</span>
+                                <span className={styles.barTrack}>
+                                    <span className={styles.bar} style={{ height: `${t.offered ? Math.max(8, (t.sections.length / maxSections) * 100) : 0}%` }} />
+                                </span>
+                                <span className={styles.barTerm}>{t.label}</span>
+                            </div>
+                        ))}
+                    </div>
+                    <p className={styles.barCaption}>Sections each term{history.offeredCount === 0 ? ' — not offered in any of these terms' : ''}</p>
 
-                {history && (
-                    <>
-                        <div className={styles.tiles} style={{ gridTemplateColumns: `repeat(${history.terms.length}, minmax(0, 1fr))` }}>
-                            {/* Oldest on the left, so the tiles read like a timeline. */}
-                            {history.terms.slice().reverse().map(t => (
-                                <div key={t.code} className={t.offered ? styles.tile : styles.tileOff}>
-                                    <span className={styles.tileTerm}>{t.label}</span>
-                                    <span className={styles.tileCount}>{t.sections.length}</span>
-                                    <span className={styles.tileLabel}>
-                                        {t.offered ? (t.sections.length === 1 ? 'section' : 'sections') : 'not offered'}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
-
-                        {history.instructors.length > 0 && (
-                            <div className={styles.sheetBlock}>
-                                <span className={styles.sectionTitle}>Who taught it</span>
+                    {history.instructors.length > 0 && (
+                        <section className={styles.sheetBlock}>
+                            <span className={styles.timelineLabel}>Who taught it</span>
+                            <ul className={styles.instructors}>
                                 {history.instructors.slice(0, 5).map(i => (
-                                    <div key={i.name} className={styles.instructorRow}>
+                                    <li key={i.name}>
                                         <span className={styles.instructorName}>{i.name}</span>
                                         <span className={styles.instructorMeta}>
                                             {i.terms.join(', ')} · {i.sections} {i.sections === 1 ? 'section' : 'sections'}
                                         </span>
-                                    </div>
+                                    </li>
                                 ))}
-                            </div>
-                        )}
+                            </ul>
+                        </section>
+                    )}
 
-                        {history.usualTimes.length > 0 && (
-                            <div className={styles.sheetBlock}>
-                                <span className={styles.sectionTitle}>Usual times</span>
-                                <div className={styles.chips}>
-                                    {history.usualTimes.map(t => <span key={t} className={styles.chipLarge}>{t}</span>)}
-                                </div>
+                    {history.usualTimes.length > 0 && (
+                        <section className={styles.sheetBlock}>
+                            <span className={styles.timelineLabel}>Usual start times</span>
+                            <div className={styles.chips}>
+                                {history.usualTimes.map(t => <span key={t} className={styles.chipLarge}>{t}</span>)}
                             </div>
-                        )}
-
-                        {newestOffered ? (
-                            <button type="button" className={styles.sheetPrimary} onClick={() => onSeeAll(newestOffered.code)}>
-                                See every section
-                            </button>
-                        ) : (
-                            <div className={styles.empty}>Not offered in any of these terms.</div>
-                        )}
-                    </>
-                )}
-            </div>
-        </div>,
-        document.body
+                        </section>
+                    )}
+                </div>
+            )}
+        </Dialog>
     );
 }
