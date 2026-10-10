@@ -4,24 +4,16 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import useUnreadCount from '@/lib/useUnreadCount';
 import { useIsGuest, refuse } from '@/lib/guest';
+import { NAV_ITEMS, isActiveRoute } from '@/components/TopBar/TopBar';
+import { PlusIcon, LockIcon } from '../Icons';
 import styles from './BottomNav.module.css';
 
-import { HomeIcon, SearchIcon, ScheduleIcon, PlusIcon, ActivityIcon, LockIcon } from '../Icons';
-
-// Post is deliberately absent: it is the raised centre button, not a tab.
-// `account` tabs are locked in guest mode.
-const NAV_ITEMS = [
-    { href: '/', icon: <HomeIcon />, label: 'Home' },
-    { href: '/browse', icon: <SearchIcon />, label: 'Browse', account: true },
-    { href: '/schedule', icon: <ScheduleIcon />, label: 'Schedule' },
-    { href: '/matches', icon: <ActivityIcon />, label: 'Activity', account: true },
-];
-
-// Sub-routes that should keep their parent tab lit. Home stays exact-match so
-// it doesn't win on every route.
-const isActiveRoute = (pathname, href) =>
-    href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);
-
+/**
+ * The phone and tablet tab bar (hidden from 1024px, where the top bar carries
+ * navigation). Docked to the bottom edge rather than floating, so it reads as
+ * part of the app rather than a widget over it. New post takes the middle
+ * slot as the one filled control.
+ */
 export default function BottomNav() {
     const pathname = usePathname();
     const unread = useUnreadCount('activity');
@@ -29,39 +21,42 @@ export default function BottomNav() {
     const isGuest = useIsGuest();
 
     const renderItem = (item) => {
+        const Icon = item.icon;
         const isActive = isActiveRoute(pathname, item.href);
+        const badge = item.href === '/matches' ? unread : 0;
+
         if (isGuest && item.account) {
             return (
                 <button
                     key={item.href}
                     type="button"
-                    className={`${styles.navItem} ${styles.locked}`}
+                    className={`${styles.item} ${styles.locked}`}
                     onClick={refuse}
                     aria-disabled="true"
                     aria-label={`${item.label}, needs an account`}
                 >
-                    <span className={styles.navIcon}>
-                        {item.icon}
+                    <span className={styles.icon}>
+                        <Icon />
                         <LockIcon className={styles.lock} />
                     </span>
-                    <span className={styles.navLabel}>{item.label}</span>
+                    <span className={styles.label}>{item.label}</span>
                 </button>
             );
         }
+
         return (
             <Link
                 key={item.href}
                 href={item.href}
-                className={`${styles.navItem} ${isActive ? styles.active : ''}`}
+                className={`${styles.item} ${isActive ? styles.active : ''}`}
                 aria-current={isActive ? 'page' : undefined}
+                aria-label={badge > 0 ? `${item.label}, ${badge} new` : undefined}
             >
-                <span className={styles.navIcon}>
-                    {item.icon}
-                    {item.badge > 0 && (
-                        <span className={styles.badge}>{item.badge > 9 ? '9+' : item.badge}</span>
-                    )}
+                <span className={styles.icon}>
+                    <Icon />
+                    {badge > 0 && <span className={styles.badge}>{badge > 9 ? '9+' : badge}</span>}
                 </span>
-                <span className={styles.navLabel}>{item.label}</span>
+                <span className={styles.label}>{item.label}</span>
             </Link>
         );
     };
@@ -69,35 +64,37 @@ export default function BottomNav() {
     const [home, browse, schedule, activity] = NAV_ITEMS;
 
     return (
-        <nav className={styles.bottomNav} aria-label="Main">
-            {renderItem(home)}
-            {renderItem(browse)}
+        <nav className={styles.bar} aria-label="Main">
+            <div className={styles.inner}>
+                {renderItem(home)}
+                {renderItem(browse)}
 
-            {/* Creating a post is the primary action, so it gets the centre
-                slot as a raised button rather than competing as a tab. */}
-            {isGuest ? (
-                <button
-                    type="button"
-                    className={`${styles.fab} ${styles.fabLocked}`}
-                    onClick={refuse}
-                    aria-disabled="true"
-                    aria-label="New post, needs an account"
-                >
-                    <LockIcon />
-                </button>
-            ) : (
-                <Link
-                    href="/post"
-                    className={`${styles.fab} ${postActive ? styles.fabActive : ''}`}
-                    aria-label="New post"
-                    aria-current={postActive ? 'page' : undefined}
-                >
-                    <PlusIcon />
-                </Link>
-            )}
+                <div className={styles.postSlot}>
+                    {isGuest ? (
+                        <button
+                            type="button"
+                            className={`${styles.post} ${styles.postLocked}`}
+                            onClick={refuse}
+                            aria-disabled="true"
+                            aria-label="New post, needs an account"
+                        >
+                            <LockIcon />
+                        </button>
+                    ) : (
+                        <Link
+                            href="/post"
+                            className={`${styles.post} ${postActive ? styles.postActive : ''}`}
+                            aria-label="New post"
+                            aria-current={postActive ? 'page' : undefined}
+                        >
+                            <PlusIcon strokeWidth={2.25} />
+                        </Link>
+                    )}
+                </div>
 
-            {renderItem(schedule)}
-            {renderItem({ ...activity, badge: unread })}
+                {renderItem(schedule)}
+                {renderItem(activity)}
+            </div>
         </nav>
     );
 }
