@@ -11,31 +11,27 @@ import { isPushSupported, getPushState, subscribeToPush, unsubscribeFromPush } f
 import PageShell from '@/components/PageShell';
 import ThemeToggle from '@/components/ThemeToggle';
 import {
-    Avatar, Badge, Button, Callout, Field, Input, SearchInput, Select, Skeleton, Switch, useConfirm, useToast,
+    Button, Callout, Field, Input, Rubric, SearchInput, Select, Skeleton, Switch, useConfirm, useToast,
 } from '@/components/ui';
-import {
-    ActivityIcon, BellIcon, CheckIcon, ChevronRightIcon, EditIcon, GitHubIcon, GraduationIcon, LayersIcon,
-    LockIcon, LogoutIcon, MailIcon, PaletteIcon, PhoneIcon, ProfileIcon, ScheduleIcon, ShieldIcon,
-} from '@/components/Icons';
 import styles from './profile.module.css';
 
 const CAMPUS = { male: "Men's campus", female: "Women's campus" };
 
 const SECTIONS = [
-    { id: 'details', label: 'Personal details', icon: ProfileIcon },
-    { id: 'appearance', label: 'Appearance', icon: PaletteIcon },
-    { id: 'notifications', label: 'Notifications', icon: BellIcon },
-    { id: 'account', label: 'Account', icon: ShieldIcon },
+    { id: 'details', label: 'Details' },
+    { id: 'appearance', label: 'Appearance' },
+    { id: 'notifications', label: 'Notifications' },
+    { id: 'account', label: 'Account' },
 ];
 
 const EMAIL_PREFS = [
-    { field: 'email_match_alerts', label: 'Swap matches', sub: 'When a swap match is found for you', icon: ActivityIcon },
-    { field: 'email_interest_alerts', label: 'Interest in your posts', sub: "When someone's interested in your giveaway or request", icon: LayersIcon },
-    { field: 'email_watch_alerts', label: 'Section alerts', sub: "When a section you're watching becomes available", icon: BellIcon },
+    { field: 'email_match_alerts', label: 'Swap matches', sub: 'When a swap match is found for you' },
+    { field: 'email_interest_alerts', label: 'Interest in your posts', sub: "When someone's interested in your giveaway or request" },
+    { field: 'email_watch_alerts', label: 'Section alerts', sub: "When a section you're watching becomes available" },
     // Separate from the watch alert above: that one fires when a section you
     // already know about frees a seat, this one when a section appears that
     // was never there before.
-    { field: 'email_new_section_alerts', label: 'New sections', sub: "When a new section opens in a course you're planning", icon: ScheduleIcon },
+    { field: 'email_new_section_alerts', label: 'New sections', sub: "When a new section opens in a course you're planning" },
 ];
 
 // Inner component that uses useSearchParams
@@ -456,11 +452,10 @@ function ProfileContent() {
         return (
             <PageShell width="standard">
                 <div className={styles.loading} aria-busy="true">
-                    <Skeleton height={180} radius={22} />
-                    <div className={styles.loadingGrid}>
-                        <Skeleton height={160} radius={12} />
-                        <Skeleton height={320} radius={18} />
-                    </div>
+                    <Skeleton width={120} height={11} />
+                    <Skeleton width={340} height={44} />
+                    <Skeleton width={260} height={14} />
+                    <Skeleton height={140} />
                 </div>
             </PageShell>
         );
@@ -469,31 +464,29 @@ function ProfileContent() {
     const needsMajor = !profile?.major;
     const needsGender = !profile?.gender;
 
-    // ===== Onboarding: the two answers CourseMate can't work without =====
+    // ===== First run: the two answers CourseMate can't work without =====
     if (showMajorSelect && (needsMajor || needsGender)) {
         const canContinue = (!needsMajor || selectedMajor) && (!needsGender || selectedGender);
         const steps = [needsMajor && 'major', needsGender && 'campus'].filter(Boolean);
         return (
             <PageShell width="reading" nav={false}>
                 <div className={styles.onboarding}>
-                    <div className={styles.onboardHero}>
-                        <span className={styles.onboardLogo}>
-                            <Image src="/logo.png" alt="" width={64} height={64} />
+                    <header className={styles.onboardHead}>
+                        <span className={styles.onboardBrand}>
+                            <Image src="/logo.png" alt="" width={56} height={56} />
+                            CourseMate
                         </span>
-                        <span className={styles.onboardEyebrow}>Almost there</span>
-                        <h1 className={styles.onboardTitle}>Two quick answers and you&rsquo;re in</h1>
+                        <h1 className={styles.onboardTitle}>{steps.length === 2 ? 'Two answers' : 'One answer'} and you&rsquo;re in.</h1>
                         <p className={styles.onboardText}>
-                            CourseMate shows you the courses in your major and only the sections open on your campus, so your schedules and swaps actually work.
+                            CourseMate lists the courses in your major and only the sections open on your campus, so every schedule and swap it suggests is one you can actually take.
                         </p>
-                    </div>
+                    </header>
 
-                    <div className={styles.onboardBody}>
-                        {needsMajor && (
-                            <section className={styles.onboardStep}>
-                                <div className={styles.onboardStepHead}>
-                                    <span className={styles.onboardNum}>{steps.indexOf('major') + 1}</span>
-                                    <h2>What&rsquo;s your major?</h2>
-                                </div>
+                    {needsMajor && (
+                        <section className={styles.onboardStep} aria-labelledby="ob-major">
+                            <span className={styles.onboardNum} aria-hidden="true">{steps.indexOf('major') + 1}</span>
+                            <div className={styles.onboardBody}>
+                                <h2 id="ob-major" className={styles.onboardQ}>What&rsquo;s your major?</h2>
                                 <SearchInput
                                     value={majorQuery}
                                     onChange={(e) => setMajorQuery(e.target.value)}
@@ -508,50 +501,48 @@ function ProfileContent() {
                                             type="button"
                                             role="radio"
                                             aria-checked={selectedMajor === m.code}
-                                            className={styles.majorOption}
+                                            className={styles.choice}
                                             onClick={() => setSelectedMajor(m.code)}
                                             disabled={saving}
                                         >
-                                            <span className={styles.majorCode}>{m.code}</span>
+                                            <span className={styles.square} aria-hidden="true" />
                                             <span className={styles.majorName}>{m.name}</span>
-                                            <span className={styles.radioMark} aria-hidden="true"><CheckIcon strokeWidth={2.5} /></span>
+                                            <span className={styles.majorCode}>{m.code}</span>
                                         </button>
                                     ))}
                                 </div>
-                            </section>
-                        )}
+                            </div>
+                        </section>
+                    )}
 
-                        {needsGender && (
-                            <section className={styles.onboardStep}>
-                                <div className={styles.onboardStepHead}>
-                                    <span className={styles.onboardNum}>{steps.indexOf('campus') + 1}</span>
-                                    <h2>Which campus do you study on?</h2>
-                                </div>
-                                <div className={styles.campusGrid} role="radiogroup" aria-label="Campus">
+                    {needsGender && (
+                        <section className={styles.onboardStep} aria-labelledby="ob-campus">
+                            <span className={styles.onboardNum} aria-hidden="true">{steps.indexOf('campus') + 1}</span>
+                            <div className={styles.onboardBody}>
+                                <h2 id="ob-campus" className={styles.onboardQ}>Which campus do you study on?</h2>
+                                <div className={styles.campusList} role="radiogroup" aria-label="Campus">
                                     {[['male', "Men's campus"], ['female', "Women's campus"]].map(([value, label]) => (
                                         <button
                                             key={value}
                                             type="button"
                                             role="radio"
                                             aria-checked={selectedGender === value}
-                                            className={styles.campusOption}
+                                            className={styles.choice}
                                             onClick={() => setSelectedGender(value)}
                                             disabled={saving}
                                         >
-                                            <GraduationIcon />
-                                            <span>{label}</span>
-                                            <span className={styles.radioMark} aria-hidden="true"><CheckIcon strokeWidth={2.5} /></span>
+                                            <span className={styles.square} aria-hidden="true" />
+                                            <span className={styles.majorName}>{label}</span>
                                         </button>
                                     ))}
                                 </div>
-                                <p className={styles.onboardNote}>
-                                    <LockIcon />
-                                    Never shown to other students. It only decides which sections you see.
-                                </p>
-                            </section>
-                        )}
+                                <p className={styles.onboardNote}>Never shown to other students. It only decides which sections you see.</p>
+                            </div>
+                        </section>
+                    )}
 
-                        <Button variant="primary" size="lg" block onClick={handleSaveSetup} disabled={!canContinue} loading={saving}>
+                    <div className={styles.onboardFoot}>
+                        <Button variant="primary" size="lg" onClick={handleSaveSetup} disabled={!canContinue} loading={saving}>
                             Continue to CourseMate
                         </Button>
                     </div>
@@ -564,268 +555,193 @@ function ProfileContent() {
     const memberSince = profile?.created_at ? new Date(profile.created_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) : null;
     const emailOn = EMAIL_PREFS.filter(p => isPrefOn(p.field)).length;
 
-    const detailRow = (label, value, Icon, opts = {}) => (
-        <div className={styles.detail}>
-            <dt className={styles.detailLabel}><Icon />{label}</dt>
-            <dd className={`${styles.detailValue} ${opts.mono ? styles.mono : ''} ${!value ? styles.detailEmpty : ''}`}>{value || 'Not set'}</dd>
+    // One field of the record: its label, then either the value or, while
+    // editing, the control that changes it, in the same place.
+    const recordField = (key, label, value, control, opts = {}) => (
+        <div className={`${styles.field} ${opts.wide ? styles.fieldWide : ''}`}>
+            <dt className={styles.fieldLabel}>{label}</dt>
+            <dd className={`${styles.fieldValue} ${opts.mono ? styles.mono : ''} ${!value ? styles.fieldEmpty : ''}`}>
+                {isEditing && control ? control : (value || 'not set')}
+            </dd>
         </div>
+    );
+
+    const input = (key, props = {}) => (
+        <Field error={typeof errors[key] === 'string' ? errors[key] : null} hint={props.hint}>
+            {({ id, invalid, describedBy }) => (
+                <Input
+                    id={id}
+                    invalid={invalid}
+                    aria-describedby={describedBy}
+                    aria-label={props.label}
+                    mono={props.mono}
+                    type={props.type}
+                    autoComplete={props.autoComplete}
+                    value={editForm[key]}
+                    placeholder={props.placeholder}
+                    onChange={(e) => {
+                        setEditForm({ ...editForm, [key]: props.upper ? e.target.value.toUpperCase() : e.target.value });
+                        if (errors[key]) setErrors({ ...errors, [key]: false });
+                    }}
+                />
+            )}
+        </Field>
+    );
+
+    const select = (key, label, options, placeholder) => (
+        <Field error={typeof errors[key] === 'string' ? errors[key] : null}>
+            {({ id, invalid, describedBy }) => (
+                <Select id={id} invalid={invalid} aria-describedby={describedBy} aria-label={label} value={editForm[key]} onChange={(e) => {
+                    setEditForm({ ...editForm, [key]: e.target.value });
+                    if (errors[key]) setErrors({ ...errors, [key]: false });
+                }}>
+                    <option value="">{placeholder}</option>
+                    {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </Select>
+            )}
+        </Field>
+    );
+
+    const pref = (field, label, sub, control) => (
+        <label key={field} className={styles.pref}>
+            <span className={styles.prefText}>
+                <span className={styles.prefLabel}>
+                    {label}
+                    {savedField === field && <span className={styles.saved}>saved</span>}
+                </span>
+                <span className={styles.prefSub}>{sub}</span>
+            </span>
+            {control}
+        </label>
     );
 
     return (
         <PageShell width="standard">
-            {/* ===== Identity ===== */}
-            <section className={styles.hero} aria-label="Your profile">
-                <Avatar name={profile?.name} size={72} tone="solid" className={styles.heroAvatar} />
-                <div className={styles.heroText}>
-                    <span className={styles.heroEyebrow}>Profile</span>
-                    <h1 className={styles.heroName}>{profile?.name || 'Your profile'}</h1>
-                    <p className={styles.heroMajor}>{majorName || 'No major set'}</p>
-                    <div className={styles.heroFacts}>
-                        {profile?.student_id && <span className={styles.fact}><span className={styles.factMono}>{profile.student_id}</span></span>}
-                        {profile?.gender && <span className={styles.fact}>{CAMPUS[profile.gender]}</span>}
-                        {memberSince && <span className={styles.fact}>Member since {memberSince}</span>}
-                    </div>
-                </div>
-                <div className={styles.heroSide}>
-                    <Link href="/matches" className={styles.heroStat}>
-                        <span className={styles.heroStatValue}>{myPosts.length}<small>/5</small></span>
-                        <span className={styles.heroStatLabel}>active posts</span>
-                    </Link>
-                    <a href="#section-notifications" className={styles.heroStat}>
-                        <span className={styles.heroStatValue}>{emailOn}<small>/{EMAIL_PREFS.length}</small></span>
-                        <span className={styles.heroStatLabel}>email alerts on</span>
-                    </a>
-                </div>
-            </section>
-
             <div className={styles.layout}>
-                <nav className={styles.sectionNav} aria-label="Profile sections">
-                    {SECTIONS.map(s => {
-                        const Icon = s.icon;
-                        return (
-                            <a
-                                key={s.id}
-                                href={`#section-${s.id}`}
-                                className={`${styles.navItem} ${activeSection === s.id ? styles.navItemActive : ''}`}
-                                aria-current={activeSection === s.id ? 'true' : undefined}
-                            >
-                                <Icon />
-                                {s.label}
-                            </a>
-                        );
-                    })}
+                <nav className={styles.index} aria-label="Profile sections">
+                    {SECTIONS.map(s => (
+                        <a
+                            key={s.id}
+                            href={`#section-${s.id}`}
+                            className={styles.indexItem}
+                            aria-current={activeSection === s.id ? 'true' : undefined}
+                        >
+                            {s.label}
+                        </a>
+                    ))}
                 </nav>
 
-                <div className={styles.sections}>
-                    {/* ===== Personal details ===== */}
-                    <section id="section-details" className={styles.card} aria-labelledby="h-details">
-                        <header className={styles.cardHead}>
-                            <div>
-                                <h2 id="h-details" className={styles.cardTitle}>Personal details</h2>
-                                <p className={styles.cardSub}>Used to match you with classmates and to put you in touch once a swap is agreed.</p>
-                            </div>
-                            {!isEditing && (
+                <div className={styles.record}>
+                    {/* ===== Who ===== */}
+                    <header className={styles.head}>
+                        <span className={styles.eyebrow}>Student record</span>
+                        <h1 className={styles.name}>{profile?.name || 'Your profile'}</h1>
+                        <p className={styles.facts}>
+                            {majorName || 'No major set'}
+                            {profile?.gender && <> · {CAMPUS[profile.gender]}</>}
+                            {memberSince && <> · on CourseMate since {memberSince}</>}
+                        </p>
+                        <p className={styles.standing}>
+                            <Link href="/matches">{myPosts.length} of 5 posts</Link> on the board
+                            {' · '}
+                            <a href="#section-notifications">{emailOn} of {EMAIL_PREFS.length} email alerts</a> on
+                        </p>
+                    </header>
+
+                    {/* ===== Details ===== */}
+                    <section id="section-details" className={styles.section} aria-labelledby="h-details">
+                        <Rubric
+                            id="h-details"
+                            title="Details"
+                            description="Used to match you with classmates, and shared only once a swap is agreed."
+                            actions={!isEditing && (
                                 <Button
                                     variant="secondary"
                                     size="sm"
-                                    icon={<EditIcon />}
                                     onClick={handleStartEdit}
                                     disabled={!canEdit}
-                                    title={canEdit ? 'Edit your details' : 'Finish or cancel your active posts first'}
+                                    title={canEdit ? 'Edit your details' : 'Finish or cancel your posts first'}
                                 >
                                     Edit
                                 </Button>
                             )}
-                        </header>
+                        />
 
-                        {isEditing ? (
-                            <form className={styles.editForm} onSubmit={handleSaveProfile} noValidate>
-                                <div className={styles.formGrid}>
-                                    <Field label="Full name" error={typeof errors.name === 'string' ? errors.name : null} className={styles.span2}>
-                                        {({ id, invalid, describedBy }) => (
-                                            <Input id={id} invalid={invalid} aria-describedby={describedBy} value={editForm.name} autoComplete="name" onChange={(e) => {
-                                                setEditForm({ ...editForm, name: e.target.value });
-                                                if (errors.name) setErrors({ ...errors, name: false });
-                                            }} placeholder="As on your university ID" />
-                                        )}
-                                    </Field>
-                                    <Field label="University ID" error={typeof errors.student_id === 'string' ? errors.student_id : null} hint="Like U24101234">
-                                        {({ id, invalid, describedBy }) => (
-                                            <Input id={id} invalid={invalid} aria-describedby={describedBy} mono value={editForm.student_id} onChange={(e) => {
-                                                setEditForm({ ...editForm, student_id: e.target.value.toUpperCase() });
-                                                if (errors.student_id) setErrors({ ...errors, student_id: false });
-                                            }} placeholder="U24101234" />
-                                        )}
-                                    </Field>
-                                    <Field label="Phone number" error={typeof errors.phone === 'string' ? errors.phone : null} hint="Shared only after a swap is accepted">
-                                        {({ id, invalid, describedBy }) => (
-                                            <Input id={id} invalid={invalid} aria-describedby={describedBy} type="tel" autoComplete="tel" value={editForm.phone} onChange={(e) => {
-                                                setEditForm({ ...editForm, phone: e.target.value });
-                                                if (errors.phone) setErrors({ ...errors, phone: false });
-                                            }} placeholder="05X XXX XXXX" />
-                                        )}
-                                    </Field>
-                                    <Field label="Major" error={typeof errors.major === 'string' ? errors.major : null}>
-                                        {({ id, invalid, describedBy }) => (
-                                            <Select id={id} invalid={invalid} aria-describedby={describedBy} value={editForm.major} onChange={(e) => {
-                                                setEditForm({ ...editForm, major: e.target.value });
-                                                if (errors.major) setErrors({ ...errors, major: false });
-                                            }}>
-                                                <option value="">Select your major</option>
-                                                {majors.map(m => (
-                                                    <option key={m.code} value={m.code}>{m.name}</option>
-                                                ))}
-                                            </Select>
-                                        )}
-                                    </Field>
-                                    <Field label="Campus" error={typeof errors.gender === 'string' ? errors.gender : null}>
-                                        {({ id, invalid, describedBy }) => (
-                                            <Select id={id} invalid={invalid} aria-describedby={describedBy} value={editForm.gender} onChange={(e) => {
-                                                setEditForm({ ...editForm, gender: e.target.value });
-                                                if (errors.gender) setErrors({ ...errors, gender: false });
-                                            }}>
-                                                <option value="">Select your campus</option>
-                                                <option value="male">Men&apos;s campus</option>
-                                                <option value="female">Women&apos;s campus</option>
-                                            </Select>
-                                        )}
-                                    </Field>
-                                </div>
-                                {(editForm.major !== profile.major || editForm.gender !== profile.gender) && editForm.major && editForm.gender && (
-                                    <Callout tone="warning" title="This will clear your saved schedules">
-                                        Saved schedules pin sections for your current {editForm.major !== profile.major ? 'major' : 'campus'}, so they&rsquo;re removed when it changes.
-                                    </Callout>
-                                )}
-                                <div className={styles.editActions}>
-                                    <Button variant="ghost" onClick={handleCancelEdit} disabled={saving}>Cancel</Button>
-                                    <Button variant="primary" type="submit" loading={saving} icon={<CheckIcon strokeWidth={2.25} />}>Save changes</Button>
-                                </div>
-                            </form>
-                        ) : (
-                            <dl className={styles.details}>
-                                {detailRow('Full name', profile?.name, ProfileIcon)}
-                                {detailRow('University ID', profile?.student_id, ShieldIcon, { mono: true })}
-                                {detailRow('Phone', profile?.phone, PhoneIcon, { mono: true })}
-                                {detailRow('Major', majorName, GraduationIcon)}
-                                {detailRow('Campus', CAMPUS[profile?.gender], LockIcon)}
-                                {profile?.email && detailRow('Email', profile.email, MailIcon)}
+                        <form onSubmit={handleSaveProfile} noValidate>
+                            <dl className={`${styles.fields} ${isEditing ? styles.fieldsEditing : ''}`}>
+                                {recordField('name', 'Full name', profile?.name, input('name', { label: 'Full name', autoComplete: 'name', placeholder: 'As on your university ID' }), { wide: true })}
+                                {recordField('student_id', 'University ID', profile?.student_id, input('student_id', { label: 'University ID', mono: true, upper: true, placeholder: 'U24101234' }), { mono: true })}
+                                {recordField('phone', 'Phone', profile?.phone, input('phone', { label: 'Phone', type: 'tel', autoComplete: 'tel', placeholder: '05X XXX XXXX', hint: 'Shared only after a swap is accepted' }), { mono: true })}
+                                {recordField('major', 'Major', majorName, select('major', 'Major', majors.map(m => [m.code, m.name]), 'Choose your major'))}
+                                {recordField('gender', 'Campus', CAMPUS[profile?.gender], select('gender', 'Campus', [['male', "Men's campus"], ['female', "Women's campus"]], 'Choose your campus'))}
+                                {profile?.email && recordField('email', 'Email', profile.email, null)}
                             </dl>
-                        )}
+
+                            {isEditing && (editForm.major !== profile.major || editForm.gender !== profile.gender) && editForm.major && editForm.gender && (
+                                <Callout tone="warning" title="This clears your saved schedules">
+                                    Saved schedules pin sections for your current {editForm.major !== profile.major ? 'major' : 'campus'}, so they&rsquo;re removed when it changes.
+                                </Callout>
+                            )}
+
+                            {isEditing && (
+                                <div className={styles.editActions}>
+                                    <Button variant="primary" type="submit" loading={saving}>Save details</Button>
+                                    <Button variant="ghost" onClick={handleCancelEdit} disabled={saving}>Cancel</Button>
+                                </div>
+                            )}
+                        </form>
 
                         {!canEdit && !isEditing && (
-                            <Callout tone="info" icon={<LockIcon />} action={<Button size="sm" variant="ghost" href="/matches" trailingIcon={<ChevronRightIcon />}>Your posts</Button>}>
-                                Your details are locked while you have {myPosts.length} active {myPosts.length === 1 ? 'post' : 'posts'}, so matches stay accurate. Complete or cancel them to edit.
+                            <Callout action={<Button size="sm" variant="link" href="/matches">Your posts →</Button>}>
+                                Your details are locked while you have {myPosts.length} {myPosts.length === 1 ? 'post' : 'posts'} on the board, so matches stay accurate.
                             </Callout>
                         )}
                     </section>
 
                     {/* ===== Appearance ===== */}
-                    <section id="section-appearance" className={styles.card} aria-labelledby="h-appearance">
-                        <header className={styles.cardHead}>
-                            <div>
-                                <h2 id="h-appearance" className={styles.cardTitle}>Appearance</h2>
-                                <p className={styles.cardSub}>Saved to this device. Auto follows your phone or computer&rsquo;s setting.</p>
-                            </div>
-                        </header>
+                    <section id="section-appearance" className={styles.section} aria-labelledby="h-appearance">
+                        <Rubric id="h-appearance" title="Appearance" description="Saved to this device. Auto follows your phone or computer." />
                         <ThemeToggle />
                     </section>
 
                     {/* ===== Notifications ===== */}
-                    <section id="section-notifications" className={styles.card} aria-labelledby="h-notifications">
-                        <header className={styles.cardHead}>
-                            <div>
-                                <h2 id="h-notifications" className={styles.cardTitle}>Notifications</h2>
-                                <p className={styles.cardSub}>Choose how CourseMate reaches you when something happens.</p>
-                            </div>
-                        </header>
-
-                        <div className={styles.prefGroup}>
-                            <span className={styles.prefGroupLabel}>In the app</span>
-                            <div className={styles.prefRow}>
-                                <span className={styles.prefIcon}><BellIcon /></span>
-                                <span className={styles.prefText}>
-                                    <span className={styles.prefLabel}>Notification centre</span>
-                                    <span className={styles.prefSub}>Everything always lands in your notifications, with a badge on the bell.</span>
-                                </span>
-                                <Badge tone="accent" icon={<CheckIcon strokeWidth={2.5} />}>Always on</Badge>
-                            </div>
-                        </div>
+                    <section id="section-notifications" className={styles.section} aria-labelledby="h-notifications">
+                        <Rubric id="h-notifications" title="Notifications" description="Everything always lands in your notifications. Choose what else reaches you." />
 
                         <div className={styles.prefGroup}>
                             <span className={styles.prefGroupLabel}>On this device</span>
-                            <label className={styles.prefRow}>
-                                <span className={styles.prefIcon}><PhoneIcon /></span>
-                                <span className={styles.prefText}>
-                                    <span className={styles.prefLabel}>
-                                        Push notifications
-                                        {savedField === 'push' && <span className={styles.saved}><CheckIcon strokeWidth={2.5} />Saved</span>}
-                                    </span>
-                                    <span className={styles.prefSub}>
-                                        {pushSupported
-                                            ? 'Matches, interest and section alerts, straight to this device.'
-                                            : 'Not available in this browser. On iPhone, add CourseMate to your Home Screen first.'}
-                                    </span>
-                                    {pushError && <span className={styles.prefError}>{pushError}</span>}
-                                </span>
-                                <Switch
-                                    checked={pushEnabled}
-                                    onChange={togglePush}
-                                    disabled={!pushSupported}
-                                    busy={pushBusy}
-                                    label="Push notifications on this device"
-                                />
-                            </label>
+                            {pref('push', 'Push notifications',
+                                <>
+                                    {pushSupported ? 'Matches, interest and section alerts, straight to this device.' : 'Not available in this browser. On iPhone, add CourseMate to your Home Screen first.'}
+                                    {pushError && <span className={styles.prefError}> {pushError}</span>}
+                                </>,
+                                <Switch checked={pushEnabled} onChange={togglePush} disabled={!pushSupported} busy={pushBusy} label="Push notifications on this device" />)}
                         </div>
 
                         <div className={styles.prefGroup}>
-                            <span className={styles.prefGroupLabel}>
-                                By email
-                                <span className={styles.prefCount}>{emailOn} of {EMAIL_PREFS.length} on</span>
-                            </span>
-                            {EMAIL_PREFS.map(p => {
-                                const Icon = p.icon;
-                                return (
-                                    <label key={p.field} className={styles.prefRow}>
-                                        <span className={styles.prefIcon}><Icon /></span>
-                                        <span className={styles.prefText}>
-                                            <span className={styles.prefLabel}>
-                                                {p.label}
-                                                {savedField === p.field && <span className={styles.saved}><CheckIcon strokeWidth={2.5} />Saved</span>}
-                                            </span>
-                                            <span className={styles.prefSub}>{p.sub}</span>
-                                        </span>
-                                        <Switch checked={isPrefOn(p.field)} onChange={() => togglePref(p.field)} label={`Email: ${p.label}`} />
-                                    </label>
-                                );
-                            })}
+                            <span className={styles.prefGroupLabel}>By email <span className={styles.prefCount}>{emailOn} of {EMAIL_PREFS.length} on</span></span>
+                            {EMAIL_PREFS.map(p => pref(p.field, p.label, p.sub,
+                                <Switch checked={isPrefOn(p.field)} onChange={() => togglePref(p.field)} label={`Email: ${p.label}`} />))}
                         </div>
                     </section>
 
                     {/* ===== Account ===== */}
-                    <section id="section-account" className={styles.card} aria-labelledby="h-account">
-                        <header className={styles.cardHead}>
-                            <div>
-                                <h2 id="h-account" className={styles.cardTitle}>Account</h2>
-                                <p className={styles.cardSub}>{profile?.email ? <>Signed in as <strong>{profile.email}</strong></> : 'Signed in'}{firstName ? `. Thanks for being here, ${firstName}.` : '.'}</p>
-                            </div>
-                        </header>
-                        <div className={styles.accountRows}>
-                            <a href="https://github.com/Karam-Kreidli/CourseMate" target="_blank" rel="noopener noreferrer" className={styles.accountRow}>
-                                <span className={styles.prefIcon}><GitHubIcon /></span>
-                                <span className={styles.prefText}>
-                                    <span className={styles.prefLabel}>Contribute on GitHub</span>
-                                    <span className={styles.prefSub}>CourseMate is open source. Ideas and fixes welcome.</span>
-                                </span>
-                                <ChevronRightIcon className={styles.rowChevron} />
-                            </a>
-                            <button type="button" className={`${styles.accountRow} ${styles.signOut}`} onClick={handleSignOut}>
-                                <span className={styles.prefIcon}><LogoutIcon /></span>
-                                <span className={styles.prefText}>
+                    <section id="section-account" className={styles.section} aria-labelledby="h-account">
+                        <Rubric id="h-account" title="Account" description={profile?.email ? `Signed in as ${profile.email}.` : 'Signed in.'} />
+                        <ul className={styles.accountRows}>
+                            <li>
+                                <a href="https://github.com/Karam-Kreidli/CourseMate" target="_blank" rel="noopener noreferrer" className={styles.accountRow}>
+                                    <span className={styles.prefLabel}>CourseMate is open source</span>
+                                    <span className={styles.prefSub}>Ideas and fixes are welcome on GitHub ↗</span>
+                                </a>
+                            </li>
+                            <li>
+                                <button type="button" className={`${styles.accountRow} ${styles.signOut}`} onClick={handleSignOut}>
                                     <span className={styles.prefLabel}>Sign out</span>
-                                    <span className={styles.prefSub}>You can sign back in any time.</span>
-                                </span>
-                            </button>
-                        </div>
+                                    <span className={styles.prefSub}>{firstName ? `See you soon, ${firstName}.` : 'You can sign back in any time.'}</span>
+                                </button>
+                            </li>
+                        </ul>
                     </section>
                 </div>
             </div>
@@ -838,7 +754,7 @@ export default function ProfilePage() {
     return (
         <Suspense fallback={
             <PageShell nav={false} width="standard">
-                <Skeleton height={180} radius={22} />
+                <Skeleton height={180} />
             </PageShell>
         }>
             <ProfileContent />
