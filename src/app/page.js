@@ -7,25 +7,32 @@ import { campusFilter } from '@/lib/campus';
 import { seatStatus } from '@/lib/seats';
 import { useSemester } from '@/lib/SemesterContext';
 import { useRequireProfile } from '@/lib/useRequireProfile';
-import { refuse } from '@/lib/guest';
-import BottomNav from '@/components/BottomNav';
-import TopBar from '@/components/TopBar';
-import AppMenu from '@/components/AppMenu';
-import AlertsBell from '@/components/AlertsBell';
+import useUnreadCount from '@/lib/useUnreadCount';
+import { refuse, SIGN_UP_HREF } from '@/lib/guest';
+import { parseClassTime, formatDuration, formatRange, formatTime, WEEKDAY_KEYS } from '@/lib/classTime';
+import PageShell from '@/components/PageShell';
 import SemesterPicker from '@/components/SemesterPicker';
-import DashboardCard, { StatBig } from '@/components/DashboardCard';
 import AnnouncementsModal from '@/components/AnnouncementsModal';
 import RoomLink from '@/components/RoomLink';
+import DayTimeline from '@/components/DayTimeline/DayTimeline';
+import { Badge, Button, Callout, CountUp, CourseSwatch, EmptyState, ProgressBar, SegmentedControl, Skeleton } from '@/components/ui';
 import {
     PlusIcon,
     ScheduleIcon,
     ActivityIcon,
     BookIcon,
+    BellIcon,
     UserCheckIcon,
     SearchIcon,
     MapIcon,
-    ProfileIcon,
     LockIcon,
+    ArrowRightIcon,
+    ChevronDownIcon,
+    ChevronRightIcon,
+    PinIcon,
+    LayersIcon,
+    SparkleIcon,
+    ClockIcon,
 } from '@/components/Icons';
 import { decodeHtmlEntities } from '@/lib/text';
 import styles from './page.module.css';
@@ -40,7 +47,7 @@ function splitClassTime(classTime) {
     if (!str) return { days: '', time: '' };
     const m = str.match(/^(.+?)\s+(\d{1,2}:\d{2}(?:\s*[AP]M)?\s*-\s*\d{1,2}:\d{2}(?:\s*[AP]M)?)$/i);
     if (!m) return { days: '', time: str };
-    return { days: m[1].trim(), time: m[2].replace(/\s*-\s*/, ' - ') };
+    return { days: m[1].trim(), time: m[2].replace(/\s*-\s*/, '–') };
 }
 
 // Trailing letters mark a lab or tutorial attached to a lecture section — except
@@ -51,40 +58,11 @@ function sectionKind(sectionNum) {
     if (!suffix) return null;
     const first = suffix[0][0].toUpperCase();
     if ((first === 'A' || first === 'E') && suffix[0].length === 1) return null;
-    return sectionNum.toUpperCase().endsWith('T') ? 'TUT' : 'LAB';
+    return sectionNum.toUpperCase().endsWith('T') ? 'Tutorial' : 'Lab';
 }
 
-const ChevronIcon = (props) => (
-    <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor"
-        strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
-        <polyline points="6 9 12 15 18 9" />
-    </svg>
-);
-
-// A home tile. In guest mode a locked one stays, blurred under a lock, and a
-// tap only shakes it.
-function QuickAction({ href, icon, label, sub, locked = false }) {
-    const body = (
-        <>
-            <span className={styles.quickActionIcon}>{icon}</span>
-            <span className={styles.quickActionLabel}>{label}</span>
-            <span className={styles.quickActionSub}>{sub}</span>
-        </>
-    );
-    if (!locked) return <Link href={href} className={styles.quickAction}>{body}</Link>;
-    return (
-        <button
-            type="button"
-            className={`${styles.quickAction} ${styles.quickActionLocked}`}
-            onClick={refuse}
-            aria-disabled="true"
-            aria-label={`${label}, needs an account`}
-        >
-            {body}
-            <LockIcon className={styles.lockCenter} width={22} height={22} />
-        </button>
-    );
-}
+const KIND_LABELS = { major: 'Department', support: 'Support', univ: 'University' };
+const DAY_NAMES = { Sun: 'Sunday', Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday' };
 
 function relativeTime(iso) {
     if (!iso) return null;
@@ -99,6 +77,78 @@ function relativeTime(iso) {
     const days = Math.floor(hrs / 24);
     if (days < 7) return `${days}d ago`;
     return new Date(iso).toLocaleDateString();
+}
+
+function greetingFor(date) {
+    const h = date.getHours();
+    if (h < 5) return 'Good evening';
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
+}
+
+function localDateKey(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// A home shortcut. A locked one (guest mode) stays visible but only nudges.
+function ActionRow({ href, icon, label, sub, primary = false, locked = false }) {
+    const body = (
+        <>
+            <span className={`${styles.actionIcon} ${primary ? styles.actionIconPrimary : ''}`}>{icon}</span>
+            <span className={styles.actionText}>
+                <span className={styles.actionLabel}>{label}</span>
+                <span className={styles.actionSub}>{sub}</span>
+            </span>
+            {locked ? <LockIcon className={styles.actionEnd} /> : <ChevronRightIcon className={styles.actionEnd} />}
+        </>
+    );
+    if (!locked) return <Link href={href} className={styles.action}>{body}</Link>;
+    return (
+        <button type="button" className={`${styles.action} ${styles.actionLocked}`} onClick={refuse} aria-disabled="true" aria-label={`${label}, needs an account`}>
+            {body}
+        </button>
+    );
+}
+
+// One reading in the signals bar.
+function Signal({ href, label, value, max, note, tone, icon, loading }) {
+    return (
+        <Link href={href} className={`${styles.signal} ${tone ? styles[`signal_${tone}`] : ''}`}>
+            <span className={styles.signalTop}>
+                <span className={styles.signalIcon}>{icon}</span>
+                <span className={styles.signalLabel}>{label}</span>
+                <ArrowRightIcon className={styles.signalArrow} />
+            </span>
+            {loading ? (
+                <Skeleton width={56} height={30} radius={6} />
+            ) : (
+                <span className={styles.signalValue}>
+                    <CountUp value={value} />
+                    {max != null && <span className={styles.signalMax}>/ {max}</span>}
+                </span>
+            )}
+            <span className={styles.signalNote}>{loading ? ' ' : note}</span>
+        </Link>
+    );
+}
+
+// The rows a loading electives list will be replaced by.
+function ElectivesSkeleton() {
+    return (
+        <div className={styles.electiveList} aria-hidden="true">
+            {[0, 1, 2, 3].map(i => (
+                <div key={i} className={styles.electiveSkeletonRow}>
+                    <Skeleton width={32} height={32} radius={9} />
+                    <span className={styles.electiveSkeletonText}>
+                        <Skeleton width={`${62 - i * 7}%`} height={13} />
+                        <Skeleton width={120} height={10} />
+                    </span>
+                    <Skeleton width={72} height={30} radius={8} />
+                </div>
+            ))}
+        </div>
+    );
 }
 
 export default function DashboardPage() {
@@ -311,283 +361,494 @@ export default function DashboardPage() {
     const currentSemesterName = semesters.find(s => s.term_code === selectedTerm)?.name || '';
     const showProfileBanner = ready && profile && !isGuest && profileCompletion.pct < 100;
 
+    const unreadAll = useUnreadCount('all');
+
+    // The clock, worked out on the client after mount (so the server's never
+    // disagrees with the student's) and ticked each minute for the timeline.
+    const [now, setNow] = useState(null);
+    useEffect(() => {
+        setNow(new Date());
+        const t = setInterval(() => setNow(new Date()), 60000);
+        return () => clearInterval(t);
+    }, []);
+
+    // The week of classes in the most recently saved schedule, for "Today".
+    const [week, setWeek] = useState({ loading: true, slots: [], hasSchedule: false });
+    useEffect(() => {
+        if (termLoading) return undefined;
+        const latest = savedSchedules[0];
+        const crns = (latest?.schedule_data?.courseGroups || []).flatMap(g => g.sections || []);
+        if (!latest || crns.length === 0) {
+            setWeek({ loading: false, slots: [], hasSchedule: !!latest });
+            return undefined;
+        }
+        const supabase = createClient();
+        let cancelled = false;
+        (async () => {
+            const { data: secs } = await supabase
+                .from('sections')
+                .select('crn, course_id, section_num, class_time, location')
+                .in('crn', crns)
+                .eq('term_code', selectedTerm);
+            const ids = [...new Set((secs || []).map(s => s.course_id))];
+            const { data: names } = ids.length
+                ? await supabase.from('courses').select('course_id, course_name').in('course_id', ids)
+                : { data: [] };
+            if (cancelled) return;
+            const nameOf = Object.fromEntries((names || []).map(c => [c.course_id, decodeHtmlEntities(c.course_name)]));
+            const slots = (secs || []).flatMap(s => parseClassTime(s.class_time).map(slot => ({
+                ...slot,
+                courseId: s.course_id,
+                courseName: nameOf[s.course_id] || '',
+                sectionNum: s.section_num,
+                location: s.location,
+            })));
+            setWeek({ loading: false, slots, hasSchedule: true });
+        })();
+        return () => { cancelled = true; };
+    }, [termLoading, savedSchedules, selectedTerm]);
+
+    const term = semesters.find(s => s.term_code === selectedTerm);
+    const termProgress = useMemo(() => {
+        if (!now || !term?.classes_start || !term?.classes_end) return null;
+        const start = new Date(term.classes_start);
+        const end = new Date(term.classes_end);
+        if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+        const DAY = 86400000;
+        if (now < start) return { state: 'before', days: Math.max(1, Math.ceil((start - now) / DAY)) };
+        if (now > new Date(end.getTime() + DAY)) return { state: 'after' };
+        const weeks = Math.max(1, Math.ceil((end - start + DAY) / (7 * DAY)));
+        const weekNo = Math.min(weeks, Math.floor((now - start) / (7 * DAY)) + 1);
+        return { state: 'during', week: weekNo, weeks, pct: Math.round(((now - start) / (end - start + DAY)) * 100) };
+    }, [now, term]);
+
+    const todayKey = now ? WEEKDAY_KEYS[now.getDay()] : null;
+    const nowMin = now ? now.getHours() * 60 + now.getMinutes() : null;
+    const isHoliday = !!(now && (term?.no_class_dates || []).includes(localDateKey(now)));
+    const todaySlots = week.slots.filter(s => s.day === todayKey).sort((a, b) => a.start - b.start);
+    const liveSlot = todaySlots.find(s => s.start <= nowMin && nowMin < s.end);
+    const nextSlot = todaySlots.find(s => s.start > nowMin);
+    const dayDone = todaySlots.length > 0 && !liveSlot && !nextSlot;
+
+    // The next day this week (Sun–Thu order) that has classes.
+    const nextClassDay = useMemo(() => {
+        if (!todayKey || week.slots.length === 0) return null;
+        const order = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const from = order.indexOf(todayKey);
+        for (let i = 1; i <= 7; i++) {
+            const d = order[(from + i) % 7];
+            const first = week.slots.filter(s => s.day === d).sort((a, b) => a.start - b.start)[0];
+            if (first) return { day: d, first };
+        }
+        return null;
+    }, [todayKey, week.slots]);
+
+    const dateLabel = now ? now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }) : '';
+
+    let statusLine = null;
+    if (ready && isGuest) {
+        statusLine = <>You&rsquo;re exploring as a guest. Build a timetable and find your way around campus; <Link href={SIGN_UP_HREF}>create an account</Link> to post swaps and get matched.</>;
+    } else if (ready && !termLoading) {
+        if (pendingMatchesCount > 0) {
+            statusLine = <>You have <Link href="/matches">{pendingMatchesCount} swap {pendingMatchesCount === 1 ? 'match' : 'matches'}</Link> waiting for your answer.</>;
+        } else if (activePostsCount > 0) {
+            statusLine = <>{activePostsCount === 1 ? 'One of your posts is' : `${activePostsCount} of your posts are`} live. We&rsquo;ll tell you the moment {activePostsCount === 1 ? 'it matches' : 'one matches'}.</>;
+        } else {
+            statusLine = 'Plan your term, trade sections and find your way around campus.';
+        }
+    }
+
+    const electivesLoading = !majorCourses || !univElectives || termLoading;
+
+    // ===== Today panel content =====
+    let today;
+    if (!ready || !now || (!isGuest && (termLoading || week.loading))) {
+        today = (
+            <div className={styles.todayBody}>
+                <Skeleton width="60%" height={14} style={{ opacity: 0.4 }} />
+                <Skeleton height={44} radius={10} style={{ opacity: 0.25 }} />
+            </div>
+        );
+    } else if (isGuest || !week.hasSchedule) {
+        today = (
+            <div className={styles.todayEmpty}>
+                <p className={styles.todayEmptyTitle}>Your day will live here</p>
+                <p className={styles.todayEmptyText}>
+                    {isGuest
+                        ? 'Build a timetable to see how your week fits together. Create an account to keep it, and today’s classes show up right here.'
+                        : 'Save a schedule and today’s classes appear here, with where you need to be next.'}
+                </p>
+                <Link href="/schedule" className={styles.todayCta}>
+                    <ScheduleIcon />
+                    Build your schedule
+                </Link>
+            </div>
+        );
+    } else if (termProgress?.state === 'before') {
+        today = (
+            <div className={styles.todayEmpty}>
+                <p className={styles.todayEmptyTitle}>Classes start in {termProgress.days} {termProgress.days === 1 ? 'day' : 'days'}</p>
+                <p className={styles.todayEmptyText}>Your saved schedule is ready. Here&rsquo;s how {nextClassDay ? DAY_NAMES[nextClassDay.day] : 'your first day'} will look:</p>
+                {nextClassDay && <DayTimeline tone="forest" slots={week.slots.filter(s => s.day === nextClassDay.day)} />}
+            </div>
+        );
+    } else if (isHoliday || todaySlots.length === 0) {
+        today = (
+            <div className={styles.todayEmpty}>
+                <p className={styles.todayEmptyTitle}>{isHoliday ? 'No classes today — it’s a day off' : 'No classes today'}</p>
+                {nextClassDay ? (
+                    <p className={styles.todayEmptyText}>
+                        Next up: <strong>{nextClassDay.first.courseName || nextClassDay.first.courseId}</strong> on {DAY_NAMES[nextClassDay.day]} at {formatTime(nextClassDay.first.start)}
+                        {nextClassDay.first.location ? <> in <RoomLink room={nextClassDay.first.location} className={styles.todayRoom} /></> : null}.
+                    </p>
+                ) : (
+                    <p className={styles.todayEmptyText}>Enjoy the free time.</p>
+                )}
+            </div>
+        );
+    } else {
+        const focus = liveSlot || nextSlot;
+        today = (
+            <div className={styles.todayBody}>
+                <DayTimeline tone="forest" slots={todaySlots} now={nowMin} />
+                {focus ? (
+                    <div className={styles.upNext}>
+                        <span className={`${styles.upNextTag} ${liveSlot ? styles.upNextLive : ''}`}>
+                            {liveSlot ? 'Now' : 'Next'}
+                        </span>
+                        <CourseSwatch courseId={focus.courseId} size="sm" />
+                        <span className={styles.upNextText}>
+                            <span className={styles.upNextName}>{focus.courseName || focus.courseId}</span>
+                            <span className={styles.upNextMeta}>
+                                {formatRange(focus.start, focus.end)}
+                                {!liveSlot && ` · in ${formatDuration(focus.start - nowMin)}`}
+                            </span>
+                        </span>
+                        {focus.location && <RoomLink room={focus.location} className={styles.upNextRoom} />}
+                    </div>
+                ) : dayDone ? (
+                    <div className={styles.upNext}>
+                        <span className={styles.upNextTag}>Done</span>
+                        <span className={styles.upNextText}>
+                            <span className={styles.upNextName}>That&rsquo;s it for today</span>
+                            <span className={styles.upNextMeta}>
+                                {nextClassDay ? `Next: ${DAY_NAMES[nextClassDay.day]} at ${formatTime(nextClassDay.first.start)}` : 'Nothing else this week'}
+                            </span>
+                        </span>
+                    </div>
+                ) : null}
+            </div>
+        );
+    }
+
     return (
-        <div className={styles.page}>
+        <PageShell width="wide">
             <AnnouncementsModal ready={ready && !!user} />
             <div className={`${styles.transitionOverlay} ${transitioning ? styles.active : ''}`} />
 
-            <TopBar />
+            {/* ===== Today ===== */}
+            <section className={styles.hero} aria-labelledby="home-greeting">
+                <div className={styles.heroMain}>
+                    <span className={styles.heroEyebrow}>
+                        {dateLabel || ' '}
+                        {currentSemesterName && (
+                            <>
+                                <span className={styles.heroDot} aria-hidden="true" />
+                                {currentSemesterName}
+                            </>
+                        )}
+                    </span>
+                    <h1 id="home-greeting" className={styles.heroTitle}>
+                        {!ready || !now ? (
+                            <Skeleton width="min(320px, 70vw)" height={36} radius={8} style={{ opacity: 0.3 }} />
+                        ) : isGuest ? (
+                            <>Welcome to <span className={styles.heroName}>CourseMate</span></>
+                        ) : (
+                            <>{greetingFor(now)},<br className={styles.heroBreak} /> <span className={styles.heroName}>{firstName}</span></>
+                        )}
+                    </h1>
+                    <p className={styles.heroStatus}>
+                        {statusLine || <Skeleton width="min(380px, 80vw)" height={14} style={{ opacity: 0.3 }} />}
+                    </p>
 
-            <div className={styles.pageInner}>
-                {/* ===== Hero ===== */}
-                {/* Home wears the app chrome inside the hero rather than in a
-                    PageHeader card, but in the same order every other page uses:
-                    hamburger left of the title, bell on the far right. Both are
-                    hidden from 1024px up, where TopBar owns them. */}
-                <section className={styles.hero}>
-                    <span className={styles.mobileChrome}><AppMenu /></span>
-                    <div className={styles.heroText}>
-                        <span className={styles.heroGreeting}>
-                            Hi, <span className={styles.heroAccent}>{firstName}</span>
-                        </span>
-                    </div>
-                    <div className={styles.heroRight}>
-                        <SemesterPicker />
-                        <span className={styles.mobileChrome}><AlertsBell /></span>
-                    </div>
-                </section>
-
-                {/* ===== Profile completeness banner (only if incomplete) ===== */}
-                {showProfileBanner && (
-                    <Link href="/profile" className={styles.profileBanner} style={{ textDecoration: 'none' }}>
-                        <ProfileIcon width={22} height={22} />
-                        <div className={styles.profileBannerText}>
-                            <div className={styles.profileBannerTitle}>Finish setting up your profile</div>
-                            <div className={styles.profileBannerSub}>
-                                {profileCompletion.filled} of {profileCompletion.total} fields filled · tap to complete
+                    <div className={styles.heroFoot}>
+                        {termProgress?.state === 'during' && (
+                            <div className={styles.term}>
+                                <span className={styles.termLabel}>
+                                    Week <strong>{termProgress.week}</strong> of {termProgress.weeks}
+                                </span>
+                                <span className={styles.termTrack} aria-hidden="true">
+                                    <span className={styles.termFill} style={{ width: `${termProgress.pct}%` }} />
+                                </span>
                             </div>
-                            <div className={styles.progressBar}>
-                                <div className={styles.progressBarFill} style={{ width: `${profileCompletion.pct}%` }} />
-                            </div>
+                        )}
+                        {termProgress?.state === 'after' && <span className={styles.termLabel}>{currentSemesterName} has finished</span>}
+                        <div className={styles.heroPicker}>
+                            <SemesterPicker />
                         </div>
-                    </Link>
-                )}
-
-                {/* ===== Quick actions ===== */}
-                <div className={styles.quickActions}>
-                    <QuickAction
-                        href="/post"
-                        icon={<PlusIcon width={20} height={20} />}
-                        label="Create post"
-                        sub="Swap, give away, or request a section"
-                        locked={isGuest}
-                    />
-                    <QuickAction
-                        href="/schedule"
-                        icon={<ScheduleIcon width={20} height={20} />}
-                        label="Build schedule"
-                        sub={`Generate timetables for ${currentSemesterName || 'the term'}`}
-                    />
-                    <QuickAction
-                        href="/browse"
-                        icon={<SearchIcon width={20} height={20} />}
-                        label="Browse"
-                        sub="See active posts from your major"
-                        locked={isGuest}
-                    />
-                    <QuickAction
-                        href="/schedule?mode=instructor"
-                        icon={<UserCheckIcon width={20} height={20} />}
-                        label="Find instructor"
-                        sub="Compare schedules across faculty"
-                    />
+                    </div>
                 </div>
 
-                {/* The way into the campus map: a strip of the 3D map itself. */}
-                <Link href="/map" className={styles.mapBanner} aria-label="Open the campus map">
-                    <span className={styles.mapBannerArt} aria-hidden="true" />
-                    <span className={styles.mapBannerOpen} aria-hidden="true">
-                        <MapIcon width={16} height={16} />
-                        Open map
+                <div className={styles.today}>
+                    <div className={styles.todayHead}>
+                        <span className={styles.todayTitle}>
+                            <ClockIcon />
+                            Today
+                        </span>
+                        {todaySlots.length > 0 && !isHoliday && (
+                            <span className={styles.todayCount}>{todaySlots.length} {todaySlots.length === 1 ? 'class' : 'classes'}</span>
+                        )}
+                    </div>
+                    {today}
+                </div>
+            </section>
+
+            {/* ===== Profile completeness (only if incomplete) ===== */}
+            {showProfileBanner && (
+                <Callout
+                    tone="accent"
+                    title="Finish setting up your profile"
+                    action={<Button size="sm" variant="primary" href="/profile">Complete profile</Button>}
+                >
+                    <span className={styles.profileNote}>
+                        {profileCompletion.filled} of {profileCompletion.total} details added. Posting and matching need all of them.
+                    </span>
+                    <ProgressBar value={profileCompletion.pct} className={styles.profileProgress} label="Profile completion" />
+                </Callout>
+            )}
+
+            {/* ===== Signals ===== */}
+            {isGuest ? (
+                <div className={styles.guestStrip}>
+                    <span className={styles.guestStripIcon}><SparkleIcon /></span>
+                    <div className={styles.guestStripText}>
+                        <strong>Get the full CourseMate</strong>
+                        <span>Post swaps and get matched automatically, save up to three schedules, and get alerts when a section opens.</span>
+                    </div>
+                    <Button variant="primary" href={SIGN_UP_HREF}>Create a free account</Button>
+                </div>
+            ) : (
+                <nav className={styles.signals} aria-label="Your activity">
+                    <Signal
+                        href="/matches"
+                        icon={<ActivityIcon />}
+                        label="Pending matches"
+                        value={pendingMatchesCount}
+                        note={pendingMatchesCount > 0 ? 'Waiting for your answer' : 'Nothing to answer'}
+                        tone={pendingMatchesCount > 0 ? 'alert' : null}
+                        loading={termLoading}
+                    />
+                    <Signal
+                        href="/matches"
+                        icon={<LayersIcon />}
+                        label="Active posts"
+                        value={activePostsCount}
+                        max={5}
+                        note={activePostsCount >= 5 ? 'At the limit' : `${5 - activePostsCount} more allowed`}
+                        loading={termLoading}
+                    />
+                    <Signal
+                        href="/schedule"
+                        icon={<ScheduleIcon />}
+                        label="Saved schedules"
+                        value={savedSchedules.length}
+                        max={3}
+                        note={savedSchedules[0]
+                            ? `${latestScheduleCredits ?? '–'} credits · saved ${relativeTime(savedSchedules[0].created_at)}`
+                            : 'None saved this term'}
+                        loading={termLoading}
+                    />
+                    <Signal
+                        href="/notifications"
+                        icon={<BellIcon />}
+                        label="Unread"
+                        value={unreadAll}
+                        note={unreadAll > 0 ? 'Notifications to read' : 'You’re all caught up'}
+                        tone={unreadAll > 0 ? 'accent' : null}
+                        loading={false}
+                    />
+                </nav>
+            )}
+
+            {/* ===== Map + start something ===== */}
+            <div className={styles.overview}>
+                <Link href="/map" className={styles.mapCard} aria-label="Open the campus map">
+                    <span className={styles.mapArt} aria-hidden="true" />
+                    <span className={styles.mapShade} aria-hidden="true" />
+                    <span className={styles.mapChip}>
+                        <MapIcon />
+                        Campus map
+                    </span>
+                    <span className={styles.mapFooter}>
+                        <span className={styles.mapText}>
+                            <span className={styles.mapTitle}>Find any building, room or coffee spot</span>
+                            <span className={styles.mapSub}>
+                                <PinIcon />
+                                Every room on your schedule links straight here
+                            </span>
+                        </span>
+                        <span className={styles.mapCta}>
+                            Open map
+                            <ArrowRightIcon />
+                        </span>
                     </span>
                 </Link>
 
-                {/* ===== Cards grid ===== */}
-                <div className={styles.grid}>
-                    <DashboardCard
-                        title="Schedule builder"
-                        icon={<ScheduleIcon width={16} height={16} />}
-                        actionLabel="Open Schedule"
-                        actionHref="/schedule"
-                        loading={termLoading}
-                        locked={isGuest && 'Sign up to save schedules'}
-                    >
-                        <div className={styles.statRow}>
-                            <StatBig
-                                value={savedSchedules.length}
-                                max={3}
-                                label="Saved schedules"
-                                sub={savedSchedules[0] ? `Latest ${relativeTime(savedSchedules[0].created_at)}` : 'No schedules yet'}
-                                tone={savedSchedules.length > 0 ? 'accent' : 'muted'}
-                            />
-                            {savedSchedules[0] && (
-                                <>
-                                    <div className={styles.statDivider} />
-                                    <StatBig
-                                        value={latestScheduleCredits ?? '-'}
-                                        label="Credits"
-                                        sub="In latest schedule"
-                                        tone="accent"
-                                    />
-                                </>
-                            )}
-                        </div>
-                    </DashboardCard>
-
-                    <DashboardCard
-                        title="My activity"
-                        icon={<ActivityIcon width={16} height={16} />}
-                        actionLabel="Open Activity"
-                        actionHref="/matches"
-                        loading={termLoading}
-                        locked={isGuest && 'Sign up to post and match'}
-                    >
-                        <div className={styles.statRow}>
-                            <StatBig
-                                value={activePostsCount}
-                                max={5}
-                                label="Active posts"
-                            />
-                            <div className={styles.statDivider} />
-                            <StatBig
-                                value={pendingMatchesCount}
-                                label="Pending matches"
-                                tone={pendingMatchesCount > 0 ? 'accent' : 'muted'}
-                            />
-                        </div>
-                    </DashboardCard>
-
-                    <DashboardCard
-                        className={styles.gridFull}
-                        title={`Electives offered · ${currentSemesterName || 'this semester'}`}
-                        icon={<BookIcon width={16} height={16} />}
-                        loading={!majorCourses || !univElectives || termLoading}
-                        empty={majorCourses && univElectives && electiveRows.length === 0
-                            ? 'No electives are offered this semester.'
-                            : undefined}
-                    >
-                        {electiveRows.length > 0 && (
-                            <>
-                                <div className={styles.electiveFilters}>
-                                    {[
-                                        { value: 'all', label: 'All' },
-                                        { value: 'dept', label: 'Department' },
-                                        { value: 'univ', label: 'University' },
-                                    ].map(opt => (
-                                        <button
-                                            key={opt.value}
-                                            type="button"
-                                            className={`${styles.electiveFilter} ${electiveFilter === opt.value ? styles.electiveFilterActive : ''}`}
-                                            onClick={() => setElectiveFilter(opt.value)}
-                                            disabled={opt.value !== 'all' && electiveCounts[opt.value] === 0}
-                                        >
-                                            {opt.label}
-                                            <span className={styles.electiveFilterCount}>{electiveCounts[opt.value]}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                                {filteredElectiveRows.length === 0 ? (
-                                    <div style={{ padding: '18px 4px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-                                        Nothing offered in this category this semester.
-                                    </div>
-                                ) : (
-                                <div className={styles.electiveList}>
-                                    {filteredElectiveRows.map(row => {
-                                        const key = `${row.kind}-${row.course_id}`;
-                                        const isOpen = openElectives.has(key);
-                                        const panelId = `sections-${key}`;
-                                        const courseLabel = row.course_name || row.course_id;
-                                        const sectionsLabel = `${row.section_count} section${row.section_count === 1 ? '' : 's'}`;
-                                        return (
-                                            <div key={key} className={`${styles.electiveItem} ${isOpen ? styles.electiveItemOpen : ''}`}>
-                                                <div className={styles.electiveHead}>
-                                                    <button
-                                                        type="button"
-                                                        className={styles.electiveRow}
-                                                        onClick={() => toggleElective(key)}
-                                                        aria-expanded={isOpen}
-                                                        aria-controls={panelId}
-                                                    >
-                                                        <span className={`${styles.kindTag} ${styles[`kindTag_${row.tag}`]}`}>
-                                                            {row.tag === 'support' ? 'SUPPORT' : row.tag === 'major' ? 'DEPT' : 'UNIV'}
-                                                        </span>
-                                                        <span className={styles.electiveMain}>
-                                                            <span className={styles.electiveName}>{row.course_name || 'Unnamed course'}</span>
-                                                            <span className={styles.electiveMeta}>
-                                                                <span className={styles.electiveCode}>{row.course_id}</span>
-                                                                {/* Phone copy of the badge. On a 390px row the right-hand
-                                                                    one squeezed the course name down to nothing, so below
-                                                                    768px the count rides the code's line instead — same
-                                                                    row height, the name gets the width back. Only ever
-                                                                    one of the two is displayed. */}
-                                                                <span className={`${styles.electiveBadge} ${styles.electiveBadgeOpen} ${styles.electiveBadgeInline}`}>
-                                                                    {sectionsLabel}
-                                                                </span>
-                                                            </span>
-                                                        </span>
-                                                        <span className={`${styles.electiveBadge} ${styles.electiveBadgeOpen} ${styles.electiveBadgeRight}`}>
-                                                            {sectionsLabel}
-                                                        </span>
-                                                        <ChevronIcon className={styles.electiveChevron} />
-                                                    </button>
-                                                    <Link
-                                                        href={`/schedule?course=${encodeURIComponent(row.course_id)}`}
-                                                        className={styles.addBtn}
-                                                        title={`Add ${courseLabel} to your schedule`}
-                                                        aria-label={`Add ${courseLabel} to your schedule`}
-                                                    >
-                                                        <PlusIcon width={14} height={14} />
-                                                        <span className={styles.addBtnLabel}>
-                                                            Add<span className={styles.addBtnLabelLong}> to schedule</span>
-                                                        </span>
-                                                    </Link>
-                                                </div>
-
-                                                {isOpen && (
-                                                    <ul id={panelId} className={styles.sectionList}>
-                                                        {(sectionsByCourse[row.course_id] || []).map(sec => {
-                                                            const { days, time } = splitClassTime(sec.class_time);
-                                                            const kind = sectionKind(sec.section_num);
-                                                            const seats = seatStatus(sec);
-                                                            return (
-                                                                <li key={sec.crn || sec.section_num} className={styles.sectionRow}>
-                                                                    <span className={styles.sectionNum}>
-                                                                        {sec.section_num}
-                                                                        {kind && <span className={styles.sectionKind}>{kind}</span>}
-                                                                        {seats && (
-                                                                            <span
-                                                                                className={`${styles.sectionSeats} ${styles[`seats_${seats.tone}`]}`}
-                                                                                title={seats.title}
-                                                                            >
-                                                                                {seats.label}
-                                                                            </span>
-                                                                        )}
-                                                                    </span>
-                                                                    <span className={styles.sectionMeta}>
-                                                                        <span className={styles.sectionWhen}>
-                                                                            {days && <span className={styles.sectionDays}>{days}</span>}
-                                                                            <span className={styles.sectionTime}>{time || 'Time TBA'}</span>
-                                                                        </span>
-                                                                        <span className={styles.sectionWho}>
-                                                                            <span className={styles.sectionInstructor}>
-                                                                                {decodeHtmlEntities((sec.instructor || '').trim()) || 'Instructor TBA'}
-                                                                            </span>
-                                                                            {sec.location && (
-                                                                                <>
-                                                                                    <span className={styles.sectionDot} aria-hidden="true">·</span>
-                                                                                    <RoomLink room={sec.location} className={styles.sectionRoom} />
-                                                                                </>
-                                                                            )}
-                                                                        </span>
-                                                                    </span>
-                                                                    <span className={styles.sectionCrn}>CRN {sec.crn}</span>
-                                                                </li>
-                                                            );
-                                                        })}
-                                                    </ul>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                                )}
-                            </>
-                        )}
-                    </DashboardCard>
-                </div>
+                <section className={styles.actions} aria-labelledby="home-start">
+                    <h2 id="home-start" className={styles.panelTitle}>Start something</h2>
+                    <div className={styles.actionList}>
+                        <ActionRow
+                            primary
+                            href="/post"
+                            icon={<PlusIcon strokeWidth={2.1} />}
+                            label="Create a post"
+                            sub="Swap, give away or request a section"
+                            locked={isGuest}
+                        />
+                        <ActionRow
+                            href="/schedule"
+                            icon={<ScheduleIcon />}
+                            label="Build a schedule"
+                            sub={`Clash-free timetables for ${currentSemesterName || 'the term'}`}
+                        />
+                        <ActionRow
+                            href="/browse"
+                            icon={<SearchIcon />}
+                            label="Browse the marketplace"
+                            sub="Sections up for grabs in your major"
+                            locked={isGuest}
+                        />
+                        <ActionRow
+                            href="/schedule?mode=instructor"
+                            icon={<UserCheckIcon />}
+                            label="Find an instructor"
+                            sub="See anyone’s teaching week"
+                        />
+                    </div>
+                </section>
             </div>
 
-            <BottomNav />
-        </div>
+            {/* ===== Electives ===== */}
+            <section className={styles.electives} aria-labelledby="home-electives">
+                <div className={styles.electivesHead}>
+                    <div>
+                        <h2 id="home-electives" className={styles.panelTitle}>
+                            Electives open this term
+                        </h2>
+                        <p className={styles.electivesNote}>
+                            Department and university electives with sections on your campus in {currentSemesterName || 'this semester'}.
+                        </p>
+                    </div>
+                    {!electivesLoading && electiveRows.length > 0 && (
+                        <SegmentedControl
+                            size="sm"
+                            label="Elective type"
+                            className={styles.electiveFilter}
+                            value={electiveFilter}
+                            onChange={setElectiveFilter}
+                            options={[
+                                { value: 'all', label: 'All', count: electiveCounts.all },
+                                { value: 'dept', label: 'Department', count: electiveCounts.dept, disabled: electiveCounts.dept === 0 },
+                                { value: 'univ', label: 'University', count: electiveCounts.univ, disabled: electiveCounts.univ === 0 },
+                            ]}
+                        />
+                    )}
+                </div>
+
+                {electivesLoading ? (
+                    <ElectivesSkeleton />
+                ) : electiveRows.length === 0 ? (
+                    <EmptyState compact tone="neutral" icon={<BookIcon />} title="No electives open this term">
+                        None of your major&rsquo;s department or university electives have sections on your campus in {currentSemesterName || 'this semester'}. Try another semester from the menu above.
+                    </EmptyState>
+                ) : filteredElectiveRows.length === 0 ? (
+                    <EmptyState compact tone="neutral" icon={<BookIcon />} title="Nothing in this category">
+                        No electives of this type are offered this semester.
+                    </EmptyState>
+                ) : (
+                    <div className={styles.electiveList}>
+                        {filteredElectiveRows.map(row => {
+                            const key = `${row.kind}-${row.course_id}`;
+                            const isOpen = openElectives.has(key);
+                            const panelId = `sections-${key}`;
+                            const courseName = decodeHtmlEntities(row.course_name);
+                            const courseLabel = courseName || row.course_id;
+                            const sectionsLabel = `${row.section_count} section${row.section_count === 1 ? '' : 's'}`;
+                            return (
+                                <div key={key} className={`${styles.electiveItem} ${isOpen ? styles.electiveItemOpen : ''}`}>
+                                    <div className={styles.electiveHead}>
+                                        <button
+                                            type="button"
+                                            className={styles.electiveRow}
+                                            onClick={() => toggleElective(key)}
+                                            aria-expanded={isOpen}
+                                            aria-controls={panelId}
+                                        >
+                                            <CourseSwatch courseId={row.course_id} />
+                                            <span className={styles.electiveMain}>
+                                                <span className={styles.electiveName}>{courseName || 'Unnamed course'}</span>
+                                                <span className={styles.electiveMeta}>
+                                                    <span className={styles.electiveCode}>{row.course_id}</span>
+                                                    <span className={styles.metaDot} aria-hidden="true" />
+                                                    <span className={`${styles.kindLabel} ${styles[`kind_${row.tag}`]}`}>{KIND_LABELS[row.tag]}</span>
+                                                    <span className={styles.metaDot} aria-hidden="true" />
+                                                    <span>{sectionsLabel}</span>
+                                                </span>
+                                            </span>
+                                            <ChevronDownIcon className={styles.electiveChevron} />
+                                        </button>
+                                        <Link
+                                            href={`/schedule?course=${encodeURIComponent(row.course_id)}`}
+                                            className={styles.addBtn}
+                                            title={`Add ${courseLabel} to your schedule`}
+                                            aria-label={`Add ${courseLabel} to your schedule`}
+                                        >
+                                            <PlusIcon />
+                                            <span className={styles.addLabel}>Add<span className={styles.addLabelLong}> to schedule</span></span>
+                                        </Link>
+                                    </div>
+
+                                    {isOpen && (
+                                        <ul id={panelId} className={styles.sectionList}>
+                                            {(sectionsByCourse[row.course_id] || []).map(sec => {
+                                                const { days, time } = splitClassTime(sec.class_time);
+                                                const kind = sectionKind(sec.section_num);
+                                                const seats = seatStatus(sec);
+                                                return (
+                                                    <li key={sec.crn || sec.section_num} className={styles.sectionRow}>
+                                                        <span className={styles.sectionId}>
+                                                            <span className={styles.sectionNum}>{sec.section_num}</span>
+                                                            {kind && <span className={styles.sectionKind}>{kind}</span>}
+                                                        </span>
+                                                        <span className={styles.sectionWhen}>
+                                                            {days && <span className={styles.sectionDays}>{days}</span>}
+                                                            <span className={styles.sectionTime}>{time || 'Time TBA'}</span>
+                                                        </span>
+                                                        <span className={styles.sectionWho}>
+                                                            <span className={styles.sectionInstructor}>
+                                                                {decodeHtmlEntities((sec.instructor || '').trim()) || 'Instructor TBA'}
+                                                            </span>
+                                                            {sec.location && <RoomLink room={sec.location} className={styles.sectionRoom} />}
+                                                        </span>
+                                                        <span className={styles.sectionEnd}>
+                                                            {seats && (
+                                                                <Badge size="sm" dot tone={seats.tone === 'open' ? 'success' : seats.tone === 'low' ? 'warning' : 'neutral'} title={seats.title}>
+                                                                    {seats.label}
+                                                                </Badge>
+                                                            )}
+                                                            <span className={styles.sectionCrn}>CRN {sec.crn}</span>
+                                                        </span>
+                                                    </li>
+                                                );
+                                            })}
+                                        </ul>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </section>
+        </PageShell>
     );
 }
