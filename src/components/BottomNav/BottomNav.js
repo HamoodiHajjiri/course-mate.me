@@ -9,10 +9,10 @@ import { PlusIcon, LockIcon } from '../Icons';
 import styles from './BottomNav.module.css';
 
 /**
- * The phone and tablet tab bar (hidden from 1024px, where the top bar carries
- * navigation). Docked to the bottom edge rather than floating, so it reads as
- * part of the app rather than a widget over it. New post takes the middle
- * slot as the one filled control.
+ * The phone and tablet tab bar (hidden from 1024px, where the app bar carries
+ * the destinations). A ruled band on the bottom edge, like the app bar on the
+ * top: the current tab gets an ink rule along the bar's top line. New post
+ * sits in the middle as the bar's one filled square.
  */
 export default function BottomNav() {
     const pathname = usePathname();
@@ -87,7 +87,7 @@ export default function BottomNav() {
                             aria-label="New post"
                             aria-current={postActive ? 'page' : undefined}
                         >
-                            <PlusIcon strokeWidth={2.25} />
+                            <PlusIcon strokeWidth={1.75} />
                         </Link>
                     )}
                 </div>
