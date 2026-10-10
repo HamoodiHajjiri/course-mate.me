@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { useConfirm, useToast } from '@/components/ui';
 import styles from '../admin.module.css';
 import CoursePicker from './CoursePicker';
 import MajorEditModal from './MajorEditModal';
@@ -13,6 +14,8 @@ function MajorsProvider({ children }) {
     const [error, setError] = useState('');
     const [editingCode, setEditingCode] = useState(null);
     const [showCreate, setShowCreate] = useState(false);
+    const confirm = useConfirm();
+    const toast = useToast();
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -32,16 +35,24 @@ function MajorsProvider({ children }) {
     useEffect(() => { load(); }, [load]);
 
     const handleDelete = async (code, name) => {
-        if (!confirm(`Delete major "${name}" (${code})? Removes the major and its course links. Existing user profiles with this major will be orphaned.`)) return;
+        const ok = await confirm({
+            title: `Delete ${name}?`,
+            body: `The major ${code} and its course list are removed. Students who chose it keep it on their profile, but it no longer exists.`,
+            confirmLabel: 'Delete major',
+            tone: 'danger',
+        });
+        if (!ok) return;
         const res = await fetch('/api/admin/majors', {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ code }),
         });
-        if (res.ok) setMajors(prev => prev.filter(m => m.code !== code));
-        else {
+        if (res.ok) {
+            setMajors(prev => prev.filter(m => m.code !== code));
+            toast.success(`${name} deleted`);
+        } else {
             const body = await res.json().catch(() => ({}));
-            alert(body.error || 'Failed');
+            toast.error(body.error || 'Couldn’t delete that major.');
         }
     };
 
@@ -62,16 +73,15 @@ function MajorsSidebar() {
 
     return (
         <div className={styles.sidebarCard}>
-            <p className={styles.sectionTitle}>Actions</p>
+            <p className={styles.sectionTitle}>Majors</p>
+            <p className={styles.previewMuted}>{majors.length} set up. Each has its own list of courses and elective counts.</p>
             <button
-                className={`${styles.btn} ${styles.btnPrimary} ${styles.btnFull}`}
+                type="button"
+                className={`${styles.btn} ${showCreate ? '' : styles.btnPrimary} ${styles.btnFull}`}
                 onClick={() => setShowCreate(v => !v)}
             >
-                {showCreate ? 'Hide create form' : '+ New major'}
+                {showCreate ? 'Close the new major' : 'New major'}
             </button>
-            <div style={{ marginTop: 12, textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                {majors.length} major{majors.length === 1 ? '' : 's'} configured
-            </div>
         </div>
     );
 }
@@ -90,37 +100,43 @@ function MajorsMain() {
                 />
             )}
 
-            <div className={styles.feedCard}>
-                {error && <div className={styles.error}>{error}</div>}
-                {loading ? (
-                    <div className={styles.loading}><div className={styles.spinner} />Loading majors...</div>
-                ) : majors.length === 0 ? (
-                    <div className={styles.empty}>
-                        <div className={styles.emptyTitle}>No majors yet</div>
-                        <span>Use “+ New major” in the sidebar to add one.</span>
-                    </div>
-                ) : (
-                    <div className={styles.feedList}>
-                        {majors.map(m => (
-                            <div key={m.code} className={styles.row}>
-                                <div className={styles.rowMain}>
-                                    <div className={styles.rowTitle}>
-                                        {m.name}
-                                        <span className={styles.badge}>{m.code}</span>
-                                    </div>
-                                    <div className={styles.rowMeta}>
-                                        {m.dept_electives_count || 0} dept electives · {m.support_electives_count || 0} support electives
-                                    </div>
-                                </div>
-                                <div className={styles.rowActions}>
-                                    <button className={`${styles.btn} ${styles.btnGhost}`} onClick={() => setEditingCode(m.code)}>Edit</button>
-                                    <button className={`${styles.btn} ${styles.btnDanger}`} onClick={() => handleDelete(m.code, m.name)}>Delete</button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
+            {error && <div className={styles.error}>{error}</div>}
+            {loading ? (
+                <div className={styles.loading}><div className={styles.spinner} />Reading majors…</div>
+            ) : majors.length === 0 ? (
+                <div className={styles.empty}>
+                    <div className={styles.emptyTitle}>No majors yet.</div>
+                    <span>Start one with New major.</span>
+                </div>
+            ) : (
+                <div className={styles.tableWrap}>
+                    <table className={styles.table}>
+                        <thead>
+                            <tr>
+                                <th>Major</th>
+                                <th>Code</th>
+                                <th className={styles.num}>Department electives</th>
+                                <th className={styles.num}>Support electives</th>
+                                <th className={styles.cellActions}><span className="sr-only">Actions</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {majors.map(m => (
+                                <tr key={m.code}>
+                                    <td className={styles.cellStrong}>{m.name}</td>
+                                    <td className={styles.mono}>{m.code}</td>
+                                    <td className={`${styles.num} ${styles.mono}`}>{m.dept_electives_count || 0}</td>
+                                    <td className={`${styles.num} ${styles.mono}`}>{m.support_electives_count || 0}</td>
+                                    <td className={styles.cellActions}>
+                                        <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={() => setEditingCode(m.code)}>Edit</button>
+                                        <button type="button" className={`${styles.btn} ${styles.btnDanger}`} onClick={() => handleDelete(m.code, m.name)}>Delete</button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
 
             {editingCode && (
                 <MajorEditModal code={editingCode} onClose={() => setEditingCode(null)} onSaved={() => { load(); }} />
@@ -138,6 +154,7 @@ function CreateMajorForm({ onCancel, onCreated }) {
     const [newCourses, setNewCourses] = useState([]);
     const [saving, setSaving] = useState(false);
     const [err, setErr] = useState('');
+    const toast = useToast();
 
     const addExisting = (c) => setExisting(prev => [...prev, c]);
     const removeExisting = (id) => setExisting(prev => prev.filter(c => c.course_id !== id));
@@ -149,7 +166,7 @@ function CreateMajorForm({ onCancel, onCreated }) {
         e.preventDefault();
         setErr('');
         if (!code.trim() || !name.trim()) {
-            setErr('Code and name are required');
+            setErr('A major needs a code and a name.');
             return;
         }
         setSaving(true);
@@ -168,8 +185,9 @@ function CreateMajorForm({ onCancel, onCreated }) {
             });
             if (!res.ok) {
                 const body = await res.json().catch(() => ({}));
-                throw new Error(body.error || 'Create failed');
+                throw new Error(body.error || 'Couldn’t create the major.');
             }
+            toast.success(`${name.trim()} created`);
             onCreated();
         } catch (e) {
             setErr(e.message);
@@ -180,48 +198,55 @@ function CreateMajorForm({ onCancel, onCreated }) {
 
     return (
         <form onSubmit={handleSubmit} className={styles.formCard}>
-            <div className={styles.formRow}>
-                <input className={styles.input} style={{ maxWidth: 180 }} placeholder="Code (e.g. CS)" value={code} onChange={(e) => setCode(e.target.value)} />
-                <input className={styles.input} style={{ flex: 1, minWidth: 220 }} placeholder="Name (e.g. Computer Science)" value={name} onChange={(e) => setName(e.target.value)} />
+            <p className={styles.sectionTitle}>New major</p>
+            <div className={styles.formSplit}>
+                <label className={styles.fieldGroup}>
+                    <span className={styles.fieldLabel}>Code</span>
+                    <input className={`${styles.input} ${styles.mono}`} placeholder="CS" value={code} onChange={(e) => setCode(e.target.value)} />
+                </label>
+                <label className={styles.fieldGroup}>
+                    <span className={styles.fieldLabel}>Name</span>
+                    <input className={styles.input} placeholder="Computer Science" value={name} onChange={(e) => setName(e.target.value)} />
+                </label>
             </div>
 
             <div className={styles.formGrid}>
-                <div className={styles.numField}>
-                    <span className={styles.numFieldLabel}>Dept electives</span>
+                <label className={styles.numField}>
+                    <span className={styles.numFieldLabel}>Department electives</span>
                     <input className={styles.input} type="number" min="0" value={deptCount} onChange={(e) => setDeptCount(+e.target.value || 0)} />
-                </div>
-                <div className={styles.numField}>
+                </label>
+                <label className={styles.numField}>
                     <span className={styles.numFieldLabel}>Support electives</span>
                     <input className={styles.input} type="number" min="0" value={supportCount} onChange={(e) => setSupportCount(+e.target.value || 0)} />
-                </div>
+                </label>
             </div>
 
-            <div>
-                <span className={styles.fieldLabel}>Attach existing courses</span>
+            <div className={styles.fieldGroup}>
+                <span className={styles.fieldLabel}>Courses already in the catalogue</span>
                 <CoursePicker selected={existing} onAdd={addExisting} />
                 {existing.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                    <div className={styles.chips}>
                         {existing.map(c => (
-                            <span key={c.course_id} className={`${styles.badge} ${styles.badgeAccent}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            <span key={c.course_id} className={styles.chip}>
                                 {c.course_id}
-                                <button type="button" onClick={() => removeExisting(c.course_id)} style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, fontSize: 14, lineHeight: 1 }}>×</button>
+                                <button type="button" className={styles.chipRemove} onClick={() => removeExisting(c.course_id)} aria-label={`Remove ${c.course_id}`}>×</button>
                             </span>
                         ))}
                     </div>
                 )}
             </div>
 
-            <div>
-                <div className={styles.fieldLabel} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>New courses to create</span>
-                    <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={addNewRow}>+ Row</button>
+            <div className={styles.fieldGroup}>
+                <div className={styles.labelRow}>
+                    <span className={styles.fieldLabel}>New courses to create</span>
+                    <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={addNewRow}>Add a row</button>
                 </div>
                 {newCourses.map((c, i) => (
-                    <div key={i} className={styles.formRow} style={{ marginBottom: 6 }}>
-                        <input className={styles.input} style={{ maxWidth: 140 }} placeholder="Course ID" value={c.course_id} onChange={(e) => updateNewRow(i, 'course_id', e.target.value)} />
-                        <input className={styles.input} style={{ flex: 1, minWidth: 180 }} placeholder="Course name" value={c.course_name} onChange={(e) => updateNewRow(i, 'course_name', e.target.value)} />
-                        <input className={styles.input} style={{ maxWidth: 90 }} type="number" min="0" placeholder="Credits" value={c.credit_hours} onChange={(e) => updateNewRow(i, 'credit_hours', e.target.value)} />
-                        <button type="button" className={`${styles.btn} ${styles.btnDanger}`} onClick={() => removeNewRow(i)}>×</button>
+                    <div key={i} className={styles.newRow}>
+                        <input className={`${styles.input} ${styles.mono}`} placeholder="Course ID" value={c.course_id} onChange={(e) => updateNewRow(i, 'course_id', e.target.value)} />
+                        <input className={styles.input} placeholder="Course name" value={c.course_name} onChange={(e) => updateNewRow(i, 'course_name', e.target.value)} />
+                        <input className={styles.input} type="number" min="0" placeholder="Credits" value={c.credit_hours} onChange={(e) => updateNewRow(i, 'credit_hours', e.target.value)} />
+                        <button type="button" className={`${styles.btn} ${styles.btnDanger}`} onClick={() => removeNewRow(i)} aria-label="Remove this row">×</button>
                     </div>
                 ))}
             </div>
@@ -230,9 +255,9 @@ function CreateMajorForm({ onCancel, onCreated }) {
 
             <div className={styles.formRow}>
                 <button type="submit" className={`${styles.btn} ${styles.btnPrimary}`} disabled={saving}>
-                    {saving ? 'Creating...' : 'Create major'}
+                    {saving ? 'Creating…' : 'Create the major'}
                 </button>
-                <button type="button" className={styles.btn} onClick={onCancel}>Cancel</button>
+                <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={onCancel}>Cancel</button>
             </div>
         </form>
     );
