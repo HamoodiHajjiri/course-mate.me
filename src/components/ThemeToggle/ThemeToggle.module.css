@@ -1,110 +1,280 @@
-/* Segmented control: four discrete themes, current one filled.
-   A slider was considered and rejected — themes are named choices, not a
-   quantity along an axis, and Navy is not "half as dark" as Black. */
+/* ===== Compact: four swatches =====
+   Each previews the ground it switches to. Hard-coded colours on purpose:
+   a swatch shows its own theme, not the current one. */
 
-.group {
+.compact {
     display: inline-flex;
-    align-items: stretch;
     gap: 2px;
-    padding: 2px;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-full, 999px);
+    padding: 3px;
+    border-radius: var(--r-full);
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--line-subtle);
 }
 
-.option {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 5px 11px;
-    font: inherit;
-    font-size: 12.5px;
-    font-weight: 500;
-    line-height: 1;
-    color: var(--text-secondary);
-    background: transparent;
+.compactPlaceholder {
+    width: 132px;
+    height: 34px;
+}
+
+.swatchBtn {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 28px;
+    padding: 0;
     border: 0;
-    border-radius: var(--radius-full, 999px);
+    border-radius: var(--r-full);
+    background: transparent;
     cursor: pointer;
-    white-space: nowrap;
-    transition: color var(--transition-fast, 150ms), background var(--transition-fast, 150ms);
+    transition: background-color var(--dur-1) var(--ease-out), box-shadow var(--dur-1) var(--ease-out);
 }
 
-.option:hover:not(.selected) {
-    color: var(--text-primary);
-    background: var(--bg-elevated);
+.swatchBtn:hover {
+    background: var(--surface-hover);
 }
 
-.option:focus-visible {
-    outline: 2px solid var(--color-accent);
-    outline-offset: 1px;
+.swatchBtn[aria-checked='true'] {
+    background: var(--surface);
+    box-shadow: var(--e1), inset 0 0 0 1px var(--line);
 }
 
-.selected {
-    color: var(--text-primary);
-    background: var(--bg-secondary);
-    box-shadow: var(--shadow-xs);
+[data-theme="dark"] .swatchBtn[aria-checked='true'],
+[data-theme="black"] .swatchBtn[aria-checked='true'] {
+    background: var(--surface-3);
 }
 
-/* Each option previews the ground it switches to, so the choice is legible
-   without reading the labels. */
 .swatch {
-    /* Even width so the Auto swatch's halves land on whole pixels. */
-    width: 12px;
-    height: 12px;
-    flex: none;
+    position: relative;
+    width: 16px;
+    height: 16px;
     border-radius: 50%;
-    border: 1px solid var(--border-color);
-    /* The border is translucent; without this the fill paints underneath it
-       and muddies the edge. */
-    background-clip: padding-box;
+    overflow: hidden;
+    box-shadow: inset 0 0 0 1px rgba(127, 140, 135, 0.45);
 }
 
-/* Two solid halves, not a gradient. A hard colour stop still interpolates
-   across the boundary, and at 12px that fringe is a visible band of the wrong
-   colour on each side. Painting the dark half as its own element gives a clean
-   edge with nothing to blend. */
-.swatch_system {
-    position: relative;
-    overflow: hidden;
-    background: #F5F7FA;
+.swatchBtn[aria-checked='true'] .swatch {
+    box-shadow: inset 0 0 0 1px rgba(127, 140, 135, 0.45), 0 0 0 2px var(--accent);
 }
+
+.swatch_light { background: #F5F4EF; }
+.swatch_dark { background: #0D1726; }
+.swatch_black { background: #000000; }
+
+/* Two solid halves rather than a gradient, for a clean edge at this size. */
+.swatch_system { background: #F5F4EF; }
 
 .swatch_system::after {
     content: '';
     position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    left: 50%;
-    background: #0B1120;
+    inset: 0 0 0 50%;
+    background: #0D1726;
 }
 
-.swatch_light { background: #F5F7FA; }
-.swatch_dark  { background: #0B1120; }
-.swatch_black { background: #000000; }
+/* ===== Full: preview cards ===== */
 
-/* On black the darkest swatches would vanish into the control. */
-[data-theme="black"] .swatch_dark,
-[data-theme="black"] .swatch_black {
-    border-color: rgba(255, 255, 255, 0.28);
+.grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
 }
 
-.label {
-    /* Labels are the affordance on wide layouts; the swatch carries it when
-       space is tight. */
+.gridPlaceholder {
+    height: 158px;
 }
 
-/* Compact: swatches only, for the account menu. */
-.compact .option { padding: 6px; }
-.compact .swatch { width: 14px; height: 14px; }
-
-@media (max-width: 560px) {
-    .label { display: none; }
-    .option { padding: 6px 8px; }
-    .swatch { width: 14px; height: 14px; }
+.card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 6px 6px 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    background: var(--surface);
+    text-align: left;
+    cursor: pointer;
+    transition: border-color var(--dur-1) var(--ease-out), box-shadow var(--dur-2) var(--ease-out), transform var(--dur-1) var(--ease-out);
 }
 
-@media (prefers-reduced-motion: reduce) {
-    .option { transition: none; }
+.card:hover {
+    border-color: var(--line-strong);
+}
+
+.card:active {
+    transform: scale(0.985);
+}
+
+.card[aria-checked='true'] {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft-2);
+}
+
+.previewFrame {
+    position: relative;
+    display: block;
+    height: 96px;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+/* Hard-coded on purpose: each miniature shows its own theme. */
+.preview {
+    --pv-canvas: #F5F4EF;
+    --pv-surface: #FFFFFF;
+    --pv-line: rgba(28, 40, 33, 0.12);
+    --pv-ink: #0F1D17;
+    --pv-ink-2: #C9CDC8;
+    --pv-forest: #0C3A2C;
+    --pv-accent: #00C389;
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 9px 10px 10px;
+    background: var(--pv-canvas);
+    box-shadow: inset 0 0 0 1px var(--pv-line);
+    border-radius: inherit;
+}
+
+.preview_dark {
+    --pv-canvas: #070D16;
+    --pv-surface: #111B29;
+    --pv-line: rgba(150, 178, 214, 0.16);
+    --pv-ink: #ECF1F7;
+    --pv-ink-2: #3A4757;
+    --pv-forest: #0B2B22;
+    --pv-accent: #2ED39C;
+}
+
+.preview_black {
+    --pv-canvas: #000000;
+    --pv-surface: #111312;
+    --pv-line: rgba(255, 255, 255, 0.12);
+    --pv-ink: #F3F5F4;
+    --pv-ink-2: #3B403D;
+    --pv-forest: #08221A;
+    --pv-accent: #2ED39C;
+}
+
+/* Auto: light on the left, navy on the right, split on the diagonal. */
+.previewHalf {
+    clip-path: polygon(64% 0, 100% 0, 100% 100%, 36% 100%);
+}
+
+.pvBar {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.pvDot {
+    width: 7px;
+    height: 7px;
+    border-radius: 2px;
+    background: var(--pv-accent);
+}
+
+.pvBarLine {
+    width: 34%;
+    height: 5px;
+    border-radius: 3px;
+    background: var(--pv-ink);
+    opacity: 0.8;
+}
+
+.pvForest {
+    display: flex;
+    align-items: flex-end;
+    height: 22px;
+    padding: 0 7px 6px;
+    border-radius: 6px;
+    background: var(--pv-forest);
+}
+
+.pvForestLine {
+    width: 46%;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.75);
+}
+
+.pvCard {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 8px;
+    flex: 1;
+    padding: 7px;
+    border-radius: 6px;
+    background: var(--pv-surface);
+    box-shadow: inset 0 0 0 1px var(--pv-line);
+}
+
+.pvLines {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+
+.pvLine {
+    width: 86%;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--pv-ink-2);
+}
+
+.pvLineShort {
+    width: 56%;
+}
+
+.pvPill {
+    width: 26%;
+    height: 9px;
+    border-radius: 3px;
+    background: var(--pv-accent);
+}
+
+.cardText {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 0 4px;
+}
+
+.cardLabel {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    font-size: var(--text-small);
+    font-weight: var(--weight-semibold);
+    color: var(--ink);
+}
+
+.check {
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--on-accent);
+    animation: cm-pop-in var(--dur-2) var(--ease-out);
+}
+
+.check svg {
+    width: 11px;
+    height: 11px;
+}
+
+.cardNote {
+    font-size: var(--text-caption);
+    color: var(--ink-3);
+}
+
+@media (max-width: 640px) {
+    .grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
