@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { Dialog, useToast } from '@/components/ui';
 import styles from '../admin.module.css';
 
 const CATEGORIES = ['Core', 'Major Elective', 'Support Elective'];
@@ -24,6 +25,7 @@ export default function CourseEditModal({ course, majors, onClose, onSaved }) {
     const [addCode, setAddCode] = useState('');
     const [saving, setSaving] = useState(false);
     const [err, setErr] = useState('');
+    const toast = useToast();
 
     const usedCodes = useMemo(() => new Set(memberships.map(m => m.code)), [memberships]);
     const available = (majors || []).filter(m => !usedCodes.has(m.code));
@@ -54,9 +56,9 @@ export default function CourseEditModal({ course, majors, onClose, onSaved }) {
         setRestricted(prev => (prev.includes(code) ? prev.filter(c => c !== code) : [...prev, code]));
 
     const handleSave = async () => {
-        if (!name.trim()) { setErr('Course name is required.'); return; }
+        if (!name.trim()) { setErr('A course needs a name.'); return; }
         if (isCreate && !/^\d{7}$/.test(courseId.trim())) {
-            setErr('Course ID must be exactly 7 digits.');
+            setErr('A course ID is exactly 7 digits.');
             return;
         }
         setSaving(true);
@@ -79,8 +81,9 @@ export default function CourseEditModal({ course, majors, onClose, onSaved }) {
             });
             if (!res.ok) {
                 const body = await res.json().catch(() => ({}));
-                throw new Error(body.error || 'Save failed');
+                throw new Error(body.error || 'Couldn’t save the course.');
             }
+            toast.success(isCreate ? `${courseId.trim()} created` : `${course.course_id} saved`);
             onSaved?.();
             onClose();
         } catch (e) {
@@ -91,155 +94,118 @@ export default function CourseEditModal({ course, majors, onClose, onSaved }) {
     };
 
     return (
-        <div
-            onClick={onClose}
-            style={{
-                position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
-                display: 'flex', justifyContent: 'center', alignItems: 'flex-start',
-                paddingTop: 40, paddingBottom: 40, overflowY: 'auto', zIndex: 100,
-            }}
+        <Dialog
+            open
+            onClose={onClose}
+            dismissible={!saving}
+            size="md"
+            title={isCreate ? 'New course' : (course.course_name || 'Edit course')}
+            description={!isCreate ? <><span className={styles.mono}>{course.course_id}</span>{course.college_name ? ` · ${course.college_name}` : ''}</> : 'It appears in the catalogue straight away.'}
+            footer={(
+                <>
+                    <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={onClose} disabled={saving}>Cancel</button>
+                    <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleSave} disabled={saving}>
+                        {saving ? 'Saving…' : isCreate ? 'Create course' : 'Save changes'}
+                    </button>
+                </>
+            )}
         >
-            <div
-                onClick={(e) => e.stopPropagation()}
-                style={{
-                    width: '100%', maxWidth: 680,
-                    background: 'var(--bg-card)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: 16, padding: 20,
-                    boxShadow: 'var(--shadow-xl)',
-                    margin: '0 16px',
-                    color: 'var(--text-primary)',
-                    display: 'flex', flexDirection: 'column', gap: 14,
-                }}
-            >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                        <div style={{ fontSize: 18, fontWeight: 700 }}>{isCreate ? 'Add course' : 'Edit course'}</div>
-                        {!isCreate && (
-                            <div className={styles.rowMeta}>{course.course_id}{course.college_name ? ` · ${course.college_name}` : ''}</div>
-                        )}
-                    </div>
-                    <button className={styles.btn} onClick={onClose}>Close</button>
-                </div>
-
+            <div className={styles.formStack}>
                 {err && <div className={styles.error}>{err}</div>}
 
-                {/* Course fields */}
                 {isCreate && (
-                    <div className={styles.fieldGroup}>
-                        <label className={styles.fieldLabel}>Course ID (7 digits)</label>
+                    <label className={styles.fieldGroup}>
+                        <span className={styles.fieldLabel}>Course ID · 7 digits</span>
                         <input
-                            className={styles.input}
-                            style={{ borderColor: courseId && !/^\d{7}$/.test(courseId) ? 'var(--color-danger, #dc2626)' : undefined }}
-                            placeholder="e.g. 1501101"
+                            className={`${styles.input} ${styles.mono} ${courseId && !/^\d{7}$/.test(courseId) ? styles.inputInvalid : ''}`}
+                            placeholder="1501101"
                             inputMode="numeric"
                             maxLength={7}
                             value={courseId}
                             onChange={(e) => setCourseId(e.target.value.replace(/\D/g, '').slice(0, 7))}
                         />
-                    </div>
+                    </label>
                 )}
-                <div className={styles.fieldGroup}>
-                    <label className={styles.fieldLabel}>Course name</label>
+                <label className={styles.fieldGroup}>
+                    <span className={styles.fieldLabel}>Name</span>
                     <input className={styles.input} value={name} onChange={(e) => setName(e.target.value)} placeholder="Course name" />
-                </div>
+                </label>
 
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                    <div className={styles.fieldGroup} style={{ flex: '0 0 120px' }}>
-                        <label className={styles.fieldLabel}>Credit hours</label>
+                <div className={styles.formSplit}>
+                    <label className={styles.fieldGroup}>
+                        <span className={styles.fieldLabel}>Credit hours</span>
                         <input className={styles.input} type="number" min="0" value={credits} onChange={(e) => setCredits(+e.target.value || 0)} />
-                    </div>
-                    <div className={styles.fieldGroup} style={{ flex: '1 1 200px' }}>
-                        <label className={styles.fieldLabel}>University elective basket</label>
+                    </label>
+                    <label className={styles.fieldGroup}>
+                        <span className={styles.fieldLabel}>University elective basket</span>
                         <select className={styles.input} value={basket} onChange={(e) => setBasket(e.target.value)}>
                             <option value="">None</option>
                             {[...new Set([...BASKETS, ...(basket ? [basket] : [])])].map(b => (
                                 <option key={b} value={b}>{b}</option>
                             ))}
                         </select>
-                        <span className={styles.rowMeta} style={{ marginTop: 4 }}>
-                            {basket ? 'Shared across all majors unless restricted below.' : 'Applies to all majors.'}
+                        <span className={styles.previewMuted}>
+                            {basket ? 'Shared with every major unless you restrict it below.' : 'Not a university elective.'}
                         </span>
-                    </div>
+                    </label>
                 </div>
 
                 {basket && (
-                    <div className={styles.fieldGroup}>
-                        <label className={styles.fieldLabel}>
-                            Restrict to majors {restricted.length === 0 ? '(none, shared with all majors)' : `(${restricted.length})`}
-                        </label>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    <section className={styles.card}>
+                        <p className={styles.sectionTitle}>
+                            Only for these majors <span className={styles.navCount}>{restricted.length === 0 ? 'every major' : restricted.length}</span>
+                        </p>
+                        <div className={styles.chips}>
                             {(majors || []).map(m => (
                                 <button
                                     type="button"
                                     key={m.code}
                                     onClick={() => toggleRestricted(m.code)}
-                                    className={`${styles.btn} ${restricted.includes(m.code) ? styles.btnPrimary : ''}`}
+                                    className={`${styles.toggleChip} ${restricted.includes(m.code) ? styles.toggleChipOn : ''}`}
+                                    aria-pressed={restricted.includes(m.code)}
                                     title={m.name}
                                 >
                                     {m.code}
                                 </button>
                             ))}
                         </div>
-                        <span className={styles.rowMeta} style={{ marginTop: 4 }}>
-                            Leave empty to share with every major. Selecting majors limits this basket course to only those.
-                        </span>
-                    </div>
+                        <span className={styles.previewMuted}>Pick none to share it with every major.</span>
+                    </section>
                 )}
 
-                {/* Major memberships */}
-                <div className={styles.fieldGroup}>
-                    <label className={styles.fieldLabel}>Majors & elective type ({memberships.length})</label>
+                <section className={styles.card}>
+                    <p className={styles.sectionTitle}>Majors and role <span className={styles.navCount}>{memberships.length}</span></p>
                     {basket && (
-                        <span className={styles.rowMeta} style={{ marginBottom: 4 }}>
-                            University-elective membership is managed by the basket setting above. Add majors here only for Core / Major / Support roles.
+                        <span className={styles.previewMuted}>
+                            Being a university elective is set by the basket above. Add majors here only where it’s core, a major elective or a support elective.
                         </span>
                     )}
-                    {memberships.length > 0 && (
-                        <span className={styles.rowMeta} style={{ marginBottom: 4 }}>
-                            Use Remove below to exclude a major after adding all of them.
-                        </span>
-                    )}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        {memberships.length === 0 && <div className={styles.rowMeta}>Not attached to any major.</div>}
-                        {memberships.map(m => (
-                            <div key={m.code} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <div style={{ flex: '1 1 auto', minWidth: 0 }}>
-                                    <div className={styles.rowTitle} style={{ fontSize: '0.8125rem' }}>{m.name}</div>
-                                    <div className={styles.rowMeta}>{m.code}</div>
-                                </div>
-                                <select
-                                    className={styles.input}
-                                    style={{ flex: '0 0 170px' }}
-                                    value={m.category}
-                                    onChange={(e) => setCategory(m.code, e.target.value)}
-                                >
-                                    {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                                </select>
-                                <button type="button" className={`${styles.btn} ${styles.btnDanger}`} style={{ flexShrink: 0 }} onClick={() => removeMajor(m.code)}>Remove</button>
+                    {memberships.length === 0 && <p className={styles.previewMuted}>In no major’s plan.</p>}
+                    {memberships.map(m => (
+                        <div key={m.code} className={styles.memberRow}>
+                            <div className={styles.rowMain}>
+                                <span className={styles.rowTitle}>{m.name}</span>
+                                <span className={`${styles.rowMeta} ${styles.mono}`}>{m.code}</span>
                             </div>
-                        ))}
-                    </div>
+                            <select className={styles.input} value={m.category} onChange={(e) => setCategory(m.code, e.target.value)} aria-label={`Role in ${m.name}`}>
+                                {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                            </select>
+                            <button type="button" className={`${styles.btn} ${styles.btnDanger}`} onClick={() => removeMajor(m.code)}>Remove</button>
+                        </div>
+                    ))}
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
-                        {/* Picking a major adds it immediately — no separate "+ Add" click to
-                            forget, which used to let admins select a major, hit Save, and have
-                            nothing actually attach (the form silently submitted an empty list). */}
-                        <select className={styles.input} style={{ flex: '1 1 auto' }} value={addCode} onChange={(e) => addMajor(e.target.value)}>
+                    <div className={styles.memberAdd}>
+                        {/* Picking a major adds it straight away, with no separate
+                            Add to forget: that used to let a save go through with
+                            nothing attached. */}
+                        <select className={styles.input} value={addCode} onChange={(e) => addMajor(e.target.value)} aria-label="Add a major">
                             <option value="">Add a major…</option>
                             {available.map(m => <option key={m.code} value={m.code}>{m.name} ({m.code})</option>)}
                         </select>
-                        <button type="button" className={styles.btn} style={{ flexShrink: 0 }} onClick={addAllMajors} disabled={available.length === 0}>+ Add all majors</button>
+                        <button type="button" className={styles.btn} onClick={addAllMajors} disabled={available.length === 0}>Add every major</button>
                     </div>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                    <button className={styles.btn} onClick={onClose} disabled={saving}>Cancel</button>
-                    <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleSave} disabled={saving}>
-                        {saving ? 'Saving…' : isCreate ? 'Create course' : 'Save changes'}
-                    </button>
-                </div>
+                </section>
             </div>
-        </div>
+        </Dialog>
     );
 }
