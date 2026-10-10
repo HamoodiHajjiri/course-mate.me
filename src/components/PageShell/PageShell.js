@@ -3,14 +3,15 @@ import TopBar from '@/components/TopBar';
 import styles from './PageShell.module.css';
 
 /**
- * The chrome every signed-in page sits in: background, centred column, bottom nav.
+ * The frame every page sits in: the app bar, a centred column, the tab bar.
  *
- * width="standard" (680px) for reading/form pages, "wide" (1100px) for the
- * dashboard and the browse feed.
+ *   width   reading (760) — inboxes and single-task pages
+ *           standard (1040) — default; pages with a side rail
+ *           wide (1200) — dashboards, the feed, the map, the schedule builder
  *
- * Pass nav={false} for states that render before the nav is meaningful (the
- * profile-setup gate), and innerClassName when a page needs to change the
- * column's own layout — browse turns it into a two-column row.
+ * Pass nav={false} for states that render before navigation means anything
+ * (the profile-setup gate), and innerClassName when a page needs to change the
+ * column's own layout.
  */
 export default function PageShell({
     children,
@@ -20,11 +21,13 @@ export default function PageShell({
     innerClassName = '',
 }) {
     return (
-        <div className={`${styles.page} ${className}`.trim()}>
+        <div className={`${styles.page} ${nav ? styles.withNav : ''} ${className}`.trim()}>
             {nav && <TopBar />}
-            <div className={`${styles.pageInner} ${styles[width]} ${innerClassName}`.trim()}>
-                {children}
-            </div>
+            <main className={styles.main} id="main">
+                <div className={`${styles.inner} ${styles[width] || ''} ${innerClassName}`.trim()}>
+                    {children}
+                </div>
+            </main>
             {nav && <BottomNav />}
         </div>
     );
