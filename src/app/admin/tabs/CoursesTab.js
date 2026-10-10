@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, Fragment, useCallback, useContext, useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { SearchIcon } from '@/components/Icons';
 import styles from '../admin.module.css';
@@ -71,142 +71,132 @@ function CoursesProvider({ children }) {
 }
 
 const CATEGORY_FILTERS = [
-    { value: '', label: 'All types' },
+    { value: '', label: 'Every type' },
     { value: 'Core', label: 'Core' },
-    { value: 'Major Elective', label: 'Major Elective' },
-    { value: 'Support Elective', label: 'Support Elective' },
-    { value: 'University Elective', label: 'University Elective' },
+    { value: 'Major Elective', label: 'Major elective' },
+    { value: 'Support Elective', label: 'Support elective' },
+    { value: 'University Elective', label: 'University elective' },
 ];
 
 function CoursesSidebar() {
     const ctx = useContext(Ctx);
     if (!ctx) return null;
-    const { major, category, majors, courses, setMajorAndLoad, setCategoryAndLoad, reset, setCreating } = ctx;
+    const { major, category, majors, setMajorAndLoad, setCategoryAndLoad, reset, setCreating } = ctx;
 
     return (
         <>
-        <div className={styles.sidebarCard}>
-            <p className={styles.sectionTitle}>Actions</p>
-            <button
-                className={`${styles.btn} ${styles.btnPrimary} ${styles.btnFull}`}
-                onClick={() => setCreating(true)}
-            >
-                + New course
-            </button>
-        </div>
-
-        <div className={styles.sidebarCard}>
-            <p className={styles.sectionTitle}>Filter by type</p>
-            <div className={styles.navList}>
-                {CATEGORY_FILTERS.map(c => (
-                    <button
-                        key={c.value || 'all'}
-                        className={`${styles.navBtn} ${category === c.value ? styles.navBtnActive : ''}`}
-                        onClick={() => setCategoryAndLoad(c.value)}
-                    >
-                        <span>{c.label}</span>
-                    </button>
-                ))}
-            </div>
-        </div>
-
-        <div className={styles.sidebarCard}>
-            <p className={styles.sectionTitle}>Filter by major</p>
-            <div className={`${styles.navList} ${styles.scrollList}`}>
-                <button
-                    className={`${styles.navBtn} ${major === '' ? styles.navBtnActive : ''}`}
-                    onClick={() => setMajorAndLoad('')}
-                >
-                    <span>All majors</span>
+            <div className={styles.sidebarCard}>
+                <p className={styles.sectionTitle}>Courses</p>
+                <button type="button" className={`${styles.btn} ${styles.btnPrimary} ${styles.btnFull}`} onClick={() => setCreating(true)}>
+                    New course
                 </button>
-                {majors.map(m => (
+            </div>
+
+            <div className={styles.sidebarCard}>
+                <p className={styles.sectionTitle}>Type</p>
+                <div className={styles.navList}>
+                    {CATEGORY_FILTERS.map(c => (
+                        <button
+                            key={c.value || 'all'}
+                            type="button"
+                            className={`${styles.navBtn} ${category === c.value ? styles.navBtnActive : ''}`}
+                            onClick={() => setCategoryAndLoad(c.value)}
+                        >
+                            <span>{c.label}</span>
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            <div className={styles.sidebarCard}>
+                <p className={styles.sectionTitle}>Major</p>
+                <div className={`${styles.navList} ${styles.scrollList}`}>
                     <button
-                        key={m.code}
-                        className={`${styles.navBtn} ${major === m.code ? styles.navBtnActive : ''}`}
-                        onClick={() => setMajorAndLoad(m.code)}
-                        title={m.name}
+                        type="button"
+                        className={`${styles.navBtn} ${major === '' ? styles.navBtnActive : ''}`}
+                        onClick={() => setMajorAndLoad('')}
                     >
-                        <span>{m.name}</span>
-                        <span className={styles.navCount}>{m.code}</span>
+                        <span>Every major</span>
                     </button>
-                ))}
+                    {majors.map(m => (
+                        <button
+                            key={m.code}
+                            type="button"
+                            className={`${styles.navBtn} ${major === m.code ? styles.navBtnActive : ''}`}
+                            onClick={() => setMajorAndLoad(m.code)}
+                            title={m.name}
+                        >
+                            <span>{m.name}</span>
+                            <span className={styles.navCount}>{m.code}</span>
+                        </button>
+                    ))}
+                </div>
+                <button type="button" className={`${styles.btn} ${styles.btnGhost} ${styles.btnFull}`} onClick={reset}>
+                    Clear the filters
+                </button>
             </div>
-            <button className={`${styles.btn} ${styles.btnGhost} ${styles.btnFull}`} style={{ marginTop: 8 }} onClick={reset}>
-                Reset filters
-            </button>
-            <div style={{ marginTop: 8, textAlign: 'center', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                {courses.length} result{courses.length === 1 ? '' : 's'}
-            </div>
-        </div>
         </>
     );
 }
 
-function chip(text, key) {
-    return <span key={key} className={styles.badge} style={{ textTransform: 'none' }}>{text}</span>;
-}
-
 function CourseDetail({ course }) {
     return (
-        <div style={{ padding: '12px 14px', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                <span><strong style={{ color: 'var(--text-primary)' }}>College:</strong> {course.college_name || 'Not set'}</span>
-                <span><strong style={{ color: 'var(--text-primary)' }}>Credits:</strong> {course.credit_hours ?? 'Not set'}</span>
-                {course.university_elective_basket && (
-                    <span><strong style={{ color: 'var(--text-primary)' }}>Elective basket:</strong> {course.university_elective_basket}</span>
-                )}
+        <div className={styles.detail}>
+            <dl className={styles.detailFacts}>
+                <div><dt>College</dt><dd>{course.college_name || <span className={styles.cellMuted}>not set</span>}</dd></div>
+                <div><dt>Credits</dt><dd className={styles.mono}>{course.credit_hours ?? '—'}</dd></div>
+                {course.university_elective_basket && <div><dt>Elective basket</dt><dd>{course.university_elective_basket}</dd></div>}
+            </dl>
+
+            <div className={styles.detailCols}>
+                <section>
+                    <p className={styles.sectionLabel}>Majors · {course.majors.length}</p>
+                    {course.majors.length === 0 ? (
+                        <p className={styles.previewMuted}>In no major’s plan.</p>
+                    ) : (
+                        <ul className={styles.plainList}>
+                            {course.majors.map(m => (
+                                <li key={m.code}>{m.name}{m.category && <span className={styles.rowMeta}> · {m.category}</span>}</li>
+                            ))}
+                        </ul>
+                    )}
+                </section>
+                <section>
+                    <p className={styles.sectionLabel}>Instructors · {course.instructors.length}</p>
+                    {course.instructors.length === 0 ? (
+                        <p className={styles.previewMuted}>None listed.</p>
+                    ) : (
+                        <ul className={styles.plainList}>
+                            {course.instructors.map((ins, i) => <li key={i}>{ins}</li>)}
+                        </ul>
+                    )}
+                </section>
             </div>
 
-            <div>
-                <div className={styles.sectionLabel}>Majors ({course.majors.length})</div>
-                {course.majors.length === 0 ? (
-                    <div className={styles.rowMeta}>Not attached to any major</div>
-                ) : (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {course.majors.map(m => (
-                            <span key={m.code} className={`${styles.badge} ${styles.badgeAccent}`} style={{ textTransform: 'none' }} title={m.category || ''}>
-                                {m.name}{m.category ? ` · ${m.category}` : ''}
-                            </span>
-                        ))}
-                    </div>
-                )}
-            </div>
-
-            <div>
-                <div className={styles.sectionLabel}>Instructors ({course.instructors.length})</div>
-                {course.instructors.length === 0 ? (
-                    <div className={styles.rowMeta}>No instructors</div>
-                ) : (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {course.instructors.map((ins, i) => chip(ins, i))}
-                    </div>
-                )}
-            </div>
-
-            <div>
-                <div className={styles.sectionLabel}>Sections ({course.section_count})</div>
+            <section>
+                <p className={styles.sectionLabel}>Sections · {course.section_count}</p>
                 {course.section_count === 0 ? (
-                    <div className={styles.rowMeta}>No sections offered</div>
+                    <p className={styles.previewMuted}>None offered.</p>
                 ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        {course.sections.map((s, i) => (
-                            <div key={i} className={styles.row} style={{ padding: '8px 10px' }}>
-                                <div className={styles.rowMain}>
-                                    <div className={styles.rowTitle}>
-                                        Section {s.section_num}
-                                        {s.crn && <span className={styles.badge}>CRN {s.crn}</span>}
-                                        {s.term_code && <span className={styles.badge}>{s.term_code}</span>}
-                                        {s.campus && <span className={styles.badge} style={{ textTransform: 'none' }}>{s.campus}</span>}
-                                    </div>
-                                    <div className={styles.rowMeta}>
-                                        {s.instructor || 'No instructor'}{s.class_time ? ` · ${s.class_time}` : ''}
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                    <table className={styles.table}>
+                        <thead>
+                            <tr><th>Section</th><th>CRN</th><th>Term</th><th>When</th><th>Instructor</th><th>Campus</th></tr>
+                        </thead>
+                        <tbody>
+                            {course.sections.map((s, i) => (
+                                <tr key={i}>
+                                    <td className={styles.mono}>§{s.section_num}</td>
+                                    <td className={styles.mono}>{s.crn || '—'}</td>
+                                    <td className={styles.mono}>{s.term_code || '—'}</td>
+                                    <td>{s.class_time || <span className={styles.cellMuted}>no set time</span>}</td>
+                                    <td>{s.instructor || <span className={styles.cellMuted}>none</span>}</td>
+                                    <td>{s.campus || '—'}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 )}
-            </div>
+            </section>
         </div>
     );
 }
@@ -218,67 +208,73 @@ function CoursesMain() {
 
     return (
         <>
-            <form onSubmit={submitSearch} className={styles.card}>
-                <div className={styles.searchWrapper}>
-                    <span className={styles.searchIcon}><SearchIcon width={18} height={18} /></span>
+            <form onSubmit={submitSearch} className={styles.toolbar}>
+                <div className={`${styles.searchWrapper} ${styles.searchGrow}`}>
+                    <span className={styles.searchIcon}><SearchIcon /></span>
                     <input
-                        type="text"
+                        type="search"
                         className={styles.searchInput}
-                        placeholder="Search courses by ID or name..."
+                        placeholder="Course code or name, then Enter"
+                        aria-label="Search courses"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                     />
                 </div>
             </form>
 
-            <div className={styles.feedCard}>
-                {error && <div className={styles.error}>{error}</div>}
-                {loading ? (
-                    <div className={styles.loading}><div className={styles.spinner} />Loading courses...</div>
-                ) : courses.length === 0 ? (
-                    <div className={styles.empty}>
-                        <div className={styles.emptyTitle}>No courses found</div>
-                        <span>Try a different search or major filter.</span>
-                    </div>
-                ) : (
-                    <div className={styles.feedList}>
-                        {courses.map(c => {
-                            const expanded = expandedId === c.course_id;
-                            return (
-                                <div key={c.course_id} className={styles.row} style={{ flexDirection: 'column', alignItems: 'stretch', gap: 0, padding: 0 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px' }}>
-                                        <button
-                                            type="button"
-                                            onClick={() => toggleExpand(c.course_id)}
-                                            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0, color: 'inherit', flex: '1 1 auto', minWidth: 0 }}
-                                        >
-                                            <div className={styles.rowMain}>
-                                                <div className={styles.rowTitle}>
-                                                    {c.course_id} · {c.course_name}
-                                                </div>
-                                                <div className={styles.rowMeta}>
-                                                    {c.majors.length} major{c.majors.length === 1 ? '' : 's'} · {c.section_count} section{c.section_count === 1 ? '' : 's'} · {c.instructors.length} instructor{c.instructors.length === 1 ? '' : 's'}
-                                                    {c.section_count === 0 && ' · no sections'}
-                                                </div>
-                                            </div>
-                                            <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>{expanded ? '▾' : '▸'}</span>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className={`${styles.btn} ${styles.btnGhost}`}
-                                            style={{ flexShrink: 0 }}
-                                            onClick={() => setEditingCourse(c)}
-                                        >
-                                            Edit
-                                        </button>
-                                    </div>
-                                    {expanded && <CourseDetail course={c} />}
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
+            {error && <div className={styles.error}>{error}</div>}
+            {loading ? (
+                <div className={styles.loading}><div className={styles.spinner} />Reading courses…</div>
+            ) : courses.length === 0 ? (
+                <div className={styles.empty}>
+                    <div className={styles.emptyTitle}>No courses match.</div>
+                    <span>Try another search, type or major.</span>
+                </div>
+            ) : (
+                <div className={styles.tableWrap}>
+                    <table className={styles.table}>
+                        <thead>
+                            <tr>
+                                <th>Course</th>
+                                <th className={styles.num}>Majors</th>
+                                <th className={styles.num}>Sections</th>
+                                <th className={styles.num}>Instructors</th>
+                                <th className={styles.cellActions}><span className="sr-only">Actions</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {courses.map(c => {
+                                const expanded = expandedId === c.course_id;
+                                return (
+                                    <Fragment key={c.course_id}>
+                                        <tr className={expanded ? styles.rowOpen : ''}>
+                                            <td>
+                                                <button type="button" className={styles.expand} onClick={() => toggleExpand(c.course_id)} aria-expanded={expanded}>
+                                                    <span className={styles.expandMark} aria-hidden="true">{expanded ? '−' : '+'}</span>
+                                                    <span className={styles.mono}>{c.course_id}</span>
+                                                    <span className={styles.expandName}>{c.course_name}</span>
+                                                </button>
+                                            </td>
+                                            <td className={`${styles.num} ${styles.mono}`}>{c.majors.length}</td>
+                                            <td className={`${styles.num} ${styles.mono} ${c.section_count === 0 ? styles.cellMuted : ''}`}>{c.section_count}</td>
+                                            <td className={`${styles.num} ${styles.mono}`}>{c.instructors.length}</td>
+                                            <td className={styles.cellActions}>
+                                                <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={() => setEditingCourse(c)}>Edit</button>
+                                            </td>
+                                        </tr>
+                                        {expanded && (
+                                            <tr className={styles.detailRow}>
+                                                <td colSpan={5}><CourseDetail course={c} /></td>
+                                            </tr>
+                                        )}
+                                    </Fragment>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                    <p className={styles.tableFoot}>{courses.length} {courses.length === 1 ? 'course' : 'courses'}</p>
+                </div>
+            )}
 
             {editingCourse && (
                 <CourseEditModal
