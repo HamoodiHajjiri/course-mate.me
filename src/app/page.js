@@ -9,31 +9,15 @@ import { useSemester } from '@/lib/SemesterContext';
 import { useRequireProfile } from '@/lib/useRequireProfile';
 import useUnreadCount from '@/lib/useUnreadCount';
 import { refuse, SIGN_UP_HREF } from '@/lib/guest';
-import { parseClassTime, formatDuration, formatRange, formatTime, WEEKDAY_KEYS } from '@/lib/classTime';
+import { parseClassTime, formatDuration, formatClock24, WEEKDAY_KEYS } from '@/lib/classTime';
 import PageShell from '@/components/PageShell';
-import SemesterPicker from '@/components/SemesterPicker';
 import AnnouncementsModal from '@/components/AnnouncementsModal';
 import RoomLink from '@/components/RoomLink';
 import DayTimeline from '@/components/DayTimeline/DayTimeline';
-import { Badge, Button, Callout, CountUp, CourseSwatch, EmptyState, ProgressBar, SegmentedControl, Skeleton } from '@/components/ui';
 import {
-    PlusIcon,
-    ScheduleIcon,
-    ActivityIcon,
-    BookIcon,
-    BellIcon,
-    UserCheckIcon,
-    SearchIcon,
-    MapIcon,
-    LockIcon,
-    ArrowRightIcon,
-    ChevronDownIcon,
-    ChevronRightIcon,
-    PinIcon,
-    LayersIcon,
-    SparkleIcon,
-    ClockIcon,
-} from '@/components/Icons';
+    Button, Callout, CourseCode, CourseMark, CourseName, EmptyState, Figure, Rubric, Section, SegmentedControl, Skeleton, Status,
+} from '@/components/ui';
+import { ChevronDownIcon } from '@/components/Icons';
 import { decodeHtmlEntities } from '@/lib/text';
 import styles from './page.module.css';
 
@@ -64,21 +48,6 @@ function sectionKind(sectionNum) {
 const KIND_LABELS = { major: 'Department', support: 'Support', univ: 'University' };
 const DAY_NAMES = { Sun: 'Sunday', Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday' };
 
-function relativeTime(iso) {
-    if (!iso) return null;
-    const then = new Date(iso).getTime();
-    const now = Date.now();
-    const diff = Math.max(0, now - then);
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'just now';
-    if (mins < 60) return `${mins}m ago`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h ago`;
-    const days = Math.floor(hrs / 24);
-    if (days < 7) return `${days}d ago`;
-    return new Date(iso).toLocaleDateString();
-}
-
 function greetingFor(date) {
     const h = date.getHours();
     if (h < 5) return 'Good evening';
@@ -91,66 +60,11 @@ function localDateKey(d) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-// A home shortcut. A locked one (guest mode) stays visible but only nudges.
-function ActionRow({ href, icon, label, sub, primary = false, locked = false }) {
-    const body = (
-        <>
-            <span className={`${styles.actionIcon} ${primary ? styles.actionIconPrimary : ''}`}>{icon}</span>
-            <span className={styles.actionText}>
-                <span className={styles.actionLabel}>{label}</span>
-                <span className={styles.actionSub}>{sub}</span>
-            </span>
-            {locked ? <LockIcon className={styles.actionEnd} /> : <ChevronRightIcon className={styles.actionEnd} />}
-        </>
-    );
-    if (!locked) return <Link href={href} className={styles.action}>{body}</Link>;
-    return (
-        <button type="button" className={`${styles.action} ${styles.actionLocked}`} onClick={refuse} aria-disabled="true" aria-label={`${label}, needs an account`}>
-            {body}
-        </button>
-    );
-}
-
-// One reading in the signals bar.
-function Signal({ href, label, value, max, note, tone, icon, loading }) {
-    return (
-        <Link href={href} className={`${styles.signal} ${tone ? styles[`signal_${tone}`] : ''}`}>
-            <span className={styles.signalTop}>
-                <span className={styles.signalIcon}>{icon}</span>
-                <span className={styles.signalLabel}>{label}</span>
-                <ArrowRightIcon className={styles.signalArrow} />
-            </span>
-            {loading ? (
-                <Skeleton width={56} height={30} radius={6} />
-            ) : (
-                <span className={styles.signalValue}>
-                    <CountUp value={value} />
-                    {max != null && <span className={styles.signalMax}>/ {max}</span>}
-                </span>
-            )}
-            <span className={styles.signalNote}>{loading ? ' ' : note}</span>
-        </Link>
-    );
-}
-
-// The rows a loading electives list will be replaced by.
-function ElectivesSkeleton() {
-    return (
-        <div className={styles.electiveList} aria-hidden="true">
-            {[0, 1, 2, 3].map(i => (
-                <div key={i} className={styles.electiveSkeletonRow}>
-                    <Skeleton width={32} height={32} radius={9} />
-                    <span className={styles.electiveSkeletonText}>
-                        <Skeleton width={`${62 - i * 7}%`} height={13} />
-                        <Skeleton width={120} height={10} />
-                    </span>
-                    <Skeleton width={72} height={30} radius={8} />
-                </div>
-            ))}
-        </div>
-    );
-}
-
+/**
+ * Home: the day sheet. The date set large with the term's weeks under it,
+ * today's classes in order with the live line, the few numbers that need
+ * you, then electives as a catalogue and an index of where to go.
+ */
 export default function DashboardPage() {
     const { user, profile, ready, transitioning } = useRequireProfile();
     // A guest has a major and a campus but no account (see lib/guest).
@@ -443,306 +357,198 @@ export default function DashboardPage() {
         return null;
     }, [todayKey, week.slots]);
 
-    const dateLabel = now ? now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }) : '';
+    const weekday = now ? now.toLocaleDateString(undefined, { weekday: 'long' }) : '';
+    const dayMonth = now ? now.toLocaleDateString(undefined, { day: 'numeric', month: 'long' }) : '';
 
     let statusLine = null;
     if (ready && isGuest) {
-        statusLine = <>You&rsquo;re exploring as a guest. Build a timetable and find your way around campus; <Link href={SIGN_UP_HREF}>create an account</Link> to post swaps and get matched.</>;
+        statusLine = <>You&rsquo;re looking around as a guest. Build a timetable and find your way on campus; <Link href={SIGN_UP_HREF}>make an account</Link> to trade sections.</>;
     } else if (ready && !termLoading) {
         if (pendingMatchesCount > 0) {
-            statusLine = <>You have <Link href="/matches">{pendingMatchesCount} swap {pendingMatchesCount === 1 ? 'match' : 'matches'}</Link> waiting for your answer.</>;
+            statusLine = <><Link href="/matches" className={styles.statusMark}>{pendingMatchesCount === 1 ? 'A swap is' : `${pendingMatchesCount} swaps are`} waiting for your answer.</Link></>;
         } else if (activePostsCount > 0) {
-            statusLine = <>{activePostsCount === 1 ? 'One of your posts is' : `${activePostsCount} of your posts are`} live. We&rsquo;ll tell you the moment {activePostsCount === 1 ? 'it matches' : 'one matches'}.</>;
+            statusLine = <>{activePostsCount === 1 ? 'Your post is' : `${activePostsCount} of your posts are`} on the board. We&rsquo;ll tell you when {activePostsCount === 1 ? 'it matches' : 'one matches'}.</>;
         } else {
-            statusLine = 'Plan your term, trade sections and find your way around campus.';
+            statusLine = 'Nothing needs you. Plan the term, or see what’s on the board.';
         }
     }
 
     const electivesLoading = !majorCourses || !univElectives || termLoading;
 
-    // ===== Today panel content =====
+    // ===== Today =====
+    const classRow = (s, i) => {
+        const past = nowMin != null && s.end <= nowMin;
+        const live = nowMin != null && s.start <= nowMin && nowMin < s.end;
+        const next = !live && nextSlot && s === nextSlot;
+        return (
+            <li key={`${s.courseId}-${s.start}-${i}`} className={`${styles.class} ${past ? styles.classPast : ''} ${live ? styles.classLive : ''}`}>
+                <span className={styles.classTime}>
+                    <span>{formatClock24(s.start)}</span>
+                    <span className={styles.classEnd}>{formatClock24(s.end)}</span>
+                </span>
+                <span className={styles.classMain}>
+                    <span className={styles.classCode}>
+                        <CourseMark courseId={s.courseId} size="sm" />
+                        <CourseCode id={s.courseId} size="sm" />
+                        {s.sectionNum && <Section value={s.sectionNum} size="sm" tone="mine" />}
+                    </span>
+                    <CourseName size="md" className={styles.className}>{s.courseName || s.courseId}</CourseName>
+                </span>
+                <span className={styles.classSide}>
+                    {live && <Status tone="go" live>Now</Status>}
+                    {next && <span className={styles.classIn}>in {formatDuration(s.start - nowMin)}</span>}
+                    {s.location && <RoomLink room={s.location} className={styles.classRoom} />}
+                </span>
+            </li>
+        );
+    };
+
     let today;
     if (!ready || !now || (!isGuest && (termLoading || week.loading))) {
         today = (
-            <div className={styles.todayBody}>
-                <Skeleton width="60%" height={14} style={{ opacity: 0.4 }} />
-                <Skeleton height={44} radius={10} style={{ opacity: 0.25 }} />
+            <div className={styles.todaySkeleton} aria-hidden="true">
+                {[0, 1, 2].map(i => <Skeleton key={i} height={44} />)}
             </div>
         );
     } else if (isGuest || !week.hasSchedule) {
         today = (
-            <div className={styles.todayEmpty}>
-                <p className={styles.todayEmptyTitle}>Your day will live here</p>
-                <p className={styles.todayEmptyText}>
-                    {isGuest
-                        ? 'Build a timetable to see how your week fits together. Create an account to keep it, and today’s classes show up right here.'
-                        : 'Save a schedule and today’s classes appear here, with where you need to be next.'}
-                </p>
-                <Link href="/schedule" className={styles.todayCta}>
-                    <ScheduleIcon />
-                    Build your schedule
-                </Link>
-            </div>
+            <EmptyState
+                title="Your day will be set out here."
+                actions={<Button variant="link" href="/schedule">Build your schedule →</Button>}
+            >
+                {isGuest
+                    ? 'Build a timetable to see how your week fits. With an account it’s saved, and each day’s classes appear here with where to go next.'
+                    : 'Save a schedule and each day’s classes appear here, in order, with the room you need to be in.'}
+            </EmptyState>
         );
     } else if (termProgress?.state === 'before') {
         today = (
-            <div className={styles.todayEmpty}>
-                <p className={styles.todayEmptyTitle}>Classes start in {termProgress.days} {termProgress.days === 1 ? 'day' : 'days'}</p>
-                <p className={styles.todayEmptyText}>Your saved schedule is ready. Here&rsquo;s how {nextClassDay ? DAY_NAMES[nextClassDay.day] : 'your first day'} will look:</p>
-                {nextClassDay && <DayTimeline tone="forest" slots={week.slots.filter(s => s.day === nextClassDay.day)} />}
-            </div>
+            <>
+                <EmptyState compact title={`Classes start in ${termProgress.days} ${termProgress.days === 1 ? 'day' : 'days'}.`}>
+                    Your saved schedule is ready. Here&rsquo;s {nextClassDay ? DAY_NAMES[nextClassDay.day] : 'your first day'}:
+                </EmptyState>
+                {nextClassDay && (
+                    <ol className={styles.classes}>
+                        {week.slots.filter(s => s.day === nextClassDay.day).sort((a, b) => a.start - b.start).map(classRow)}
+                    </ol>
+                )}
+            </>
         );
     } else if (isHoliday || todaySlots.length === 0) {
         today = (
-            <div className={styles.todayEmpty}>
-                <p className={styles.todayEmptyTitle}>{isHoliday ? 'No classes today — it’s a day off' : 'No classes today'}</p>
+            <EmptyState compact title={isHoliday ? 'No classes today. It’s a day off.' : 'No classes today.'}>
                 {nextClassDay ? (
-                    <p className={styles.todayEmptyText}>
-                        Next up: <strong>{nextClassDay.first.courseName || nextClassDay.first.courseId}</strong> on {DAY_NAMES[nextClassDay.day]} at {formatTime(nextClassDay.first.start)}
-                        {nextClassDay.first.location ? <> in <RoomLink room={nextClassDay.first.location} className={styles.todayRoom} /></> : null}.
-                    </p>
-                ) : (
-                    <p className={styles.todayEmptyText}>Enjoy the free time.</p>
-                )}
-            </div>
+                    <>Next: <strong>{nextClassDay.first.courseName || nextClassDay.first.courseId}</strong>, {DAY_NAMES[nextClassDay.day]} at {formatClock24(nextClassDay.first.start)}
+                        {nextClassDay.first.location ? <> in <RoomLink room={nextClassDay.first.location} /></> : null}.</>
+                ) : 'Nothing else on this week.'}
+            </EmptyState>
         );
     } else {
-        const focus = liveSlot || nextSlot;
         today = (
-            <div className={styles.todayBody}>
-                <DayTimeline tone="forest" slots={todaySlots} now={nowMin} />
-                {focus ? (
-                    <div className={styles.upNext}>
-                        <span className={`${styles.upNextTag} ${liveSlot ? styles.upNextLive : ''}`}>
-                            {liveSlot ? 'Now' : 'Next'}
-                        </span>
-                        <CourseSwatch courseId={focus.courseId} size="sm" />
-                        <span className={styles.upNextText}>
-                            <span className={styles.upNextName}>{focus.courseName || focus.courseId}</span>
-                            <span className={styles.upNextMeta}>
-                                {formatRange(focus.start, focus.end)}
-                                {!liveSlot && ` · in ${formatDuration(focus.start - nowMin)}`}
-                            </span>
-                        </span>
-                        {focus.location && <RoomLink room={focus.location} className={styles.upNextRoom} />}
-                    </div>
-                ) : dayDone ? (
-                    <div className={styles.upNext}>
-                        <span className={styles.upNextTag}>Done</span>
-                        <span className={styles.upNextText}>
-                            <span className={styles.upNextName}>That&rsquo;s it for today</span>
-                            <span className={styles.upNextMeta}>
-                                {nextClassDay ? `Next: ${DAY_NAMES[nextClassDay.day]} at ${formatTime(nextClassDay.first.start)}` : 'Nothing else this week'}
-                            </span>
-                        </span>
-                    </div>
-                ) : null}
-            </div>
+            <>
+                <DayTimeline slots={todaySlots} now={nowMin} className={styles.ruler} />
+                <ol className={styles.classes}>{todaySlots.map(classRow)}</ol>
+                {dayDone && (
+                    <p className={styles.dayDone}>
+                        That&rsquo;s the day done.{nextClassDay ? ` Next: ${DAY_NAMES[nextClassDay.day]} at ${formatClock24(nextClassDay.first.start)}.` : ''}
+                    </p>
+                )}
+            </>
         );
     }
+
+    const figure = (href, value, of, label, tone) => (
+        <Link href={href} className={styles.figureLink}>
+            {termLoading ? <Skeleton width={48} height={34} /> : <Figure value={value} of={of} label={label} tone={tone} />}
+        </Link>
+    );
 
     return (
         <PageShell width="wide">
             <AnnouncementsModal ready={ready && !!user} />
             <div className={`${styles.transitionOverlay} ${transitioning ? styles.active : ''}`} />
 
-            {/* ===== Today ===== */}
-            <section className={styles.hero} aria-labelledby="home-greeting">
-                <div className={styles.heroMain}>
-                    <span className={styles.heroEyebrow}>
-                        {dateLabel || ' '}
-                        {currentSemesterName && (
-                            <>
-                                <span className={styles.heroDot} aria-hidden="true" />
-                                {currentSemesterName}
-                            </>
-                        )}
-                    </span>
-                    <h1 id="home-greeting" className={styles.heroTitle}>
-                        {!ready || !now ? (
-                            <Skeleton width="min(320px, 70vw)" height={36} radius={8} style={{ opacity: 0.3 }} />
-                        ) : isGuest ? (
-                            <>Welcome to <span className={styles.heroName}>CourseMate</span></>
-                        ) : (
-                            <>{greetingFor(now)},<br className={styles.heroBreak} /> <span className={styles.heroName}>{firstName}</span></>
-                        )}
+            <div className={styles.top}>
+                {/* ===== The date ===== */}
+                <section className={styles.date} aria-labelledby="home-date">
+                    <span className={styles.weekday}>{weekday || ' '}</span>
+                    <h1 id="home-date" className={styles.dayMonth}>
+                        {dayMonth || <Skeleton width={260} height={52} />}
                     </h1>
-                    <p className={styles.heroStatus}>
-                        {statusLine || <Skeleton width="min(380px, 80vw)" height={14} style={{ opacity: 0.3 }} />}
-                    </p>
-
-                    <div className={styles.heroFoot}>
-                        {termProgress?.state === 'during' && (
-                            <div className={styles.term}>
-                                <span className={styles.termLabel}>
-                                    Week <strong>{termProgress.week}</strong> of {termProgress.weeks}
-                                </span>
-                                <span className={styles.termTrack} aria-hidden="true">
-                                    <span className={styles.termFill} style={{ width: `${termProgress.pct}%` }} />
-                                </span>
-                            </div>
-                        )}
-                        {termProgress?.state === 'after' && <span className={styles.termLabel}>{currentSemesterName} has finished</span>}
-                        <div className={styles.heroPicker}>
-                            <SemesterPicker />
+                    <div className={styles.termLine}>
+                        {currentSemesterName && <span>{currentSemesterName}</span>}
+                        {termProgress?.state === 'during' && <span>Week {termProgress.week} of {termProgress.weeks}</span>}
+                        {termProgress?.state === 'before' && <span>Starts in {termProgress.days} {termProgress.days === 1 ? 'day' : 'days'}</span>}
+                        {termProgress?.state === 'after' && <span>Finished</span>}
+                    </div>
+                    {termProgress?.state === 'during' && (
+                        <div className={styles.weeks} role="img" aria-label={`Week ${termProgress.week} of ${termProgress.weeks}`}>
+                            {Array.from({ length: termProgress.weeks }, (_, i) => (
+                                <span key={i} className={`${styles.weekCell} ${i + 1 < termProgress.week ? styles.weekPast : ''} ${i + 1 === termProgress.week ? styles.weekNow : ''}`} />
+                            ))}
                         </div>
-                    </div>
-                </div>
+                    )}
 
-                <div className={styles.today}>
-                    <div className={styles.todayHead}>
-                        <span className={styles.todayTitle}>
-                            <ClockIcon />
-                            Today
-                        </span>
-                        {todaySlots.length > 0 && !isHoliday && (
-                            <span className={styles.todayCount}>{todaySlots.length} {todaySlots.length === 1 ? 'class' : 'classes'}</span>
-                        )}
-                    </div>
+                    <p className={styles.greeting}>
+                        {!ready || !now ? <Skeleton width={220} height={20} /> : isGuest ? 'Welcome to CourseMate.' : `${greetingFor(now)}, ${firstName}.`}
+                    </p>
+                    <p className={styles.status}>{statusLine || <Skeleton width="80%" height={14} />}</p>
+                </section>
+
+                {/* ===== Today ===== */}
+                <section className={styles.today} aria-labelledby="home-today">
+                    <Rubric
+                        id="home-today"
+                        title={termProgress?.state === 'before' && nextClassDay ? `${DAY_NAMES[nextClassDay.day]}, your first day` : 'Today'}
+                        meta={todaySlots.length > 0 && !isHoliday && termProgress?.state !== 'before' ? `${todaySlots.length} ${todaySlots.length === 1 ? 'class' : 'classes'}` : null}
+                        actions={week.hasSchedule && <Button variant="link" href="/schedule" className={styles.rubricLink}>Full week</Button>}
+                    />
                     {today}
-                </div>
-            </section>
-
-            {/* ===== Profile completeness (only if incomplete) ===== */}
-            {showProfileBanner && (
-                <Callout
-                    tone="accent"
-                    title="Finish setting up your profile"
-                    action={<Button size="sm" variant="primary" href="/profile">Complete profile</Button>}
-                >
-                    <span className={styles.profileNote}>
-                        {profileCompletion.filled} of {profileCompletion.total} details added. Posting and matching need all of them.
-                    </span>
-                    <ProgressBar value={profileCompletion.pct} className={styles.profileProgress} label="Profile completion" />
-                </Callout>
-            )}
-
-            {/* ===== Signals ===== */}
-            {isGuest ? (
-                <div className={styles.guestStrip}>
-                    <span className={styles.guestStripIcon}><SparkleIcon /></span>
-                    <div className={styles.guestStripText}>
-                        <strong>Get the full CourseMate</strong>
-                        <span>Post swaps and get matched automatically, save up to three schedules, and get alerts when a section opens.</span>
-                    </div>
-                    <Button variant="primary" href={SIGN_UP_HREF}>Create a free account</Button>
-                </div>
-            ) : (
-                <nav className={styles.signals} aria-label="Your activity">
-                    <Signal
-                        href="/matches"
-                        icon={<ActivityIcon />}
-                        label="Pending matches"
-                        value={pendingMatchesCount}
-                        note={pendingMatchesCount > 0 ? 'Waiting for your answer' : 'Nothing to answer'}
-                        tone={pendingMatchesCount > 0 ? 'alert' : null}
-                        loading={termLoading}
-                    />
-                    <Signal
-                        href="/matches"
-                        icon={<LayersIcon />}
-                        label="Active posts"
-                        value={activePostsCount}
-                        max={5}
-                        note={activePostsCount >= 5 ? 'At the limit' : `${5 - activePostsCount} more allowed`}
-                        loading={termLoading}
-                    />
-                    <Signal
-                        href="/schedule"
-                        icon={<ScheduleIcon />}
-                        label="Saved schedules"
-                        value={savedSchedules.length}
-                        max={3}
-                        note={savedSchedules[0]
-                            ? `${latestScheduleCredits ?? '–'} credits · saved ${relativeTime(savedSchedules[0].created_at)}`
-                            : 'None saved this term'}
-                        loading={termLoading}
-                    />
-                    <Signal
-                        href="/notifications"
-                        icon={<BellIcon />}
-                        label="Unread"
-                        value={unreadAll}
-                        note={unreadAll > 0 ? 'Notifications to read' : 'You’re all caught up'}
-                        tone={unreadAll > 0 ? 'accent' : null}
-                        loading={false}
-                    />
-                </nav>
-            )}
-
-            {/* ===== Map + start something ===== */}
-            <div className={styles.overview}>
-                <Link href="/map" className={styles.mapCard} aria-label="Open the campus map">
-                    <span className={styles.mapArt} aria-hidden="true" />
-                    <span className={styles.mapShade} aria-hidden="true" />
-                    <span className={styles.mapChip}>
-                        <MapIcon />
-                        Campus map
-                    </span>
-                    <span className={styles.mapFooter}>
-                        <span className={styles.mapText}>
-                            <span className={styles.mapTitle}>Find any building, room or coffee spot</span>
-                            <span className={styles.mapSub}>
-                                <PinIcon />
-                                Every room on your schedule links straight here
-                            </span>
-                        </span>
-                        <span className={styles.mapCta}>
-                            Open map
-                            <ArrowRightIcon />
-                        </span>
-                    </span>
-                </Link>
-
-                <section className={styles.actions} aria-labelledby="home-start">
-                    <h2 id="home-start" className={styles.panelTitle}>Start something</h2>
-                    <div className={styles.actionList}>
-                        <ActionRow
-                            primary
-                            href="/post"
-                            icon={<PlusIcon strokeWidth={2.1} />}
-                            label="Create a post"
-                            sub="Swap, give away or request a section"
-                            locked={isGuest}
-                        />
-                        <ActionRow
-                            href="/schedule"
-                            icon={<ScheduleIcon />}
-                            label="Build a schedule"
-                            sub={`Clash-free timetables for ${currentSemesterName || 'the term'}`}
-                        />
-                        <ActionRow
-                            href="/browse"
-                            icon={<SearchIcon />}
-                            label="Browse the marketplace"
-                            sub="Sections up for grabs in your major"
-                            locked={isGuest}
-                        />
-                        <ActionRow
-                            href="/schedule?mode=instructor"
-                            icon={<UserCheckIcon />}
-                            label="Find an instructor"
-                            sub="See anyone’s teaching week"
-                        />
-                    </div>
                 </section>
             </div>
 
-            {/* ===== Electives ===== */}
-            <section className={styles.electives} aria-labelledby="home-electives">
-                <div className={styles.electivesHead}>
-                    <div>
-                        <h2 id="home-electives" className={styles.panelTitle}>
-                            Electives open this term
-                        </h2>
-                        <p className={styles.electivesNote}>
-                            Department and university electives with sections on your campus in {currentSemesterName || 'this semester'}.
-                        </p>
-                    </div>
+            {showProfileBanner && (
+                <Callout
+                    tone="accent"
+                    title="Finish your profile to trade sections"
+                    action={<Button size="sm" variant="secondary" href="/profile">Add the rest</Button>}
+                >
+                    {profileCompletion.filled} of {profileCompletion.total} details added. Posting and matching need all of them.
+                </Callout>
+            )}
+
+            {/* ===== What's waiting ===== */}
+            {isGuest ? (
+                <section className={styles.guest} aria-label="Accounts">
+                    <p className={styles.guestText}>
+                        <strong>An account adds the trading.</strong> Post a section and get matched automatically, keep up to three schedules, and hear when a section you want opens up.
+                    </p>
+                    <Button variant="primary" href={SIGN_UP_HREF}>Make an account</Button>
+                </section>
+            ) : (
+                <nav className={styles.figures} aria-label="Your numbers">
+                    {figure('/matches', pendingMatchesCount, null, pendingMatchesCount === 1 ? 'swap to answer' : 'swaps to answer', pendingMatchesCount > 0 ? 'warn' : 'muted')}
+                    {figure('/matches', activePostsCount, 5, 'posts on the board')}
+                    {figure('/schedule', savedSchedules.length, 3, savedSchedules[0] ? `schedules · ${latestScheduleCredits ?? '–'} credits in the latest` : 'schedules saved')}
+                    <Link href="/notifications" className={styles.figureLink}>
+                        <Figure value={unreadAll} label="unread notifications" tone={unreadAll > 0 ? 'ink' : 'muted'} />
+                    </Link>
+                </nav>
+            )}
+
+            <div className={styles.lower}>
+                {/* ===== Electives ===== */}
+                <section className={styles.electives} aria-labelledby="home-electives">
+                    <Rubric
+                        id="home-electives"
+                        title="Electives open this term"
+                        meta={electivesLoading ? null : electiveRows.length}
+                        description={`Department and university electives with sections on your campus in ${currentSemesterName || 'this term'}. Open one to compare its sections.`}
+                    />
                     {!electivesLoading && electiveRows.length > 0 && (
                         <SegmentedControl
                             size="sm"
-                            label="Elective type"
+                            label="Kind of elective"
                             className={styles.electiveFilter}
                             value={electiveFilter}
                             onChange={setElectiveFilter}
@@ -753,102 +559,125 @@ export default function DashboardPage() {
                             ]}
                         />
                     )}
-                </div>
 
-                {electivesLoading ? (
-                    <ElectivesSkeleton />
-                ) : electiveRows.length === 0 ? (
-                    <EmptyState compact tone="neutral" icon={<BookIcon />} title="No electives open this term">
-                        None of your major&rsquo;s department or university electives have sections on your campus in {currentSemesterName || 'this semester'}. Try another semester from the menu above.
-                    </EmptyState>
-                ) : filteredElectiveRows.length === 0 ? (
-                    <EmptyState compact tone="neutral" icon={<BookIcon />} title="Nothing in this category">
-                        No electives of this type are offered this semester.
-                    </EmptyState>
-                ) : (
-                    <div className={styles.electiveList}>
-                        {filteredElectiveRows.map(row => {
-                            const key = `${row.kind}-${row.course_id}`;
-                            const isOpen = openElectives.has(key);
-                            const panelId = `sections-${key}`;
-                            const courseName = decodeHtmlEntities(row.course_name);
-                            const courseLabel = courseName || row.course_id;
-                            const sectionsLabel = `${row.section_count} section${row.section_count === 1 ? '' : 's'}`;
-                            return (
-                                <div key={key} className={`${styles.electiveItem} ${isOpen ? styles.electiveItemOpen : ''}`}>
-                                    <div className={styles.electiveHead}>
-                                        <button
-                                            type="button"
-                                            className={styles.electiveRow}
-                                            onClick={() => toggleElective(key)}
-                                            aria-expanded={isOpen}
-                                            aria-controls={panelId}
-                                        >
-                                            <CourseSwatch courseId={row.course_id} />
-                                            <span className={styles.electiveMain}>
-                                                <span className={styles.electiveName}>{courseName || 'Unnamed course'}</span>
-                                                <span className={styles.electiveMeta}>
-                                                    <span className={styles.electiveCode}>{row.course_id}</span>
-                                                    <span className={styles.metaDot} aria-hidden="true" />
-                                                    <span className={`${styles.kindLabel} ${styles[`kind_${row.tag}`]}`}>{KIND_LABELS[row.tag]}</span>
-                                                    <span className={styles.metaDot} aria-hidden="true" />
-                                                    <span>{sectionsLabel}</span>
+                    {electivesLoading ? (
+                        <div className={styles.electiveSkeleton} aria-hidden="true">
+                            {[0, 1, 2, 3].map(i => <Skeleton key={i} height={38} />)}
+                        </div>
+                    ) : electiveRows.length === 0 ? (
+                        <EmptyState compact title="No electives open this term.">
+                            None of your major&rsquo;s electives have sections on your campus in {currentSemesterName || 'this term'}. Try another term from the app bar.
+                        </EmptyState>
+                    ) : filteredElectiveRows.length === 0 ? (
+                        <EmptyState compact title="None of this kind this term." />
+                    ) : (
+                        <ol className={styles.electiveList}>
+                            {filteredElectiveRows.map(row => {
+                                const key = `${row.kind}-${row.course_id}`;
+                                const isOpen = openElectives.has(key);
+                                const panelId = `sections-${key}`;
+                                const courseName = decodeHtmlEntities(row.course_name);
+                                const courseLabel = courseName || row.course_id;
+                                return (
+                                    <li key={key} className={`${styles.elective} ${isOpen ? styles.electiveOpen : ''}`}>
+                                        <div className={styles.electiveHead}>
+                                            <button
+                                                type="button"
+                                                className={styles.electiveRow}
+                                                onClick={() => toggleElective(key)}
+                                                aria-expanded={isOpen}
+                                                aria-controls={panelId}
+                                            >
+                                                <span className={styles.electiveCode}>
+                                                    <CourseMark courseId={row.course_id} size="sm" />
+                                                    <CourseCode id={row.course_id} size="sm" />
                                                 </span>
-                                            </span>
-                                            <ChevronDownIcon className={styles.electiveChevron} />
-                                        </button>
-                                        <Link
-                                            href={`/schedule?course=${encodeURIComponent(row.course_id)}`}
-                                            className={styles.addBtn}
-                                            title={`Add ${courseLabel} to your schedule`}
-                                            aria-label={`Add ${courseLabel} to your schedule`}
-                                        >
-                                            <PlusIcon />
-                                            <span className={styles.addLabel}>Add<span className={styles.addLabelLong}> to schedule</span></span>
-                                        </Link>
-                                    </div>
+                                                <CourseName className={styles.electiveName}>{courseName || 'Unnamed course'}</CourseName>
+                                                <span className={styles.electiveKind}>{KIND_LABELS[row.tag]}</span>
+                                                <span className={styles.electiveCount}>{row.section_count} {row.section_count === 1 ? 'section' : 'sections'}</span>
+                                                <ChevronDownIcon className={styles.electiveChevron} />
+                                            </button>
+                                            <Link
+                                                href={`/schedule?course=${encodeURIComponent(row.course_id)}`}
+                                                className={styles.add}
+                                                aria-label={`Add ${courseLabel} to your schedule`}
+                                            >
+                                                Add
+                                            </Link>
+                                        </div>
 
-                                    {isOpen && (
-                                        <ul id={panelId} className={styles.sectionList}>
-                                            {(sectionsByCourse[row.course_id] || []).map(sec => {
-                                                const { days, time } = splitClassTime(sec.class_time);
-                                                const kind = sectionKind(sec.section_num);
-                                                const seats = seatStatus(sec);
-                                                return (
-                                                    <li key={sec.crn || sec.section_num} className={styles.sectionRow}>
-                                                        <span className={styles.sectionId}>
-                                                            <span className={styles.sectionNum}>{sec.section_num}</span>
-                                                            {kind && <span className={styles.sectionKind}>{kind}</span>}
-                                                        </span>
-                                                        <span className={styles.sectionWhen}>
-                                                            {days && <span className={styles.sectionDays}>{days}</span>}
-                                                            <span className={styles.sectionTime}>{time || 'Time TBA'}</span>
-                                                        </span>
-                                                        <span className={styles.sectionWho}>
-                                                            <span className={styles.sectionInstructor}>
-                                                                {decodeHtmlEntities((sec.instructor || '').trim()) || 'Instructor TBA'}
+                                        {isOpen && (
+                                            <ul id={panelId} className={styles.sections}>
+                                                {(sectionsByCourse[row.course_id] || []).map(sec => {
+                                                    const { days, time } = splitClassTime(sec.class_time);
+                                                    const kind = sectionKind(sec.section_num);
+                                                    const seats = seatStatus(sec);
+                                                    return (
+                                                        <li key={sec.crn || sec.section_num} className={styles.sectionRow}>
+                                                            <span className={styles.sectionId}>
+                                                                <Section value={sec.section_num} size="sm" />
+                                                                {kind && <span className={styles.sectionKind}>{kind}</span>}
                                                             </span>
-                                                            {sec.location && <RoomLink room={sec.location} className={styles.sectionRoom} />}
-                                                        </span>
-                                                        <span className={styles.sectionEnd}>
-                                                            {seats && (
-                                                                <Badge size="sm" dot tone={seats.tone === 'open' ? 'success' : seats.tone === 'low' ? 'warning' : 'neutral'} title={seats.title}>
-                                                                    {seats.label}
-                                                                </Badge>
-                                                            )}
-                                                            <span className={styles.sectionCrn}>CRN {sec.crn}</span>
-                                                        </span>
-                                                    </li>
-                                                );
-                                            })}
-                                        </ul>
+                                                            <span className={styles.sectionWhen}>
+                                                                {days && <span className={styles.sectionDays}>{days.replace(/\//g, ' ')}</span>}
+                                                                <span>{time || 'time not listed'}</span>
+                                                            </span>
+                                                            <span className={styles.sectionWho}>{decodeHtmlEntities((sec.instructor || '').trim()) || 'Staff'}</span>
+                                                            <span className={styles.sectionRoom}>{sec.location && <RoomLink room={sec.location} />}</span>
+                                                            <span className={styles.sectionSeats}>
+                                                                {seats && <Status tone={seats.tone === 'open' ? 'go' : seats.tone === 'low' ? 'warn' : 'danger'} title={seats.title}>{seats.label}</Status>}
+                                                            </span>
+                                                            <span className={styles.sectionCrn}>{sec.crn}</span>
+                                                        </li>
+                                                    );
+                                                })}
+                                            </ul>
+                                        )}
+                                    </li>
+                                );
+                            })}
+                        </ol>
+                    )}
+                </section>
+
+                {/* ===== Where to go ===== */}
+                <aside className={styles.side}>
+                    <Link href="/map" className={styles.map} aria-label="Open the campus map">
+                        <span className={styles.mapArt} aria-hidden="true" />
+                        <span className={styles.mapCaption}>
+                            <span className={styles.mapTitle}>Campus map</span>
+                            <span className={styles.mapSub}>Every room on your schedule opens here →</span>
+                        </span>
+                    </Link>
+
+                    <nav aria-labelledby="home-go">
+                        <Rubric id="home-go" title="Go to" quiet />
+                        <ul className={styles.go}>
+                            {[
+                                { href: '/post', label: 'Post a section', sub: 'Swap, give away or ask for one', locked: isGuest },
+                                { href: '/schedule', label: 'Build a schedule', sub: `Clash-free timetables for ${currentSemesterName || 'the term'}` },
+                                { href: '/browse', label: 'The board', sub: 'Sections up for trade in your major', locked: isGuest },
+                                { href: '/schedule?mode=instructor', label: 'Find an instructor', sub: 'Anyone’s teaching week and office hours' },
+                                { href: '/schedule?mode=history', label: 'Course history', sub: 'How a course ran in past terms' },
+                            ].map(item => (
+                                <li key={item.href}>
+                                    {item.locked ? (
+                                        <button type="button" className={`${styles.goItem} ${styles.goLocked}`} onClick={refuse} aria-disabled="true" aria-label={`${item.label}, needs an account`}>
+                                            <span className={styles.goLabel}>{item.label}</span>
+                                            <span className={styles.goSub}>Needs an account</span>
+                                        </button>
+                                    ) : (
+                                        <Link href={item.href} className={styles.goItem}>
+                                            <span className={styles.goLabel}>{item.label}</span>
+                                            <span className={styles.goSub}>{item.sub}</span>
+                                        </Link>
                                     )}
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </section>
+                                </li>
+                            ))}
+                        </ul>
+                    </nav>
+                </aside>
+            </div>
         </PageShell>
     );
 }
