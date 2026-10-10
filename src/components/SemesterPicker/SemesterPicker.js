@@ -2,14 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useSemester } from '@/lib/SemesterContext';
-import { CheckIcon, ChevronDownIcon, ScheduleIcon } from '@/components/Icons';
+import { ChevronDownIcon } from '@/components/Icons';
 import styles from './SemesterPicker.module.css';
 
 /**
- * Term switcher: a chip that opens a short list.
- *
- * Works for any number of active semesters and renders nothing when there is
- * nothing to choose between.
+ * The term everything is showing: its name as words in the app bar, opening
+ * a short list. The current term is highlighted in the list, the way your
+ * own things are everywhere else. Renders nothing when there's only one.
  */
 export default function SemesterPicker({ align = 'right' }) {
     const { semesters, selectedTerm, setSelectedTerm } = useSemester();
@@ -62,14 +61,13 @@ export default function SemesterPicker({ align = 'right' }) {
                 aria-haspopup="listbox"
                 aria-label={`Semester: ${current?.name || 'select'}`}
             >
-                <ScheduleIcon className={styles.calendar} />
                 <span className={styles.chipLabel}>{current?.name || 'Select semester'}</span>
                 <ChevronDownIcon className={styles.chevron} />
             </button>
 
             {open && (
                 <ul ref={listRef} className={`${styles.menu} ${align === 'left' ? styles.menuLeft : ''}`} role="listbox" aria-label="Semester">
-                    <li className={styles.menuLabel} role="presentation">Semester</li>
+                    <li className={styles.menuLabel} role="presentation">Term</li>
                     {semesters.map(sem => {
                         const isSelected = sem.term_code === selectedTerm;
                         return (
@@ -85,8 +83,8 @@ export default function SemesterPicker({ align = 'right' }) {
                                         triggerRef.current?.focus();
                                     }}
                                 >
-                                    {sem.name}
-                                    {isSelected && <CheckIcon className={styles.check} strokeWidth={2.25} />}
+                                    <span className={styles.optionName}>{sem.name}</span>
+                                    <span className={styles.optionCode}>{sem.term_code}</span>
                                 </button>
                             </li>
                         );
