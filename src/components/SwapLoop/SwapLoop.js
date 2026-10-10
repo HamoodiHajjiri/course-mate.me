@@ -3,25 +3,26 @@
 import styles from './SwapLoop.module.css';
 
 /**
- * A multi-person swap drawn as what it is: a loop. Each person is a node;
- * each arrow carries the section they hand to the next person, who is the
- * one whose `gets_section` it is. You are the filled node.
+ * A swap drawn as a route. Each person is a station on a line; each segment
+ * carries the section one person hands to the next; a return line over the
+ * top carries the last section back to the start and closes the loop. A
+ * direct swap and a 3-way loop are the same drawing with a different number
+ * of stops — which is exactly what they are.
+ *
+ * Stations are circles (people); a filled station has accepted. Segments
+ * that touch you are drawn in ink, the rest in grey.
  *
  *   participants  [{ position, user_id, gives_section, gets_section, accepted, name }]
- *   me            the viewer's user_id
+ *   me            the viewer's user_id; their station is drawn first
  */
 export default function SwapLoop({ participants, me }) {
     const n = participants.length;
-    const size = 260;
-    const cx = size / 2;
-    const cy = size / 2 + 4;
-    const r = n === 3 ? 82 : 92;
-    const nodeR = 26;
+    if (n < 2) return null;
 
-    // Lay people round the ring in the order sections travel: each person's
-    // section goes to whoever gets that section, so following that chain
-    // gives the loop, and every arrow then runs clockwise to the next node.
-    const order = participants.length ? [participants[0]] : [];
+    // Follow the sections: start with the viewer, then whoever receives what
+    // the previous person gives.
+    const first = participants.find(p => p.user_id === me) || participants[0];
+    const order = [first];
     while (order.length < n) {
         const last = order[order.length - 1];
         const next = participants.find(q => !order.includes(q) && q.gets_section === last.gives_section)
@@ -29,67 +30,80 @@ export default function SwapLoop({ participants, me }) {
         order.push(next);
     }
 
-    const nodes = order.map((p, i) => {
-        const angle = -Math.PI / 2 + (i * 2 * Math.PI) / n;
-        return { ...p, x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle), angle };
-    });
-
-    const edges = nodes.map((p, i) => ({ from: p, to: nodes[(i + 1) % n], section: p.gives_section }));
+    const gap = n === 2 ? 240 : n === 3 ? 196 : 160;
+    const pad = 58;
+    const width = pad * 2 + (n - 1) * gap;
+    const yLine = 66;
+    const yTop = 22;
+    const r = 9;
+    const height = yLine + 58;
+    const x = (i) => pad + i * gap;
 
     const label = (p) => (p.user_id === me ? 'You' : (p.name || 'Student').split(' ')[0]);
+    const touchesMe = (a, b) => a.user_id === me || b.user_id === me;
+
+    const forward = order.slice(0, -1).map((p, i) => ({ from: p, to: order[i + 1], x1: x(i) + r + 5, x2: x(i + 1) - r - 7, section: p.gives_section }));
+    const lastP = order[n - 1];
+    const rise = yLine - r - 4 - yTop;
+    const back = {
+        from: lastP,
+        to: order[0],
+        d: `M ${x(n - 1) - 4} ${yLine - r - 4} L ${x(n - 1) - 4 - rise} ${yTop} L ${x(0) + 4 + rise} ${yTop} L ${x(0) + 4} ${yLine - r - 6}`,
+        section: lastP.gives_section,
+    };
+
+    const sectionTag = (cx, cy, section, mine) => {
+        const w = 14 + String(section).length * 7.4;
+        return (
+            <g transform={`translate(${cx} ${cy})`} className={`${styles.tag} ${mine ? styles.tagMine : ''}`}>
+                <rect x={-w / 2} y={-9} width={w} height={18} />
+                <text textAnchor="middle" dominantBaseline="central">
+                    <tspan className={styles.tagSign}>§</tspan>{section}
+                </text>
+            </g>
+        );
+    };
+
+    const description = order.map((p, i) => `${label(p)} gives section ${p.gives_section} to ${label(order[(i + 1) % n])}`).join('; ');
 
     return (
-        <figure className={styles.loop}>
-            <svg viewBox={`0 0 ${size} ${size}`} className={styles.svg} role="img" aria-label={edges.map(e => `${label(e.from)} gives section ${e.section} to ${label(e.to)}`).join('; ')}>
+        <figure className={styles.route}>
+            <svg
+                viewBox={`0 0 ${width} ${height}`}
+                className={styles.svg}
+                style={{ maxWidth: width }}
+                role="img"
+                aria-label={description}
+            >
                 <defs>
-                    <marker id="loop-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-                        <path d="M0 0 10 5 0 10z" className={styles.arrowHead} />
+                    <marker id="route-head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
+                        <path d="M1 1 9 5 1 9" className={styles.head} />
                     </marker>
                 </defs>
-                <circle cx={cx} cy={cy} r={r} className={styles.track} />
-                {edges.map((e, i) => {
-                    // Curve along the ring between the two nodes, trimmed so the
-                    // arrow starts and ends at the node edges.
-                    const a1 = e.from.angle + (nodeR + 6) / r;
-                    const a2 = e.to.angle - (nodeR + 6) / r + (e.to.angle < e.from.angle ? 2 * Math.PI : 0);
-                    const x1 = cx + r * Math.cos(a1);
-                    const y1 = cy + r * Math.sin(a1);
-                    const x2 = cx + r * Math.cos(a2);
-                    const y2 = cy + r * Math.sin(a2);
-                    const mid = (a1 + a2) / 2;
-                    const lx = cx + (r + 28) * Math.cos(mid);
-                    const ly = cy + (r + 28) * Math.sin(mid);
-                    const fromMe = e.from.user_id === me;
-                    const toMe = e.to.user_id === me;
-                    return (
-                        <g key={i} className={`${styles.edge} ${fromMe || toMe ? styles.edgeMine : ''}`}>
-                            <path d={`M${x1} ${y1} A${r} ${r} 0 0 1 ${x2} ${y2}`} markerEnd="url(#loop-arrow)" />
-                            <g transform={`translate(${lx} ${ly})`}>
-                                <rect x="-19" y="-10" width="38" height="20" rx="6" className={styles.pill} />
-                                <text className={styles.pillText} textAnchor="middle" dominantBaseline="central">{e.section}</text>
-                            </g>
-                        </g>
-                    );
-                })}
-                {nodes.map(p => {
+
+                {forward.map((e, i) => (
+                    <g key={`f-${i}`} className={`${styles.edge} ${touchesMe(e.from, e.to) ? styles.edgeMine : ''}`}>
+                        <line x1={e.x1} y1={yLine} x2={e.x2} y2={yLine} markerEnd="url(#route-head)" />
+                        {sectionTag((e.x1 + e.x2) / 2, yLine, e.section, touchesMe(e.from, e.to))}
+                    </g>
+                ))}
+
+                <g className={`${styles.edge} ${styles.edgeBack} ${touchesMe(back.from, back.to) ? styles.edgeMine : ''}`}>
+                    <path d={back.d} markerEnd="url(#route-head)" />
+                    {sectionTag((x(0) + x(n - 1)) / 2, yTop, back.section, touchesMe(back.from, back.to))}
+                </g>
+
+                {order.map((p, i) => {
                     const mine = p.user_id === me;
                     return (
-                        <g key={p.position} transform={`translate(${p.x} ${p.y})`} className={`${styles.node} ${mine ? styles.nodeMe : ''} ${p.accepted ? styles.nodeAccepted : ''}`}>
-                            <circle r={nodeR} />
-                            <text className={styles.nodeText} textAnchor="middle" dominantBaseline="central">{label(p)}</text>
-                            {p.accepted && (
-                                <g transform={`translate(${nodeR * 0.72} ${-nodeR * 0.72})`} className={styles.tick}>
-                                    <circle r="8" />
-                                    <path d="M-3.5 0 -1 2.5 3.5 -2.5" />
-                                </g>
-                            )}
+                        <g key={p.position} transform={`translate(${x(i)} ${yLine})`} className={`${styles.station} ${mine ? styles.stationMe : ''} ${p.accepted ? styles.stationAccepted : ''}`}>
+                            <circle r={r} />
+                            <text y={r + 19} textAnchor="middle" className={styles.who}>{label(p)}</text>
+                            <text y={r + 34} textAnchor="middle" className={styles.state}>{p.accepted ? 'accepted' : 'waiting'}</text>
                         </g>
                     );
                 })}
             </svg>
-            <figcaption className={styles.caption}>
-                A {n}-way loop: each arrow is a section moving to the next person.
-            </figcaption>
         </figure>
     );
 }
