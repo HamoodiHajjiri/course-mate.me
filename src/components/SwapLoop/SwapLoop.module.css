@@ -1,96 +1,98 @@
-.loop {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
+/* ===== Swap route ===== */
+.route {
+    margin: 0;
 }
 
 .svg {
+    display: block;
     width: 100%;
-    max-width: 260px;
     height: auto;
     overflow: visible;
 }
 
-.track {
-    fill: none;
-    stroke: var(--line);
-    stroke-width: 1;
-    stroke-dasharray: 2 5;
-}
-
+.edge line,
 .edge path {
     fill: none;
     stroke: var(--ink-4);
-    stroke-width: 2;
-    stroke-linecap: round;
+    stroke-width: 1.25;
 }
 
-.arrowHead {
+.edgeMine line,
+.edgeMine path {
+    stroke: var(--ink);
+    stroke-width: 1.75;
+}
+
+.head {
+    fill: none;
+    stroke: context-stroke;
+    stroke-width: 1.5;
+    stroke-linecap: square;
+}
+
+/* Fallback for browsers without context-stroke. */
+.edge .head { stroke: var(--ink-4); }
+.edgeMine .head { stroke: var(--ink); }
+
+/* The section riding on its segment, knocked out of the line. */
+.tag rect {
+    fill: var(--route-ground, var(--canvas));
+}
+
+.tag text {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+    fill: var(--ink-3);
+}
+
+.tagMine text {
+    fill: var(--ink);
+}
+
+.tagSign {
+    font-family: var(--font-serif);
     fill: var(--ink-4);
 }
 
-.edgeMine path {
-    stroke: var(--accent);
-}
-
-.pill {
-    fill: var(--surface);
-    stroke: var(--line-strong);
-    stroke-width: 1;
-}
-
-.edgeMine .pill {
-    fill: var(--accent-soft-2);
-    stroke: var(--accent-line);
-}
-
-.pillText {
-    font-family: var(--font-mono);
-    font-size: 11px;
-    font-weight: 600;
-    fill: var(--ink);
-}
-
-.node circle:first-child {
-    fill: var(--surface-2);
-    stroke: var(--line-strong);
+/* People are circles; a filled one has accepted. */
+.station circle {
+    fill: var(--route-ground, var(--canvas));
+    stroke: var(--ink-3);
     stroke-width: 1.5;
+    transition: fill var(--dur-3) var(--ease-out), stroke var(--dur-3) var(--ease-out);
 }
 
-.nodeMe circle:first-child {
-    fill: var(--forest);
-    stroke: var(--accent);
+.stationMe circle {
+    stroke: var(--ink);
     stroke-width: 2;
 }
 
-.nodeText {
+.stationAccepted circle {
+    fill: var(--go);
+    stroke: var(--go);
+}
+
+.who {
     font-family: var(--font-sans);
-    font-size: 11px;
-    font-weight: 600;
+    font-size: 13px;
+    font-weight: 500;
     fill: var(--ink);
 }
 
-.nodeMe .nodeText {
-    fill: var(--forest-ink);
+.stationMe .who {
+    font-weight: 600;
 }
 
-.tick circle {
-    fill: var(--accent);
-    stroke: var(--surface);
-    stroke-width: 2;
+.state {
+    font-family: var(--font-cond);
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    fill: var(--ink-4);
 }
 
-.tick path {
-    fill: none;
-    stroke: var(--on-accent);
-    stroke-width: 1.8;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
-
-.caption {
-    font-size: var(--text-caption);
-    color: var(--ink-3);
-    text-align: center;
+.stationAccepted .state {
+    fill: var(--go-ink);
 }
