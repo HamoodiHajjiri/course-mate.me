@@ -1,16 +1,12 @@
 /* ===== Page shell =====
-   The canvas: one calm ground with a faint mint light falling from the top
-   edge. It replaces the old animated grid and orb, which competed with the
-   content on every page and made the app read like a prototype. */
+   The page is the paper. Nothing decorates it: no glow, no texture, no
+   entrance animation. The content's own rules give it structure. */
 
 .page {
     position: relative;
     min-height: 100vh;
     min-height: 100dvh;
-    background:
-        radial-gradient(ellipse 70% 360px at 50% -140px, var(--canvas-glow), transparent 72%),
-        var(--canvas);
-    background-repeat: no-repeat;
+    background: var(--canvas);
     overflow-x: clip;
 }
 
@@ -22,12 +18,11 @@
 .inner {
     display: flex;
     flex-direction: column;
-    gap: var(--space-6);
+    gap: var(--space-8);
     width: 100%;
     max-width: calc(1040px + 2 * var(--page-gutter));
     margin: 0 auto;
-    padding: var(--space-6) var(--page-gutter) var(--space-10);
-    animation: pageIn var(--dur-3) var(--ease-out);
+    padding: var(--space-7) var(--page-gutter) var(--space-10);
 }
 
 .reading {
@@ -42,22 +37,30 @@
     max-width: calc(var(--page-max) + 2 * var(--page-gutter));
 }
 
-@keyframes pageIn {
-    from { opacity: 0; transform: translateY(4px); }
-    to { opacity: 1; transform: none; }
+/* Full: the page is the content (the map). */
+.full {
+    max-width: none;
+    padding: 0;
+    gap: 0;
 }
 
-/* Phones and tablets: tighter gutters, and room under the content for the
-   tab bar. */
 @media (max-width: 1023px) {
     .withNav .inner {
-        padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + var(--space-7));
+        padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + var(--space-8));
+    }
+
+    .withNav .full {
+        padding-bottom: 0;
     }
 }
 
 @media (max-width: 767px) {
     .inner {
-        gap: var(--space-5);
-        padding: var(--space-4) var(--space-4) var(--space-8);
+        gap: var(--space-7);
+        padding: var(--space-5) var(--space-4) var(--space-8);
+    }
+
+    .full {
+        padding: 0;
     }
 }
