@@ -1,24 +1,25 @@
 import React from 'react';
 
 /**
- * CourseMate's icon set: one family, one stroke weight, drawn on a 24 unit
- * grid. Icons take their colour from the text around them (currentColor), so
- * a hover or selected state on the parent recolours the icon with it.
+ * CourseMate's icons: drawn like the rest of the product, with square ends
+ * and mitred corners at a 1.5 stroke, so they sit with the ruled lines and
+ * square course marks rather than looking borrowed from a library. They take
+ * their colour from the text around them. Icons are used sparingly: where a
+ * word does the job, the word wins.
  *
- * Size with width/height (default 20). The stroke is 1.75 at every size,
- * which reads as one weight from 14px badges to 24px empty states.
+ * Size with `size` (default 18).
  */
-const IconWrapper = ({ children, size, width, height, strokeWidth = 1.75, className, ...props }) => (
+const IconWrapper = ({ children, size, width, height, strokeWidth = 1.5, className, ...props }) => (
     <svg
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 24 24"
-        width={width ?? size ?? 20}
-        height={height ?? size ?? 20}
+        width={width ?? size ?? 18}
+        height={height ?? size ?? 18}
         fill="none"
         stroke="currentColor"
         strokeWidth={strokeWidth}
-        strokeLinecap="round"
-        strokeLinejoin="round"
+        strokeLinecap="square"
+        strokeLinejoin="miter"
         aria-hidden="true"
         focusable="false"
         className={className}
@@ -43,7 +44,7 @@ export const SearchIcon = icon(<>
 </>);
 
 export const ScheduleIcon = icon(<>
-    <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
+    <rect x="3.5" y="5" width="17" height="15.5" />
     <path d="M3.5 10h17M8 3v4M16 3v4" />
 </>);
 
@@ -94,7 +95,7 @@ export const LoginIcon = icon(<>
 </>);
 
 export const LockIcon = icon(<>
-    <rect x="4.5" y="10.5" width="15" height="10" rx="2.5" />
+    <rect x="4.5" y="10.5" width="15" height="10" />
     <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
 </>);
 
@@ -108,12 +109,12 @@ export const PhoneIcon = icon(<>
 </>);
 
 export const MailIcon = icon(<>
-    <rect x="3" y="5" width="18" height="14" rx="2.5" />
+    <rect x="3" y="5" width="18" height="14" />
     <path d="m3.5 7 8.5 6 8.5-6" />
 </>);
 
 export const IdIcon = icon(<>
-    <rect x="3" y="5" width="18" height="14" rx="2.5" />
+    <rect x="3" y="5" width="18" height="14" />
     <circle cx="9" cy="11" r="2" />
     <path d="M6 16c.6-1.4 1.7-2 3-2s2.4.6 3 2M14.5 10h3.5M14.5 13.5H17" />
 </>);
@@ -122,7 +123,7 @@ export const IdIcon = icon(<>
 export const SwapIcon = ActivityIcon;
 
 export const GiftIcon = icon(<>
-    <rect x="3.5" y="8" width="17" height="4" rx="1" />
+    <rect x="3.5" y="8" width="17" height="4" />
     <path d="M5 12v7.5A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V12M12 8v13" />
     <path d="M12 8S10.5 3.5 8 3.5a2.25 2.25 0 0 0 0 4.5zM12 8s1.5-4.5 4-4.5a2.25 2.25 0 0 1 0 4.5z" />
 </>);
@@ -180,7 +181,7 @@ export const PinIcon = icon(<>
 </>);
 
 export const BuildingIcon = icon(<>
-    <rect x="4.5" y="3.5" width="15" height="17" rx="1.5" />
+    <rect x="4.5" y="3.5" width="15" height="17" />
     <path d="M9.5 20.5V17h5v3.5M8.5 7.5h1M14.5 7.5h1M8.5 11h1M14.5 11h1M8.5 14.5h1M14.5 14.5h1" />
 </>);
 
@@ -191,7 +192,7 @@ export const CompassIcon = icon(<>
 
 /* ----- Actions ----- */
 export const CopyIcon = icon(<>
-    <rect x="8.5" y="8.5" width="12" height="12" rx="2.5" />
+    <rect x="8.5" y="8.5" width="12" height="12" />
     <path d="M15.5 8.5V6A2.5 2.5 0 0 0 13 3.5H6A2.5 2.5 0 0 0 3.5 6v7A2.5 2.5 0 0 0 6 15.5h2.5" />
 </>);
 
@@ -297,9 +298,9 @@ export const MegaphoneIcon = icon(<>
 
 export const ChartIcon = icon(<>
     <path d="M4 20.5h16" />
-    <rect x="5.5" y="11" width="3" height="6.5" rx="0.75" />
-    <rect x="10.5" y="6.5" width="3" height="11" rx="0.75" />
-    <rect x="15.5" y="13.5" width="3" height="4" rx="0.75" />
+    <rect x="5.5" y="11" width="3" height="6.5" />
+    <rect x="10.5" y="6.5" width="3" height="11" />
+    <rect x="15.5" y="13.5" width="3" height="4" />
 </>);
 
 export const SunIcon = icon(<>
