@@ -1,196 +1,176 @@
-.bottomNav {
+/* ===== Tab bar (phone and tablet) ===== */
+
+.bar {
     position: fixed;
-    bottom: 24px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: calc(100% - 32px);
-    max-width: 500px;
-    height: 68px;
-    background: var(--glass-bg-dense);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-full);
-    display: flex;
-    justify-content: space-around;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: var(--z-nav);
+    padding-bottom: env(safe-area-inset-bottom);
+    background: color-mix(in srgb, var(--surface) 90%, transparent);
+    backdrop-filter: saturate(1.6) blur(16px);
+    -webkit-backdrop-filter: saturate(1.6) blur(16px);
+    border-top: 1px solid var(--line);
+}
+
+.inner {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     align-items: center;
-    z-index: 1000;
-    box-shadow: var(--shadow-2xl), 0 20px 40px rgba(0, 0, 0, 0.2);
-    padding: 0 8px;
-    /* ensure it stays above scrolling content correctly */
+    height: var(--tabbar-h);
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 0 6px;
 }
 
-.bottomNav::before {
-    content: '';
-    position: absolute;
-    inset: -1px;
-    border-radius: var(--radius-full);
-    background: var(--gradient-border);
-    z-index: -1;
-    opacity: 0.4;
-}
-
-.navItem {
+.item {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 3px;
-    padding: 8px 10px;
-    color: var(--text-muted);
-    text-decoration: none;
-    font-size: 0.6875rem;
-    transition: all var(--transition-fast) var(--ease-out-expo);
-    border-radius: var(--radius-full);
-    position: relative;
     height: 100%;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink-3);
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: color var(--dur-1) var(--ease-out);
 }
 
-.navItem:hover {
-    color: var(--color-accent);
+.item:hover {
+    color: var(--ink);
 }
 
-.navItem.active {
-    color: var(--color-accent);
-}
-
-/* Active pill background */
-.navItem.active::before {
-    content: '';
-    position: absolute;
-    inset: 4px;
-    background: var(--color-accent-muted);
-    border-radius: var(--radius-full);
-    z-index: -1;
-    animation: pillFade 0.25s var(--ease-out-expo);
-}
-
-@keyframes pillFade {
-    from { opacity: 0; transform: scale(0.85); }
-    to { opacity: 1; transform: scale(1); }
-}
-
-.navIcon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: transform var(--transition-fast) var(--ease-spring);
+.icon {
     position: relative;
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 30px;
+    border-radius: var(--r-full);
+    transition: background-color var(--dur-2) var(--ease-out), transform var(--dur-1) var(--ease-out);
+}
+
+.item:active .icon {
+    transform: scale(0.92);
+}
+
+.icon svg {
+    width: 22px;
+    height: 22px;
+}
+
+.label {
+    font-size: 0.6875rem;
+    font-weight: var(--weight-medium);
+    letter-spacing: 0.005em;
+    line-height: 1;
+}
+
+/* Current tab: a soft mint lozenge behind the icon, ink-dark label. */
+.active {
+    color: var(--ink);
+}
+
+.active .icon {
+    background: var(--accent-soft-2);
+    color: var(--accent-ink);
+}
+
+.active .label {
+    font-weight: var(--weight-semibold);
 }
 
 .badge {
     position: absolute;
-    top: -6px;
-    right: -10px;
-    min-width: 16px;
-    height: 16px;
+    top: -2px;
+    left: 30px;
+    min-width: 17px;
+    height: 17px;
     padding: 0 4px;
-    border-radius: var(--radius-full);
-    background: var(--status-expired, #ef4444);
+    border-radius: var(--r-full);
+    background: var(--danger);
     color: #fff;
     font-size: 0.625rem;
-    font-weight: 700;
-    line-height: 16px;
+    font-weight: var(--weight-bold);
+    line-height: 17px;
     text-align: center;
-    box-shadow: 0 0 0 2px var(--glass-bg-dense);
+    font-variant-numeric: tabular-nums;
+    box-shadow: 0 0 0 2px var(--surface);
 }
 
-.navItem.active .navIcon {
-    transform: scale(1.05);
-    filter: drop-shadow(0 0 6px var(--color-accent-muted));
+/* ===== New post ===== */
+.postSlot {
+    display: grid;
+    place-items: center;
 }
 
-.navIcon svg {
-    width: 22px;
-    height: 22px;
-    stroke-width: 2px;
+.post {
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 40px;
+    padding: 0;
+    border: 0;
+    border-radius: 13px;
+    background: var(--accent);
+    color: var(--on-accent);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 4px 12px -4px color-mix(in srgb, var(--accent) 70%, transparent);
+    transition: transform var(--dur-1) var(--ease-out), background-color var(--dur-1) var(--ease-out);
 }
 
-.navLabel {
-    font-weight: 600;
-    letter-spacing: 0.01em;
+.post:hover {
+    background: var(--accent-hover);
+    color: var(--on-accent);
 }
 
-/* ===== Centre action ===== */
-.fab {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 56px;
-    height: 56px;
-    flex-shrink: 0;
-    border-radius: var(--radius-full);
-    background: var(--gradient-accent-vivid);
-    color: var(--text-inverse);
-    /* Lifts clear of the pill; the ring hides the bar edge behind it. */
-    transform: translateY(-18px);
-    border: 3px solid var(--auth-bg);
-    box-shadow: var(--shadow-accent-lg), var(--shadow-accent);
-    transition: transform var(--transition-fast) var(--ease-spring),
-                box-shadow var(--transition-fast) var(--ease-out-expo);
+.post:active {
+    transform: scale(0.94);
 }
 
-.fab:hover {
-    transform: translateY(-21px) scale(1.04);
+.post svg {
+    width: 24px;
+    height: 24px;
 }
 
-.fab:active {
-    transform: translateY(-16px) scale(0.97);
+.postActive {
+    box-shadow: 0 0 0 3px var(--accent-soft-2);
 }
 
-.fab svg {
-    width: 26px;
-    height: 26px;
-    stroke-width: 2.5px;
-}
-
-.fabActive {
-    box-shadow: var(--shadow-accent-lg), 0 0 0 4px var(--color-accent-muted);
-}
-
-/* ===== Desktop =====
-   The floating pill is a phone idiom. Above 1024px navigation lives in the
-   top bar instead, so the pill (and the space reserved for it) goes away. */
 @media (min-width: 1024px) {
-    .bottomNav {
+    .bar {
         display: none;
     }
 }
 
-@media (prefers-reduced-motion: reduce) {
-    .fab,
-    .fab:hover,
-    .fab:active {
-        transition: none;
-        transform: translateY(-18px);
-    }
-
-    .navItem.active::before {
-        animation: none;
-    }
-}
-/* ===== Guest mode: tabs that need an account ===== */
+/* ===== Guest mode ===== */
 .locked {
-    opacity: 0.6;
-    border: none;
-    background: none;
-    font-family: inherit;
+    color: var(--ink-4);
     cursor: not-allowed;
 }
 
-.navIcon .lock {
+.icon .lock {
     position: absolute;
-    top: -4px;
-    right: -9px;
+    top: 1px;
+    right: 9px;
     width: 12px;
     height: 12px;
-    stroke-width: 2.5px;
+    padding: 1px;
+    border-radius: 50%;
+    background: var(--surface);
 }
 
-.fabLocked {
-    padding: 0;
+.postLocked {
+    background: var(--surface-2);
+    color: var(--ink-3);
+    box-shadow: inset 0 0 0 1px var(--line);
     cursor: not-allowed;
-    background: var(--bg-tertiary);
-    color: var(--text-muted);
-    box-shadow: var(--shadow-md);
+}
+
+.postLocked svg {
+    width: 20px;
+    height: 20px;
 }
