@@ -1,10 +1,10 @@
 import './globals.css';
-import Script from 'next/script';
 import { SemesterProviderWrapper } from '@/lib/SemesterContext';
+import { FeedbackProvider } from '@/components/ui/Feedback';
 
 export const metadata = {
     title: 'CourseMate',
-    description: 'University course section swap platform',
+    description: 'Swap sections, build your schedule and find your way around campus.',
     icons: {
         icon: '/logo.png',
         shortcut: '/logo.png',
@@ -12,15 +12,30 @@ export const metadata = {
     },
 };
 
+// Pinch-zoom stays available: inputs are 16px on phones, so iOS has no reason
+// to zoom on focus and nothing needs locking.
+export const viewport = {
+    width: 'device-width',
+    initialScale: 1,
+    viewportFit: 'cover',
+};
+
+// Browser chrome colour per theme, matching --canvas in globals.css.
+const THEME_COLORS = { light: '#F5F4EF', dark: '#070D16', black: '#000000' };
+
 export default function RootLayout({ children }) {
     return (
         <html lang="en" suppressHydrationWarning>
             <head>
                 <link rel="preconnect" href="https://fonts.googleapis.com" />
                 <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
-                <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-                <meta name="theme-color" content="#0a2540" />
+                {/* Loaded by family name rather than next/font: the schedule
+                    PNG export draws on a canvas with these exact names. */}
+                <link
+                    href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap"
+                    rel="stylesheet"
+                />
+                <meta name="theme-color" content={THEME_COLORS.light} />
                 <script dangerouslySetInnerHTML={{
                     __html: `
                         (function () {
@@ -34,6 +49,9 @@ export default function RootLayout({ children }) {
                                     ? saved
                                     : (prefersDark ? 'dark' : 'light');
                                 document.documentElement.setAttribute('data-theme', theme);
+                                var colors = ${JSON.stringify(THEME_COLORS)};
+                                var meta = document.querySelector('meta[name="theme-color"]');
+                                if (meta) meta.setAttribute('content', colors[theme]);
                             } catch (e) { }
                         })();
                     `,
@@ -41,7 +59,9 @@ export default function RootLayout({ children }) {
             </head>
             <body suppressHydrationWarning>
                 <SemesterProviderWrapper>
-                    {children}
+                    <FeedbackProvider>
+                        {children}
+                    </FeedbackProvider>
                 </SemesterProviderWrapper>
             </body>
         </html>
