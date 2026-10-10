@@ -85,3 +85,15 @@ export function formatDuration(minutes) {
     if (h) return `${h}h`;
     return `${m}m`;
 }
+
+const pad2 = (n) => String(n).padStart(2, '0');
+
+/** 510 → "08:30": the timetable's clock, 24-hour like Banner's own. */
+export function formatClock24(minutes) {
+    return `${pad2(Math.floor(minutes / 60))}:${pad2(minutes % 60)}`;
+}
+
+/** "08:00–09:15": a meeting as the timetable writes it. */
+export function formatSpan(start, end) {
+    return `${formatClock24(start)}–${formatClock24(end)}`;
+}
