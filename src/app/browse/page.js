@@ -6,20 +6,21 @@ import { createClient } from '@/lib/supabase/client';
 import { fetchAllRows } from '@/lib/supabase/fetchAll';
 import { campusFilter } from '@/lib/campus';
 import { useSemester } from '@/lib/SemesterContext';
-import { ActivityIcon, GiftIcon, HandIcon, InboxIcon, LayersIcon, PlusIcon, SearchIcon } from '@/components/Icons';
 import PageShell from '@/components/PageShell';
-import PageHeader from '@/components/PageHeader';
 import PostCard from '@/components/PostCard';
-import { Button, CourseSwatch, EmptyState, Kbd, SearchInput, SegmentedControl, Select, Skeleton, useConfirm, useToast } from '@/components/ui';
+import {
+    Button, CourseCode, CourseMark, CourseName, EmptyState, Kbd, Rubric, SearchInput, SegmentedControl, Select, Skeleton,
+    useConfirm, useToast,
+} from '@/components/ui';
 import SectionAlerts from '@/components/SectionAlerts';
 import { decodeSectionInstructors } from '@/lib/text';
 import styles from './page.module.css';
 
 const TYPE_FILTERS = [
-    { value: 'all', label: 'All posts', singular: 'post', icon: LayersIcon },
-    { value: 'swap', label: 'Swaps', singular: 'swap', icon: ActivityIcon, cta: 'Post a swap', empty: 'Nobody is offering a swap in your major right now. Post yours and the matcher will look for a direct swap or a three-way loop.' },
-    { value: 'giveaway', label: 'Giveaways', singular: 'giveaway', icon: GiftIcon, cta: 'Give a section away', empty: 'No one is giving a section away right now. Set a section alert and we\u2019ll tell you the moment one is posted.' },
-    { value: 'request', label: 'Requests', singular: 'request', icon: HandIcon, cta: 'Request a section', empty: 'No open requests right now. If you need a section, post a request so anyone dropping it can find you.' },
+    { value: 'all', label: 'All', singular: 'post' },
+    { value: 'swap', label: 'Swaps', singular: 'swap', cta: 'Post a swap', empty: 'Nobody is offering a swap in your major right now. Post yours and the matcher will look for a direct swap or a three-way loop.' },
+    { value: 'giveaway', label: 'Giveaways', singular: 'giveaway', cta: 'Give a section away', empty: 'No one is giving a section away right now. Set a section alert and we\u2019ll tell you the moment one is posted.' },
+    { value: 'request', label: 'Requests', singular: 'request', cta: 'Request a section', empty: 'No open requests right now. If you need a section, post a request so anyone dropping it can find you.' },
 ];
 
 export default function BrowsePage() {
@@ -280,164 +281,146 @@ export default function BrowsePage() {
 
     const termName = semesters.find(s => s.term_code === selectedTerm)?.name;
     const activeType = TYPE_FILTERS.find(t => t.value === filter);
-    const ActiveTypeIcon = activeType.icon;
     const hasQuery = !!search.trim();
     const anyFilter = hasQuery || filter !== 'all' || !!courseFilter;
     const clearAll = () => { setSearch(''); setFilter('all'); setCourseFilter(''); };
+
+    // The board groups posts under their course, in the order the sort puts
+    // each course's first post.
+    const groups = [];
+    const groupIndex = new Map();
+    filteredPosts.forEach(post => {
+        if (!groupIndex.has(post.course_code)) {
+            groupIndex.set(post.course_code, groups.length);
+            groups.push({ code: post.course_code, name: courses[post.course_code] || post.course_name || post.course_code, posts: [] });
+        }
+        groups[groupIndex.get(post.course_code)].posts.push(post);
+    });
+
+    const sentence = loading ? 'Reading the board…' : (
+        <>
+            <strong>{filteredPosts.length}</strong>{' '}
+            {filter === 'all'
+                ? (filteredPosts.length === 1 ? 'post' : 'posts')
+                : (filteredPosts.length === 1 ? activeType.singular : activeType.label.toLowerCase())}
+            {groups.length > 1 && <> across <strong>{groups.length}</strong> courses</>}
+            {courseFilter && <> in <span className={styles.mono}>{courseFilter}</span></>}
+            {hasQuery && <> matching &ldquo;{search.trim()}&rdquo;</>}
+            {termName && <> for {termName}</>}
+            {sort === 'expiring' ? ', ending soonest first.' : ', newest first.'}
+        </>
+    );
 
     return (
         <PageShell width="wide">
             <div className={`${styles.transitionOverlay} ${transitioning ? styles.active : ''}`} />
 
-            <PageHeader
-                title="Browse"
-                subtitle={`Sections your classmates are swapping, giving away and looking for${termName ? ` in ${termName}` : ''}.`}
-            >
-                <Button variant="primary" href="/post" icon={<PlusIcon strokeWidth={2.1} />} className={styles.headerPost}>New post</Button>
-            </PageHeader>
+            <header className={styles.head}>
+                <h1 className={styles.title}>Browse</h1>
+                <p className={styles.sentence} aria-live="polite">{sentence}</p>
+            </header>
 
             <div className={styles.layout}>
-                <aside className={styles.rail} aria-label="Filters">
-                    <nav className={styles.facet} aria-label="Filter by type">
-                        <span className={styles.railLabel}>Type</span>
-                        <div className={styles.typeNav}>
-                            {TYPE_FILTERS.map(t => {
-                                const Icon = t.icon;
-                                const isActive = filter === t.value;
-                                return (
-                                    <button
-                                        key={t.value}
-                                        type="button"
-                                        onClick={() => setFilter(t.value)}
-                                        className={`${styles.typeBtn} ${styles[`type_${t.value}`]} ${isActive ? styles.typeBtnActive : ''}`}
-                                        aria-pressed={isActive}
-                                    >
-                                        <span className={styles.typeIcon}><Icon /></span>
-                                        <span className={styles.typeLabel}>{t.label}</span>
-                                        <span className={styles.typeCount}>{loading ? '–' : typeCounts[t.value]}</span>
+                <aside className={styles.rail} aria-label="Courses and alerts">
+                    <section className={styles.index} aria-labelledby="h-index">
+                        <Rubric
+                            id="h-index"
+                            title="Courses"
+                            meta={loading ? null : courseCounts.length}
+                            actions={courseFilter && <Button variant="link" onClick={() => setCourseFilter('')} className={styles.railLink}>All</Button>}
+                        />
+                        {loading ? (
+                            <div className={styles.indexSkeleton}>{[0, 1, 2, 3, 4].map(i => <Skeleton key={i} height={12} width={`${70 - i * 6}%`} />)}</div>
+                        ) : courseCounts.length === 0 ? (
+                            <p className={styles.railNote}>Courses appear here as people post.</p>
+                        ) : (
+                            <>
+                                <ol className={styles.indexList}>
+                                    {shownCourses.map(c => {
+                                        const isActive = courseFilter === c.code;
+                                        return (
+                                            <li key={c.code}>
+                                                <button
+                                                    type="button"
+                                                    className={`${styles.indexItem} ${isActive ? styles.indexItemActive : ''}`}
+                                                    onClick={() => setCourseFilter(isActive ? '' : c.code)}
+                                                    aria-pressed={isActive}
+                                                    title={c.name}
+                                                >
+                                                    <CourseMark courseId={c.code} size="sm" />
+                                                    <span className={styles.indexText}>
+                                                        <CourseCode id={c.code} size="sm" />
+                                                        <span className={styles.indexName}>{c.name}</span>
+                                                    </span>
+                                                    <span className={styles.indexCount}>{c.count}</span>
+                                                </button>
+                                            </li>
+                                        );
+                                    })}
+                                </ol>
+                                {courseCounts.length > 6 && (
+                                    <button type="button" className={styles.showMore} onClick={() => setShowAllCourses(v => !v)}>
+                                        {showAllCourses ? 'Fewer courses' : `All ${courseCounts.length} courses`}
                                     </button>
-                                );
-                            })}
-                        </div>
-                    </nav>
-
-                    {!loading && courseCounts.length > 0 && (
-                        <nav className={`${styles.facet} ${styles.courseFacet}`} aria-label="Filter by course">
-                            <span className={styles.railLabel}>
-                                Courses
-                                {courseFilter && <button type="button" className={styles.facetClear} onClick={() => setCourseFilter('')}>Clear</button>}
-                            </span>
-                            <div className={styles.courseList}>
-                                {shownCourses.map(c => {
-                                    const isActive = courseFilter === c.code;
-                                    return (
-                                        <button
-                                            key={c.code}
-                                            type="button"
-                                            className={`${styles.courseBtn} ${isActive ? styles.courseBtnActive : ''}`}
-                                            onClick={() => setCourseFilter(isActive ? '' : c.code)}
-                                            aria-pressed={isActive}
-                                            title={c.name}
-                                        >
-                                            <CourseSwatch courseId={c.code} size="sm" />
-                                            <span className={styles.courseText}>
-                                                <span className={styles.courseName}>{c.name || c.code}</span>
-                                                <span className={styles.courseCode}>{c.code}</span>
-                                            </span>
-                                            <span className={styles.typeCount}>{c.count}</span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                            {courseCounts.length > 6 && (
-                                <button type="button" className={styles.showMore} onClick={() => setShowAllCourses(v => !v)}>
-                                    {showAllCourses ? 'Show fewer' : `Show all ${courseCounts.length} courses`}
-                                </button>
-                            )}
-                        </nav>
-                    )}
+                                )}
+                            </>
+                        )}
+                    </section>
 
                     <SectionAlerts term={selectedTerm} courses={courses} sections={sections} majorCourses={majorCourses} />
                 </aside>
 
-                <section className={styles.main} aria-label="Posts">
-                    <div className={styles.searchBar}>
+                <section className={styles.board} aria-label="Posts">
+                    <div className={styles.toolbar}>
                         <SearchInput
                             ref={searchRef}
-                            size="lg"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Search by course ID, name or CRN"
-                            aria-label="Search posts by course ID, name or CRN"
-                            trailing={<span className={styles.searchHint}><Kbd>/</Kbd></span>}
+                            placeholder="Course code, name or CRN"
+                            aria-label="Search posts by course code, name or CRN"
+                            wrapClassName={styles.search}
+                            trailing={<Kbd>/</Kbd>}
                         />
-                    </div>
-
-                    <div className={styles.toolbar}>
-                        <p className={styles.resultsCount} aria-live="polite">
-                            {loading ? 'Loading posts…' : (
-                                <>
-                                    <strong>{filteredPosts.length}</strong>
-                                    {' '}
-                                    {filter === 'all'
-                                        ? (filteredPosts.length === 1 ? 'post' : 'posts')
-                                        : (filteredPosts.length === 1 ? activeType.singular : activeType.label.toLowerCase())}
-                                    {courseFilter && <> in <span className={styles.mono}>{courseFilter}</span></>}
-                                    {hasQuery && <> matching &ldquo;{search.trim()}&rdquo;</>}
-                                </>
-                            )}
-                        </p>
-                        <div className={styles.toolbarEnd}>
-                            {anyFilter && !loading && (
-                                <button type="button" className={styles.clearFilters} onClick={clearAll}>
-                                    Clear filters
-                                </button>
-                            )}
-                            {!loading && courseCounts.length > 0 && (
-                                <Select
-                                    size="sm"
-                                    wrapClassName={styles.courseSelect}
-                                    value={courseFilter}
-                                    onChange={(e) => setCourseFilter(e.target.value)}
-                                    aria-label="Filter by course"
-                                >
-                                    <option value="">All courses</option>
-                                    {courseCounts.map(c => <option key={c.code} value={c.code}>{c.code} · {c.name} ({c.count})</option>)}
-                                </Select>
-                            )}
+                        <div className={styles.filters}>
                             <SegmentedControl
-                                size="sm"
-                                label="Sort posts"
-                                value={sort}
-                                onChange={setSort}
-                                options={[
-                                    { value: 'newest', label: 'Newest' },
-                                    { value: 'expiring', label: 'Ending soon' },
-                                ]}
+                                label="Kind of post"
+                                value={filter}
+                                onChange={setFilter}
+                                options={TYPE_FILTERS.map(t => ({ value: t.value, label: t.label, count: loading ? null : typeCounts[t.value] }))}
                             />
+                            <div className={styles.filtersEnd}>
+                                {!loading && courseCounts.length > 0 && (
+                                    <Select
+                                        size="sm"
+                                        wrapClassName={styles.courseSelect}
+                                        value={courseFilter}
+                                        onChange={(e) => setCourseFilter(e.target.value)}
+                                        aria-label="Course"
+                                    >
+                                        <option value="">All courses</option>
+                                        {courseCounts.map(c => <option key={c.code} value={c.code}>{c.code} · {c.name} ({c.count})</option>)}
+                                    </Select>
+                                )}
+                                <SegmentedControl
+                                    size="sm"
+                                    label="Order"
+                                    value={sort}
+                                    onChange={setSort}
+                                    options={[
+                                        { value: 'newest', label: 'Newest' },
+                                        { value: 'expiring', label: 'Ending soon' },
+                                    ]}
+                                />
+                            </div>
                         </div>
                     </div>
 
                     {loading ? (
-                        <div className={styles.postGrid} aria-hidden="true">
-                            {[0, 1, 2, 3].map(i => (
-                                <div key={i} className={styles.skeletonCard}>
-                                    <div className={styles.skeletonRow}>
-                                        <Skeleton width={32} height={32} radius={9} />
-                                        <span className={styles.skeletonStack}>
-                                            <Skeleton width="70%" height={14} />
-                                            <Skeleton width={110} height={10} />
-                                        </span>
-                                        <Skeleton width={66} height={22} radius={6} />
-                                    </div>
-                                    <div className={styles.skeletonTickets}>
-                                        <Skeleton height={86} radius={10} />
-                                        <Skeleton height={86} radius={10} />
-                                    </div>
-                                    <div className={styles.skeletonRow}>
-                                        <Skeleton width={150} height={26} radius={13} />
-                                        <Skeleton width={110} height={32} radius={8} />
-                                    </div>
+                        <div className={styles.skeleton} aria-hidden="true">
+                            {[0, 1].map(g => (
+                                <div key={g} className={styles.skeletonGroup}>
+                                    <Skeleton width="40%" height={18} />
+                                    {[0, 1, 2].map(i => <Skeleton key={i} height={34} />)}
                                 </div>
                             ))}
                         </div>
@@ -445,29 +428,25 @@ export default function BrowsePage() {
                         <div className={styles.emptyWrap}>
                             {hasQuery || courseFilter ? (
                                 <EmptyState
-                                    tone="neutral"
-                                    icon={<SearchIcon />}
-                                    title={hasQuery ? `Nothing matches “${search.trim()}”` : `No ${filter === 'all' ? 'posts' : activeType.label.toLowerCase()} for ${courseFilter} yet`}
+                                    title={hasQuery ? `Nothing matches “${search.trim()}”.` : `No ${filter === 'all' ? 'posts' : activeType.label.toLowerCase()} for ${courseFilter} yet.`}
                                     actions={(
                                         <>
-                                            <Button variant="secondary" onClick={clearAll}>Clear filters</Button>
-                                            <Button variant="primary" href={courseFilter ? `/post?course=${courseFilter}` : '/post'} icon={<PlusIcon />}>Post it yourself</Button>
+                                            {anyFilter && <Button variant="link" onClick={clearAll}>Clear the filters</Button>}
+                                            <Button variant="link" href={courseFilter ? `/post?course=${courseFilter}` : '/post'}>Post it yourself →</Button>
                                         </>
                                     )}
                                 >
                                     {hasQuery
-                                        ? <>Try a course ID like 0401211, part of a course name, or a section&rsquo;s CRN. Only courses in your major are listed.</>
-                                        : <>Be the first: post the section you have or need, or set a section alert below and we&rsquo;ll tell you when one appears.</>}
+                                        ? <>Try a course code like 0401211, part of a course name, or a section&rsquo;s CRN. Only courses in your major are on this board.</>
+                                        : <>Post the section you have or need, or set an alert and we&rsquo;ll tell you when one appears.</>}
                                 </EmptyState>
                             ) : filter !== 'all' ? (
                                 <EmptyState
-                                    tone="neutral"
-                                    icon={<ActiveTypeIcon />}
-                                    title={`No ${activeType.label.toLowerCase()} right now`}
+                                    title={`No ${activeType.label.toLowerCase()} right now.`}
                                     actions={(
                                         <>
-                                            <Button variant="secondary" onClick={() => setFilter('all')}>Show all posts</Button>
-                                            <Button variant="primary" href={`/post?type=${filter}`} icon={<PlusIcon />}>{activeType.cta}</Button>
+                                            <Button variant="link" onClick={() => setFilter('all')}>Show every post</Button>
+                                            <Button variant="link" href={`/post?type=${filter}`}>{activeType.cta} →</Button>
                                         </>
                                     )}
                                 >
@@ -475,41 +454,62 @@ export default function BrowsePage() {
                                 </EmptyState>
                             ) : (
                                 <EmptyState
-                                    icon={<InboxIcon />}
-                                    title="The marketplace is quiet"
-                                    actions={(
-                                        <Button variant="primary" href="/post" icon={<PlusIcon />}>Create the first post</Button>
-                                    )}
+                                    title="The board is empty."
+                                    actions={<Button variant="link" href="/post">Post the first section →</Button>}
                                 >
-                                    No one in your major has posted a section{termName ? ` for ${termName}` : ''} yet. Post yours, or set a section alert and we&rsquo;ll tell you when one appears.
+                                    No one in your major has posted a section{termName ? ` for ${termName}` : ''} yet. Post yours, or set an alert and we&rsquo;ll tell you when one appears.
                                 </EmptyState>
                             )}
                         </div>
                     ) : (
-                        <div className={styles.postGrid}>
-                            {filteredPosts.map((post) => {
-                                const haveSectionData = sections.find(s => s.course_id === post.course_code && s.section_num === post.have_section);
-                                const wantSectionData = post.want_section ? sections.find(s => s.course_id === post.course_code && s.section_num === post.want_section) : null;
-
-                                const isOwn = user?.id && post.user_id === user.id;
-                                return (
-                                    <PostCard
-                                        key={post.id}
-                                        post={post}
-                                        courseName={courses[post.course_code]}
-                                        haveInstructor={haveSectionData?.instructor}
-                                        wantInstructor={wantSectionData?.instructor}
-                                        haveSeats={haveSectionData}
-                                        wantSeats={wantSectionData}
-                                        showContact={post.type !== 'swap'}
-                                        showActions={isOwn}
-                                        isOwn={isOwn}
-                                        onDelete={handleDeletePost}
-                                        interestAlreadySent={interestedPostIds.has(post.id)}
-                                    />
-                                );
-                            })}
-                        </div>
+                        <>
+                            <div className={styles.columns} aria-hidden="true">
+                                <span>Kind</span>
+                                <span className={styles.columnsLines}>
+                                    <span />
+                                    <span>Section</span>
+                                    <span>When</span>
+                                    <span>Instructor</span>
+                                    <span>Seats</span>
+                                </span>
+                                <span className={styles.columnsWho}>Posted by</span>
+                                <span />
+                            </div>
+                            {groups.map(group => (
+                                <section key={group.code} className={styles.group} aria-label={`${group.code} ${group.name}`}>
+                                    <header className={styles.groupHead}>
+                                        <span className={styles.groupCode}>
+                                            <CourseMark courseId={group.code} />
+                                            <CourseCode id={group.code} />
+                                        </span>
+                                        <CourseName as="h2" size="lg" className={styles.groupName}>{group.name}</CourseName>
+                                        <span className={styles.groupCount}>{group.posts.length} {group.posts.length === 1 ? 'post' : 'posts'}</span>
+                                        <Button variant="link" href={`/post?course=${encodeURIComponent(group.code)}`} className={styles.groupLink}>Post for this course</Button>
+                                    </header>
+                                    {group.posts.map(post => {
+                                        const haveSectionData = sections.find(s => s.course_id === post.course_code && s.section_num === post.have_section);
+                                        const wantSectionData = post.want_section ? sections.find(s => s.course_id === post.course_code && s.section_num === post.want_section) : null;
+                                        const isOwn = user?.id && post.user_id === user.id;
+                                        return (
+                                            <PostCard
+                                                key={post.id}
+                                                post={post}
+                                                courseName={courses[post.course_code]}
+                                                haveInstructor={haveSectionData?.instructor}
+                                                wantInstructor={wantSectionData?.instructor}
+                                                haveSeats={haveSectionData}
+                                                wantSeats={wantSectionData}
+                                                showContact={post.type !== 'swap'}
+                                                showActions={isOwn}
+                                                isOwn={isOwn}
+                                                onDelete={handleDeletePost}
+                                                interestAlreadySent={interestedPostIds.has(post.id)}
+                                            />
+                                        );
+                                    })}
+                                </section>
+                            ))}
+                        </>
                     )}
                 </section>
             </div>
