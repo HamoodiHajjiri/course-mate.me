@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Dialog, useToast } from '@/components/ui';
 import styles from '../admin.module.css';
 import CoursePicker from './CoursePicker';
 
@@ -12,6 +13,7 @@ export default function MajorEditModal({ code, onClose, onSaved }) {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [err, setErr] = useState('');
+    const toast = useToast();
 
     const [deptCount, setDeptCount] = useState(0);
     const [supportCount, setSupportCount] = useState(0);
@@ -58,7 +60,7 @@ export default function MajorEditModal({ code, onClose, onSaved }) {
         const filledNew = newCourses.filter(c => (c.course_id || '').trim() || (c.course_name || '').trim());
         const invalid = filledNew.find(c => !/^\d{7}$/.test((c.course_id || '').trim()));
         if (invalid) {
-            setErr(`Invalid course ID "${(invalid.course_id || '').trim() || '(empty)'}". Course IDs must be exactly 7 digits.`);
+            setErr(`“${(invalid.course_id || '').trim() || 'an empty ID'}” isn’t a course ID: they’re exactly 7 digits.`);
             return;
         }
         setSaving(true);
@@ -78,8 +80,9 @@ export default function MajorEditModal({ code, onClose, onSaved }) {
             });
             if (!res.ok) {
                 const body = await res.json().catch(() => ({}));
-                throw new Error(body.error || 'Save failed');
+                throw new Error(body.error || 'Couldn’t save the major.');
             }
+            toast.success(`${name || code} saved`);
             onSaved?.();
             onClose();
         } catch (e) {
@@ -92,128 +95,107 @@ export default function MajorEditModal({ code, onClose, onSaved }) {
     const excludeIds = [...courses.map(c => c.course_id), ...toAttach.map(c => c.course_id)];
 
     return (
-        <div
-            onClick={onClose}
-            style={{
-                position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
-                display: 'flex', justifyContent: 'center', alignItems: 'flex-start',
-                paddingTop: 40, paddingBottom: 40, overflowY: 'auto', zIndex: 100,
-            }}
+        <Dialog
+            open
+            onClose={onClose}
+            dismissible={!saving}
+            size="lg"
+            title={major?.name || 'Edit major'}
+            description={<span className={styles.mono}>{code}</span>}
+            footer={!loading && major && (
+                <>
+                    <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={onClose} disabled={saving}>Cancel</button>
+                    <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleSave} disabled={saving}>
+                        {saving ? 'Saving…' : 'Save changes'}
+                    </button>
+                </>
+            )}
         >
-            <div
-                onClick={(e) => e.stopPropagation()}
-                style={{
-                    width: '100%', maxWidth: 760,
-                    background: 'var(--bg-card)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: 16, padding: 20,
-                    boxShadow: 'var(--shadow-xl)',
-                    margin: '0 16px',
-                    color: 'var(--text-primary)',
-                    display: 'flex', flexDirection: 'column', gap: 14,
-                }}
-            >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                        <div style={{ fontSize: 18, fontWeight: 700 }}>Edit major</div>
-                        <div className={styles.rowMeta}>{code}</div>
+            {loading && <div className={styles.loading}><div className={styles.spinner} />Reading the major…</div>}
+            {err && <div className={styles.error}>{err}</div>}
+
+            {!loading && major && (
+                <div className={styles.formStack}>
+                    <label className={styles.fieldGroup}>
+                        <span className={styles.fieldLabel}>Name</span>
+                        <input className={styles.input} value={name} onChange={(e) => setName(e.target.value)} />
+                    </label>
+
+                    <div className={styles.formGrid}>
+                        <label className={styles.numField}>
+                            <span className={styles.numFieldLabel}>Department electives</span>
+                            <input className={styles.input} type="number" min="0" value={deptCount} onChange={(e) => setDeptCount(+e.target.value || 0)} />
+                        </label>
+                        <label className={styles.numField}>
+                            <span className={styles.numFieldLabel}>Support electives</span>
+                            <input className={styles.input} type="number" min="0" value={supportCount} onChange={(e) => setSupportCount(+e.target.value || 0)} />
+                        </label>
                     </div>
-                    <button className={styles.btn} onClick={onClose}>Close</button>
-                </div>
 
-                {loading && <div className={styles.loading}>Loading...</div>}
-                {err && <div className={styles.error}>{err}</div>}
-
-                {!loading && major && (
-                    <>
-                        <div className={styles.toolbar}>
-                            <input className={styles.input} placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
-                        </div>
-
-                        <div className={styles.formGrid}>
-                            <div className={styles.numField}>
-                                <span className={styles.numFieldLabel}>Dept electives</span>
-                                <input className={styles.input} type="number" min="0" value={deptCount} onChange={(e) => setDeptCount(+e.target.value || 0)} />
-                            </div>
-                            <div className={styles.numField}>
-                                <span className={styles.numFieldLabel}>Support electives</span>
-                                <input className={styles.input} type="number" min="0" value={supportCount} onChange={(e) => setSupportCount(+e.target.value || 0)} />
-                            </div>
-                        </div>
-
-                        <div>
-                            <div className={styles.sectionLabel}>Currently attached ({courses.length})</div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 240, overflowY: 'auto' }}>
-                                {courses.length === 0 && <div className={styles.rowMeta}>No courses attached</div>}
-                                {courses.map(c => {
-                                    const marked = toDetach.has(c.course_id);
-                                    return (
-                                        <div key={c.course_id} className={styles.row} style={{ opacity: marked ? 0.5 : 1 }}>
-                                            <div className={styles.rowMain}>
-                                                <div className={styles.rowTitle}>{c.course_id}</div>
-                                                <div className={styles.rowMeta}>{c.course_name}{c.credit_hours != null && ` · ${c.credit_hours} cr`}</div>
-                                            </div>
-                                            <div className={styles.rowActions}>
-                                                <button className={`${styles.btn} ${marked ? '' : styles.btnDanger}`} onClick={() => toggleDetach(c.course_id)}>
-                                                    {marked ? 'Undo' : 'Remove'}
-                                                </button>
-                                            </div>
+                    <section className={styles.card}>
+                        <p className={styles.sectionTitle}>In this major <span className={styles.navCount}>{courses.length}</span></p>
+                        <div className={styles.attachedList}>
+                            {courses.length === 0 && <p className={styles.previewMuted}>No courses yet.</p>}
+                            {courses.map(c => {
+                                const marked = toDetach.has(c.course_id);
+                                return (
+                                    <div key={c.course_id} className={`${styles.row} ${marked ? styles.rowMarked : ''}`}>
+                                        <div className={styles.rowMain}>
+                                            <div className={styles.rowTitle}><span className={styles.mono}>{c.course_id}</span> {c.course_name}</div>
+                                            {c.credit_hours != null && <div className={styles.rowMeta}>{c.credit_hours} credits</div>}
                                         </div>
-                                    );
-                                })}
+                                        <div className={styles.rowActions}>
+                                            <button type="button" className={`${styles.btn} ${marked ? styles.btnGhost : styles.btnDanger}`} onClick={() => toggleDetach(c.course_id)}>
+                                                {marked ? 'Keep' : 'Remove'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </section>
+
+                    <section className={styles.card}>
+                        <p className={styles.sectionTitle}>Add courses from the catalogue</p>
+                        <CoursePicker selected={toAttach} onAdd={addAttach} excludeIds={excludeIds} />
+                        {toAttach.length > 0 && (
+                            <div className={styles.chips}>
+                                {toAttach.map(c => (
+                                    <span key={c.course_id} className={styles.chip}>
+                                        {c.course_id}
+                                        <button type="button" className={styles.chipRemove} onClick={() => removeAttach(c.course_id)} aria-label={`Remove ${c.course_id}`}>×</button>
+                                    </span>
+                                ))}
                             </div>
-                        </div>
+                        )}
+                    </section>
 
-                        <div>
-                            <div className={styles.sectionLabel}>Attach more existing courses</div>
-                            <CoursePicker selected={toAttach} onAdd={addAttach} excludeIds={excludeIds} />
-                            {toAttach.length > 0 && (
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-                                    {toAttach.map(c => (
-                                        <span key={c.course_id} className={`${styles.badge} ${styles.badgeAccent}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                                            {c.course_id}
-                                            <button type="button" onClick={() => removeAttach(c.course_id)} style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, fontSize: 14, lineHeight: 1 }}>×</button>
-                                        </span>
-                                    ))}
-                                </div>
-                            )}
+                    <section className={styles.card}>
+                        <div className={styles.labelRow}>
+                            <p className={styles.sectionTitle}>Create new courses for it</p>
+                            <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={addNewRow}>Add a row</button>
                         </div>
-
-                        <div>
-                            <div className={styles.sectionLabel} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span>Create + attach new courses</span>
-                                <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={addNewRow}>+ Row</button>
+                        {newCourses.map((c, i) => (
+                            <div key={i} className={`${styles.newRow} ${styles.newRowWide}`}>
+                                <input
+                                    className={`${styles.input} ${styles.mono} ${c.course_id && !/^\d{7}$/.test(c.course_id) ? styles.inputInvalid : ''}`}
+                                    placeholder="7-digit ID"
+                                    inputMode="numeric"
+                                    maxLength={7}
+                                    value={c.course_id}
+                                    onChange={(e) => updateNewRow(i, 'course_id', e.target.value.replace(/\D/g, '').slice(0, 7))}
+                                />
+                                <input className={styles.input} placeholder="Course name" value={c.course_name} onChange={(e) => updateNewRow(i, 'course_name', e.target.value)} />
+                                <input className={styles.input} type="number" min="0" placeholder="Credits" value={c.credit_hours} onChange={(e) => updateNewRow(i, 'credit_hours', e.target.value)} />
+                                <select className={styles.input} value={c.category || 'Core'} onChange={(e) => updateNewRow(i, 'category', e.target.value)} title="Core, Major and Support apply to this major; Basket 1 and 2 make it a university elective for every major.">
+                                    {NEW_COURSE_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                </select>
+                                <button type="button" className={`${styles.btn} ${styles.btnDanger}`} onClick={() => removeNewRow(i)} aria-label="Remove this row">×</button>
                             </div>
-                            {newCourses.map((c, i) => (
-                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                                    <input
-                                        className={styles.input}
-                                        style={{ flex: '0 0 130px', borderColor: c.course_id && !/^\d{7}$/.test(c.course_id) ? 'var(--color-danger, #dc2626)' : undefined }}
-                                        placeholder="Course ID (7 digits)"
-                                        inputMode="numeric"
-                                        maxLength={7}
-                                        value={c.course_id}
-                                        onChange={(e) => updateNewRow(i, 'course_id', e.target.value.replace(/\D/g, '').slice(0, 7))}
-                                    />
-                                    <input className={styles.input} style={{ flex: '1 1 auto', minWidth: 0 }} placeholder="Course name" value={c.course_name} onChange={(e) => updateNewRow(i, 'course_name', e.target.value)} />
-                                    <input className={styles.input} style={{ flex: '0 0 80px' }} type="number" min="0" placeholder="Credits" value={c.credit_hours} onChange={(e) => updateNewRow(i, 'credit_hours', e.target.value)} />
-                                    <select className={styles.input} style={{ flex: '0 0 150px' }} value={c.category || 'Core'} onChange={(e) => updateNewRow(i, 'category', e.target.value)} title="Course type. Core / Major / Support apply to this major; Basket 1 / 2 make it a university elective shared across all majors.">
-                                        {NEW_COURSE_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                                    </select>
-                                    <button type="button" className={`${styles.btn} ${styles.btnDanger}`} style={{ flexShrink: 0 }} onClick={() => removeNewRow(i)}>×</button>
-                                </div>
-                            ))}
-                        </div>
-
-                        <div className={styles.toolbar}>
-                            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleSave} disabled={saving}>
-                                {saving ? 'Saving...' : 'Save changes'}
-                            </button>
-                            <button className={styles.btn} onClick={onClose}>Cancel</button>
-                        </div>
-                    </>
-                )}
-            </div>
-        </div>
+                        ))}
+                    </section>
+                </div>
+            )}
+        </Dialog>
     );
 }
