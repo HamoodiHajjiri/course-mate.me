@@ -1,46 +1,73 @@
 /* ==========================================================================
-   CourseMate design system
+   CourseMate — the timetable as a design language
    --------------------------------------------------------------------------
-   One set of tokens drives every screen. Components read the semantic names
-   (--canvas, --surface, --ink, --accent ...), never raw colours, so the four
-   themes only have to retune values here.
+   CourseMate is about where a student will be, when, and in which section.
+   Its look is drawn from the documents of university life rather than from
+   app chrome: the printed timetable, the course catalogue, the registration
+   slip, the campus sign.
 
-   Layers, in order:
-     1. Foundations   type, spacing, radii, motion, z-index (theme independent)
-     2. Themes        light, navy ("dark"), black — surfaces, ink, accent,
-                      semantic states, elevation, course palette
-     3. Legacy names  the old token names, mapped onto the new system so any
-                      straggler still lands on the right value
-     4. Base          element defaults, focus, selection, scrollbars, motion
+   Five rules follow from that, and every screen keeps them:
+
+   1. Structure is ruled, not boxed. Hairlines divide rows, a solid ink rule
+      opens a section, columns align across the page. Containers are the
+      exception (floating layers, the timetable sheet), never the default.
+
+   2. Every kind of academic information has one typographic voice:
+        course names     serif (Newsreader), like a catalogue entry
+        identifiers      mono (Plex Mono) — course codes, CRNs, rooms, IDs
+        sections         § followed by the mono number: §01, §51E
+        time and counts  Plex Sans with tabular figures
+        dense headings   Plex Sans Condensed capitals (column and day heads)
+        everything else  Plex Sans
+      A screenshot is recognisable from its type alone.
+
+   3. Green has three jobs and never swaps them:
+        --brand  the institution's forest green: actions, navigation, the
+                 one solid fill a screen allows
+        --go     signal green: open, now, free, confirmed — a state, small
+        --mark   the highlighter: what is yours (your sections, today, the
+                 selected option), laid over text like ink on a printout
+
+   4. Shape has meaning. Squares are courses and sections (timetable cells);
+      circles are people and live moments (the now-dot). Corners are square
+      on structure, 4px on controls, 8px on floating layers. Nothing is a
+      pill.
+
+   5. Depth is flat. Paper doesn't cast shadows; only what floats above it
+      (menus, dialogs, the map's panels) does, crisply.
+
+   Themes are one family on three grounds: Paper (light), Blueprint (navy),
+   Night (black). Blueprint keeps the drafting idea — light rules on navy.
    ========================================================================== */
 
-/* ===== 1. Foundations ===== */
+/* ===== Foundations ===== */
 :root {
-    /* Type families. Bricolage Grotesque is the display voice (titles, the
-       greeting, big numbers); Inter carries the interface; JetBrains Mono is
-       reserved for identifiers — course IDs, CRNs, sections, rooms. */
-    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    --font-display: 'Bricolage Grotesque', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    --font-serif: 'Newsreader', 'Iowan Old Style', 'Georgia', serif;
+    --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-cond: 'IBM Plex Sans Condensed', 'IBM Plex Sans', 'Arial Narrow', sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    --font-display: var(--font-serif);
 
-    /* Type scale (size / line-height pairs live with the component). */
-    --text-display: 2rem;      /* 32 — home greeting, auth brand */
-    --text-title: 1.5rem;      /* 24 — page titles */
-    --text-heading: 1.125rem;  /* 18 — section titles, dialog titles */
-    --text-subheading: 0.9375rem; /* 15 — card titles */
-    --text-body: 0.875rem;     /* 14 — default interface text */
-    --text-small: 0.8125rem;   /* 13 — compact rows, secondary text */
-    --text-caption: 0.75rem;   /* 12 — metadata, timestamps */
-    --text-micro: 0.6875rem;   /* 11 — overlines, tags */
+    /* Type scale. Serif sizes are for names and moments; the interface lives
+       between 12 and 16. */
+    --text-hero: 3rem;          /* 48 serif — the date on Home, a name */
+    --text-display: 2.125rem;   /* 34 serif — page titles */
+    --text-title: 1.625rem;     /* 26 serif — dialog and section titles */
+    --text-heading: 1.25rem;    /* 20 serif — course names in focus */
+    --text-subheading: 1rem;    /* 16 */
+    --text-body: 0.875rem;      /* 14 — the interface */
+    --text-small: 0.8125rem;    /* 13 — secondary rows */
+    --text-caption: 0.75rem;    /* 12 — metadata */
+    --text-micro: 0.6875rem;    /* 11 — condensed column heads */
 
     --weight-regular: 400;
     --weight-medium: 500;
     --weight-semibold: 600;
     --weight-bold: 700;
 
-    --tracking-tight: -0.02em;
-    --tracking-display: -0.035em;
-    --tracking-overline: 0.07em;
+    --tracking-tight: -0.01em;
+    --tracking-display: -0.015em;
+    --tracking-caps: 0.06em;
 
     /* Spacing: a 4px grid. */
     --space-1: 4px;
@@ -54,381 +81,342 @@
     --space-9: 48px;
     --space-10: 64px;
 
-    /* Radii, each with a job:
-       xs  tags, keyboard hints        sm  badges, small chips, blocks
-       md  buttons, inputs, rows       lg  cards
-       xl  large panels, dialogs, map  full  avatars, dots, filter chips */
-    --r-xs: 4px;
-    --r-sm: 6px;
-    --r-md: 10px;
-    --r-lg: 14px;
-    --r-xl: 18px;
+    /* Corners. Structure is square; controls are barely softened; only
+       floating layers get a visible radius. Circles are reserved for people
+       and live dots. */
+    --r-0: 0;
+    --r-1: 2px;
+    --r-2: 4px;
+    --r-3: 8px;
+    --r-xs: 2px;
+    --r-sm: 3px;
+    --r-md: 4px;
+    --r-lg: 4px;
+    --r-xl: 8px;
     --r-full: 999px;
 
-    /* Control heights, shared by buttons, inputs, selects and segments. */
-    --control-sm: 32px;
-    --control-md: 40px;
-    --control-lg: 48px;
+    --control-sm: 30px;
+    --control-md: 36px;
+    --control-lg: 44px;
 
-    /* Layout */
-    --page-max: 1200px;
+    --page-max: 1240px;
     --page-reading: 760px;
-    --page-gutter: 24px;
-    --topbar-h: 60px;
-    --tabbar-h: 64px;
+    --page-gutter: 32px;
+    --topbar-h: 56px;
+    --tabbar-h: 60px;
 
-    /* Motion: quick, decelerating, never bouncy. */
-    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-    --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-    --dur-1: 120ms;  /* hover, press */
-    --dur-2: 180ms;  /* menus, tabs, toggles */
-    --dur-3: 260ms;  /* dialogs, sheets */
+    /* Motion explains a change or stays out of the way. */
+    --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --ease-in-out: cubic-bezier(0.6, 0, 0.3, 1);
+    --dur-1: 100ms;
+    --dur-2: 160ms;
+    --dur-3: 240ms;
 
-    /* Stacking */
     --z-sticky: 50;
     --z-nav: 100;
     --z-dropdown: 200;
     --z-overlay: 1000;
     --z-modal: 1010;
     --z-toast: 1100;
-
-    /* Brand greens, theme independent. */
-    --mint-300: #6BE3B8;
-    --mint-400: #2ED39C;
-    --mint-500: #00C389;
-    --mint-600: #00A374;
-    --mint-700: #007A55;
-    --forest-900: #052219;
-    --forest-800: #0A3326;
 }
 
-/* ===== 2. Themes ===== */
-
-/* Light — "paper". A warm off-white ground, white cards, ink that leans
-   green-black. Warmth is what separates CourseMate from cool-grey SaaS. */
+/* ===== Paper — light ===== */
 :root,
 [data-theme="light"] {
     color-scheme: light;
 
-    --canvas: #F5F4EF;
-    --canvas-glow: transparent;
-    --surface: #FFFFFF;
-    --surface-2: #F3F2EC;   /* inset areas inside a card */
-    --surface-3: #E8E7E0;   /* pressed, tracks */
-    --surface-raised: #FFFFFF;
-    --surface-hover: rgba(24, 38, 31, 0.045);
-    --surface-active: rgba(24, 38, 31, 0.08);
-    --overlay: rgba(12, 22, 17, 0.44);
+    --canvas: #F3F1EA;          /* the page */
+    --sheet: #FBFAF6;           /* paper laid on the page: inputs, menus, the timetable */
+    --sheet-2: #EEEBE2;         /* a recessed band */
+    --wash: rgba(20, 30, 24, 0.045);     /* row hover */
+    --wash-2: rgba(20, 30, 24, 0.085);   /* row pressed */
+    --overlay: rgba(14, 20, 17, 0.42);
 
-    --line: rgba(28, 40, 33, 0.10);
-    --line-strong: rgba(28, 40, 33, 0.18);
-    --line-subtle: rgba(28, 40, 33, 0.065);
+    --ink: #131B17;
+    --ink-2: #3B4640;
+    --ink-3: #66706A;
+    --ink-4: #848C87;
+    --on-ink: #F3F1EA;
 
-    --ink: #0F1D17;
-    --ink-2: #44524B;
-    --ink-3: #6E7973;
-    --ink-4: #A2A9A4;
+    --rule: rgba(19, 27, 23, 0.14);
+    --rule-soft: rgba(19, 27, 23, 0.075);
+    --rule-strong: #131B17;
+    --rule-control: rgba(19, 27, 23, 0.28);   /* the edge of an input or button */
 
-    /* Forest: the brand's deep surface. One per screen at most — the hero,
-       the moment that matters — so green is a place, not just a button. */
-    --forest: #0C3A2C;
-    --forest-2: #082A20;
-    --forest-ink: #ECF7F1;
-    --forest-ink-2: rgba(236, 247, 241, 0.7);
-    --forest-ink-3: rgba(236, 247, 241, 0.48);
-    --forest-line: rgba(236, 247, 241, 0.12);
-    --forest-raised: rgba(236, 247, 241, 0.07);
+    --brand: #0F4C35;
+    --brand-hover: #0B3D2A;
+    --brand-ink: #0F4C35;
+    --on-brand: #F6F4EC;
 
-    --accent: #00C389;
-    --accent-hover: #00B47F;
-    --accent-pressed: #00A374;
-    --on-accent: #042118;
-    --accent-ink: #00754F;
-    --accent-soft: rgba(0, 176, 122, 0.10);
-    --accent-soft-2: rgba(0, 176, 122, 0.17);
-    --accent-line: rgba(0, 150, 105, 0.38);
-    --focus: #00A374;
+    --go: #11A05A;
+    --go-ink: #0A7A43;
+    --go-wash: rgba(17, 160, 90, 0.1);
 
-    --success: #0E9F6E;
-    --success-ink: #08704D;
-    --success-soft: rgba(14, 159, 110, 0.10);
-    --warning: #D98A0B;
-    --warning-ink: #8F5600;
-    --warning-soft: rgba(217, 138, 11, 0.12);
-    --danger: #D63A3A;
-    --danger-ink: #B02424;
-    --danger-soft: rgba(214, 58, 58, 0.09);
-    --info: #2F7CD6;
-    --info-ink: #1D5DAA;
-    --info-soft: rgba(47, 124, 214, 0.10);
+    --mark: #DCEFA0;
+    --mark-ink: #131B17;
 
-    --swap: var(--accent);
-    --swap-ink: var(--accent-ink);
-    --swap-soft: var(--accent-soft);
-    --giveaway: #DB9420;
-    --giveaway-ink: #8A5805;
-    --giveaway-soft: rgba(219, 148, 32, 0.13);
-    --request: #4B7BEF;
-    --request-ink: #2954BC;
-    --request-soft: rgba(75, 123, 239, 0.10);
+    --warn: #D68400;
+    --warn-ink: #8F5800;
+    --warn-wash: rgba(214, 132, 0, 0.1);
+    --danger: #C8321F;
+    --danger-ink: #A6281A;
+    --danger-wash: rgba(200, 50, 31, 0.08);
 
-    /* Elevation, four levels and no others:
-       e0 flat — borders do the work      e1 resting card, input
-       e2 popover, dropdown, map control  e3 dialog, sheet, toast */
-    --e1: 0 1px 2px rgba(28, 33, 26, 0.05), 0 1px 1px rgba(28, 33, 26, 0.025);
-    --e1-hover: 0 1px 2px rgba(28, 33, 26, 0.05), 0 8px 20px -8px rgba(28, 33, 26, 0.16);
-    --e2: 0 2px 6px rgba(28, 33, 26, 0.06), 0 14px 34px -10px rgba(28, 33, 26, 0.22);
-    --e3: 0 8px 20px -6px rgba(28, 33, 26, 0.16), 0 34px 76px -18px rgba(28, 33, 26, 0.34);
-    --highlight: inset 0 0 0 0 transparent;
+    /* Post kinds read by glyph first; colour only tints the glyph. */
+    --swap: var(--brand);
+    --giveaway: #B26F12;
+    --request: #3550B8;
 
-    --map-ground: #EDEBE3;
+    --float: 0 0 0 1px var(--rule), 0 12px 32px -12px rgba(20, 28, 24, 0.28);
+    --float-lg: 0 0 0 1px var(--rule), 0 28px 64px -20px rgba(20, 28, 24, 0.4);
 
-    /* Course palette: eight hues of equal weight, led by the brand emerald. */
-    --course-1: #12A47E;
-    --course-2: #2F84D2;
-    --course-3: #D6921B;
-    --course-4: #7A5BD3;
-    --course-5: #D24F6B;
-    --course-6: #1293A0;
-    --course-7: #DB7334;
-    --course-8: #6E9222;
-    --course-tint: 12%;
+    --hatch: rgba(200, 50, 31, 0.5);
+    --map-ground: #ECE9E0;
+
+    /* Course inks: print colours, muted enough to sit together on a page. */
+    --course-1: #2C5EA8;
+    --course-2: #C1502A;
+    --course-3: #1C7A68;
+    --course-4: #8350AE;
+    --course-5: #A87A16;
+    --course-6: #BB3F69;
+    --course-7: #4C7A26;
+    --course-8: #22809F;
+    --course-tint: 13%;
     --course-ink-base: #000000;
-    --course-ink: 60%;
+    --course-ink: 34%;
 }
 
-/* Navy — the dark identity. Midnight blue with surfaces kept close to the
-   ground, so screens read as one space rather than a stack of rectangles;
-   green arrives through forest panels, course colour and the mint accent. */
+/* ===== Blueprint — navy ===== */
 [data-theme="dark"] {
     color-scheme: dark;
 
-    --canvas: #070D16;
-    --canvas-glow: transparent;
-    --surface: #0D1520;
-    --surface-2: #0A111A;
-    --surface-3: #172232;
-    --surface-raised: #121C2A;
-    --surface-hover: rgba(165, 195, 235, 0.055);
-    --surface-active: rgba(165, 195, 235, 0.095);
-    --overlay: rgba(2, 5, 10, 0.68);
+    --canvas: #0C1826;
+    --sheet: #102033;
+    --sheet-2: #0A1521;
+    --wash: rgba(170, 200, 240, 0.06);
+    --wash-2: rgba(170, 200, 240, 0.11);
+    --overlay: rgba(3, 8, 14, 0.66);
 
-    --line: rgba(150, 178, 214, 0.11);
-    --line-strong: rgba(150, 178, 214, 0.2);
-    --line-subtle: rgba(150, 178, 214, 0.07);
+    --ink: #E9EFF6;
+    --ink-2: #AEBBCB;
+    --ink-3: #7A8BA2;
+    --ink-4: #5A6C84;
+    --on-ink: #0C1826;
 
-    --ink: #ECF1F7;
-    --ink-2: #A6B3C4;
-    --ink-3: #738299;
-    --ink-4: #4C596B;
+    --rule: rgba(170, 200, 240, 0.17);
+    --rule-soft: rgba(170, 200, 240, 0.085);
+    --rule-strong: #C9D6E6;
+    --rule-control: rgba(170, 200, 240, 0.32);
 
-    --forest: #0B2B22;
-    --forest-2: #07201A;
-    --forest-ink: #E6F6EE;
-    --forest-ink-2: rgba(230, 246, 238, 0.7);
-    --forest-ink-3: rgba(230, 246, 238, 0.46);
-    --forest-line: rgba(140, 240, 200, 0.12);
-    --forest-raised: rgba(140, 240, 200, 0.06);
+    --brand: #56CF95;
+    --brand-hover: #6FDAA6;
+    --brand-ink: #74DDA9;
+    --on-brand: #06231A;
 
-    --accent: #2ED39C;
-    --accent-hover: #4BDDAC;
-    --accent-pressed: #22BF8B;
-    --on-accent: #03221A;
-    --accent-ink: #4FDFAF;
-    --accent-soft: rgba(46, 211, 156, 0.11);
-    --accent-soft-2: rgba(46, 211, 156, 0.18);
-    --accent-line: rgba(46, 211, 156, 0.36);
-    --focus: #4BDDAC;
+    --go: #5BE09B;
+    --go-ink: #74E6AB;
+    --go-wash: rgba(91, 224, 155, 0.12);
 
-    --success: #34D399;
-    --success-ink: #5FE3B4;
-    --success-soft: rgba(52, 211, 153, 0.12);
-    --warning: #F2B240;
-    --warning-ink: #F6C66B;
-    --warning-soft: rgba(242, 178, 64, 0.13);
-    --danger: #F06A6A;
-    --danger-ink: #FF8E8E;
-    --danger-soft: rgba(240, 106, 106, 0.12);
-    --info: #6AA6F8;
-    --info-ink: #8EBCFB;
-    --info-soft: rgba(106, 166, 248, 0.12);
+    --mark: rgba(196, 238, 110, 0.22);
+    --mark-ink: #F2F7E6;
 
-    --giveaway: #F0B54A;
-    --giveaway-ink: #F5C772;
-    --giveaway-soft: rgba(240, 181, 74, 0.13);
-    --request: #7EA2F8;
-    --request-ink: #9DB9FA;
-    --request-soft: rgba(126, 162, 248, 0.13);
+    --warn: #F0B04A;
+    --warn-ink: #F5C46F;
+    --warn-wash: rgba(240, 176, 74, 0.12);
+    --danger: #F2705F;
+    --danger-ink: #FF9384;
+    --danger-wash: rgba(242, 112, 95, 0.12);
 
-    --e1: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --e1-hover: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 24px -10px rgba(0, 0, 0, 0.7);
-    --e2: 0 2px 6px rgba(0, 0, 0, 0.3), 0 18px 42px -10px rgba(0, 0, 0, 0.65);
-    --e3: 0 8px 24px -4px rgba(0, 0, 0, 0.5), 0 34px 84px -14px rgba(0, 0, 0, 0.8);
-    --highlight: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    --giveaway: #EDB55A;
+    --request: #8FA7FA;
 
-    --map-ground: #0C1520;
+    --float: 0 0 0 1px var(--rule), 0 16px 40px -12px rgba(0, 0, 0, 0.6);
+    --float-lg: 0 0 0 1px var(--rule), 0 32px 72px -20px rgba(0, 0, 0, 0.75);
 
-    --course-1: #34D3A0;
-    --course-2: #5AAEF0;
-    --course-3: #F0B54A;
-    --course-4: #A48BF0;
-    --course-5: #F07A93;
-    --course-6: #3CC4CF;
-    --course-7: #F49A62;
-    --course-8: #A6C645;
-    --course-tint: 16%;
+    --hatch: rgba(242, 112, 95, 0.55);
+    --map-ground: #0E1C2B;
+
+    --course-1: #79A6F0;
+    --course-2: #F08A63;
+    --course-3: #4FC7AE;
+    --course-4: #B892E8;
+    --course-5: #E2BA55;
+    --course-6: #F07FA6;
+    --course-7: #9CCB62;
+    --course-8: #5CC2E4;
+    --course-tint: 17%;
     --course-ink-base: #FFFFFF;
-    --course-ink: 42%;
+    --course-ink: 30%;
 }
 
-/* Black — true black for OLED and low light. Surfaces step up in neutral
-   greys with a breath of green; borders carry the separation. */
+/* ===== Night — black ===== */
 [data-theme="black"] {
     color-scheme: dark;
 
     --canvas: #000000;
-    --canvas-glow: transparent;
-    --surface: #0A0B0B;
-    --surface-2: #050606;
-    --surface-3: #181A19;
-    --surface-raised: #121413;
-    --surface-hover: rgba(255, 255, 255, 0.05);
-    --surface-active: rgba(255, 255, 255, 0.085);
-    --overlay: rgba(0, 0, 0, 0.76);
+    --sheet: #0E0F0E;
+    --sheet-2: #070807;
+    --wash: rgba(255, 255, 255, 0.055);
+    --wash-2: rgba(255, 255, 255, 0.1);
+    --overlay: rgba(0, 0, 0, 0.74);
 
-    --line: rgba(255, 255, 255, 0.1);
-    --line-strong: rgba(255, 255, 255, 0.18);
-    --line-subtle: rgba(255, 255, 255, 0.062);
+    --ink: #F1F3F1;
+    --ink-2: #AFB4B0;
+    --ink-3: #7D827E;
+    --ink-4: #5C615E;
+    --on-ink: #000000;
 
-    --ink: #F3F5F4;
-    --ink-2: #A9AFAC;
-    --ink-3: #777D7A;
-    --ink-4: #4A4F4C;
+    --rule: rgba(255, 255, 255, 0.15);
+    --rule-soft: rgba(255, 255, 255, 0.075);
+    --rule-strong: #D9DDDA;
+    --rule-control: rgba(255, 255, 255, 0.3);
 
-    --forest: #08221A;
-    --forest-2: #051812;
-    --forest-ink: #E6F6EE;
-    --forest-ink-2: rgba(230, 246, 238, 0.7);
-    --forest-ink-3: rgba(230, 246, 238, 0.46);
-    --forest-line: rgba(140, 240, 200, 0.13);
-    --forest-raised: rgba(140, 240, 200, 0.06);
+    --brand: #56CF95;
+    --brand-hover: #6FDAA6;
+    --brand-ink: #74DDA9;
+    --on-brand: #04170F;
 
-    --accent: #2ED39C;
-    --accent-hover: #4BDDAC;
-    --accent-pressed: #22BF8B;
-    --on-accent: #03221A;
-    --accent-ink: #4FDEAE;
-    --accent-soft: rgba(46, 211, 156, 0.12);
-    --accent-soft-2: rgba(46, 211, 156, 0.2);
-    --accent-line: rgba(46, 211, 156, 0.4);
-    --focus: #4BDDAC;
+    --go: #5BE09B;
+    --go-ink: #74E6AB;
+    --go-wash: rgba(91, 224, 155, 0.12);
 
-    --success: #34D399;
-    --success-ink: #5FE3B4;
-    --success-soft: rgba(52, 211, 153, 0.13);
-    --warning: #F2B240;
-    --warning-ink: #F6C66B;
-    --warning-soft: rgba(242, 178, 64, 0.14);
-    --danger: #F06A6A;
-    --danger-ink: #FF8E8E;
-    --danger-soft: rgba(240, 106, 106, 0.14);
-    --info: #6AA6F8;
-    --info-ink: #8EBCFB;
-    --info-soft: rgba(106, 166, 248, 0.14);
+    --mark: rgba(196, 238, 110, 0.2);
+    --mark-ink: #F2F7E6;
 
-    --giveaway: #F0B54A;
-    --giveaway-ink: #F5C772;
-    --giveaway-soft: rgba(240, 181, 74, 0.14);
-    --request: #7EA2F8;
-    --request-ink: #9DB9FA;
-    --request-soft: rgba(126, 162, 248, 0.15);
+    --warn: #F0B04A;
+    --warn-ink: #F5C46F;
+    --warn-wash: rgba(240, 176, 74, 0.12);
+    --danger: #F2705F;
+    --danger-ink: #FF9384;
+    --danger-wash: rgba(242, 112, 95, 0.12);
 
-    --e1: 0 0 0 0 transparent;
-    --e1-hover: 0 0 0 0 transparent;
-    --e2: 0 18px 42px -10px rgba(0, 0, 0, 0.92);
-    --e3: 0 34px 84px -14px rgba(0, 0, 0, 0.96);
-    --highlight: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    --giveaway: #EDB55A;
+    --request: #8FA7FA;
 
-    --map-ground: #090A0A;
+    --float: 0 0 0 1px var(--rule), 0 16px 40px -12px rgba(0, 0, 0, 0.9);
+    --float-lg: 0 0 0 1px var(--rule), 0 32px 72px -20px rgba(0, 0, 0, 0.95);
 
-    --course-1: #34D3A0;
-    --course-2: #5AAEF0;
-    --course-3: #F0B54A;
-    --course-4: #A48BF0;
-    --course-5: #F07A93;
-    --course-6: #3CC4CF;
-    --course-7: #F49A62;
-    --course-8: #A6C645;
-    --course-tint: 15%;
+    --hatch: rgba(242, 112, 95, 0.55);
+    --map-ground: #0A0B0A;
+
+    --course-1: #79A6F0;
+    --course-2: #F08A63;
+    --course-3: #4FC7AE;
+    --course-4: #B892E8;
+    --course-5: #E2BA55;
+    --course-6: #F07FA6;
+    --course-7: #9CCB62;
+    --course-8: #5CC2E4;
+    --course-tint: 16%;
     --course-ink-base: #FFFFFF;
-    --course-ink: 42%;
+    --course-ink: 30%;
 }
 
-/* ===== 3. Legacy names =====
-   The previous token set, pointed at the new one. New code should use the
-   names above; these keep anything older visually in the same system. */
+/* ===== Older names =====
+   Earlier tokens, pointed at the system above so nothing drifts outside it.
+   New code uses the names above. */
 :root {
+    --surface: var(--sheet);
+    --surface-2: var(--sheet-2);
+    --surface-3: var(--wash-2);
+    --surface-raised: var(--sheet);
+    --surface-hover: var(--wash);
+    --surface-active: var(--wash-2);
+    --line: var(--rule);
+    --line-strong: var(--rule);
+    --line-subtle: var(--rule-soft);
+
+    --accent: var(--brand);
+    --accent-hover: var(--brand-hover);
+    --accent-pressed: var(--brand-hover);
+    --on-accent: var(--on-brand);
+    --accent-ink: var(--brand-ink);
+    --accent-soft: var(--go-wash);
+    --accent-soft-2: var(--mark);
+    --accent-line: var(--brand);
+    --focus: var(--brand);
+
+    --forest: var(--brand);
+    --forest-ink: var(--on-brand);
+    --forest-ink-2: var(--on-brand);
+    --forest-ink-3: var(--on-brand);
+    --forest-line: var(--rule);
+    --forest-raised: var(--wash);
+
+    --success: var(--go);
+    --success-ink: var(--go-ink);
+    --success-soft: var(--go-wash);
+    --warning: var(--warn);
+    --warning-ink: var(--warn-ink);
+    --warning-soft: var(--warn-wash);
+    --danger-soft: var(--danger-wash);
+    --info: var(--request);
+    --info-ink: var(--request);
+    --info-soft: var(--wash);
+
+    --swap-ink: var(--brand-ink);
+    --swap-soft: var(--wash);
+    --giveaway-ink: var(--giveaway);
+    --giveaway-soft: var(--wash);
+    --request-ink: var(--request);
+    --request-soft: var(--wash);
+
+    --e1: none;
+    --e1-hover: none;
+    --e2: var(--float);
+    --e3: var(--float-lg);
+    --highlight: none;
+
     --color-primary: var(--ink);
-    --color-primary-light: var(--surface-3);
-    --color-primary-dark: var(--canvas);
-    --color-accent: var(--accent);
-    --color-accent-light: var(--accent-hover);
-    --color-accent-dark: var(--accent-ink);
-    --color-accent-muted: var(--accent-soft);
+    --color-accent: var(--brand);
+    --color-accent-light: var(--brand-hover);
+    --color-accent-dark: var(--brand-ink);
+    --color-accent-muted: var(--wash);
     --color-danger: var(--danger);
-
-    --gradient-primary: var(--accent);
-    --gradient-accent: var(--accent);
-    --gradient-accent-vivid: var(--accent);
-    --gradient-subtle: var(--surface-2);
+    --gradient-primary: var(--brand);
+    --gradient-accent: var(--brand);
+    --gradient-accent-vivid: var(--brand);
+    --gradient-subtle: var(--sheet-2);
     --gradient-border: transparent;
-
     --icon-color: currentColor;
-
     --bg-primary: var(--canvas);
-    --bg-secondary: var(--surface);
-    --bg-tertiary: var(--surface-2);
-    --bg-card: var(--surface);
-    --bg-elevated: var(--surface-raised);
-
-    --glass-bg: var(--surface);
-    --glass-bg-dense: var(--surface);
-    --glass-border: var(--line);
+    --bg-secondary: var(--sheet);
+    --bg-tertiary: var(--sheet-2);
+    --bg-card: var(--sheet);
+    --bg-elevated: var(--sheet);
+    --glass-bg: var(--sheet);
+    --glass-bg-dense: var(--sheet);
+    --glass-border: var(--rule);
     --glass-blur: 0px;
-
     --text-primary: var(--ink);
     --text-secondary: var(--ink-2);
     --text-muted: var(--ink-3);
-    --text-inverse: var(--on-accent);
-
+    --text-inverse: var(--on-brand);
     --post-swap: var(--swap);
-    --post-swap-bg: var(--swap-soft);
+    --post-swap-bg: var(--wash);
     --post-giveaway: var(--giveaway);
-    --post-giveaway-bg: var(--giveaway-soft);
+    --post-giveaway-bg: var(--wash);
     --post-request: var(--request);
-    --post-request-bg: var(--request-soft);
-
-    --status-active: var(--success);
-    --status-pending: var(--warning);
+    --post-request-bg: var(--wash);
+    --status-active: var(--go);
+    --status-pending: var(--warn);
     --status-completed: var(--ink-3);
     --status-expired: var(--danger);
-
-    --border-color: var(--line);
-    --border-color-subtle: var(--line-subtle);
-
-    --shadow-xs: var(--e1);
-    --shadow-sm: var(--e1);
-    --shadow-md: var(--e1);
-    --shadow-lg: var(--e2);
-    --shadow-xl: var(--e2);
-    --shadow-2xl: var(--e3);
-    --shadow-card: var(--e1);
-    --shadow-card-hover: var(--e1-hover);
-    --shadow-elevated: var(--e2);
+    --border-color: var(--rule);
+    --border-color-subtle: var(--rule-soft);
+    --shadow-xs: none;
+    --shadow-sm: none;
+    --shadow-md: none;
+    --shadow-lg: var(--float);
+    --shadow-xl: var(--float);
+    --shadow-2xl: var(--float-lg);
+    --shadow-card: none;
+    --shadow-card-hover: none;
+    --shadow-elevated: var(--float);
     --shadow-accent: none;
     --shadow-accent-lg: none;
     --shadow-inner: none;
-
     --radius-xs: var(--r-xs);
     --radius-sm: var(--r-sm);
     --radius-md: var(--r-md);
@@ -436,21 +424,19 @@
     --radius-xl: var(--r-xl);
     --radius-2xl: var(--r-xl);
     --radius-full: var(--r-full);
-
     --transition-fast: var(--dur-1) var(--ease-out);
     --transition-normal: var(--dur-2) var(--ease-out);
     --transition-slow: var(--dur-3) var(--ease-out);
     --ease-spring: var(--ease-out);
     --ease-out-expo: var(--ease-out);
     --ease-bounce: var(--ease-out);
-
     --nav-height: var(--tabbar-h);
     --auth-bg: var(--canvas);
     --auth-grid-color: transparent;
     --auth-orb-color: transparent;
 }
 
-/* ===== 4. Base ===== */
+/* ===== Base ===== */
 *,
 *::before,
 *::after {
@@ -476,14 +462,20 @@ body {
     background-color: var(--canvas);
     min-height: 100vh;
     min-height: 100dvh;
-    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
     -webkit-tap-highlight-color: transparent;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1 {
+    font-family: var(--font-serif);
+    font-weight: 500;
+    line-height: 1.1;
+    letter-spacing: var(--tracking-display);
+    color: var(--ink);
+}
+
+h2, h3, h4, h5, h6 {
     font-weight: var(--weight-semibold);
     line-height: 1.25;
-    letter-spacing: var(--tracking-tight);
     color: var(--ink);
 }
 
@@ -492,13 +484,8 @@ p {
 }
 
 a {
-    color: var(--accent-ink);
+    color: inherit;
     text-decoration: none;
-    transition: color var(--dur-1) var(--ease-out);
-}
-
-a:hover {
-    color: var(--ink);
 }
 
 button,
@@ -528,14 +515,13 @@ svg {
 }
 
 ::selection {
-    background: var(--accent-soft-2);
-    color: var(--ink);
+    background: var(--mark);
+    color: var(--mark-ink);
 }
 
-/* One focus ring for the whole product: visible, green, never on mouse
-   clicks. Components that need it inset override the offset. */
+/* One focus ring: square, forest, offset — it reads as a drawn outline. */
 :focus-visible {
-    outline: 2px solid var(--focus);
+    outline: 2px solid var(--brand);
     outline-offset: 2px;
 }
 
@@ -543,10 +529,9 @@ svg {
     outline: none;
 }
 
-/* Quiet scrollbars that pick up the theme. */
 * {
     scrollbar-width: thin;
-    scrollbar-color: var(--line-strong) transparent;
+    scrollbar-color: var(--rule) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -559,23 +544,16 @@ svg {
 }
 
 *::-webkit-scrollbar-thumb {
-    background: var(--line-strong);
-    border-radius: var(--r-full);
+    background: var(--rule);
     border: 3px solid transparent;
     background-clip: padding-box;
 }
 
-*::-webkit-scrollbar-thumb:hover {
-    background-color: var(--ink-4);
-}
-
-/* Numbers that sit in columns or tick over line up. */
 .tabular,
 time {
     font-variant-numeric: tabular-nums;
 }
 
-/* Visually hidden, still read aloud. */
 .sr-only {
     position: absolute;
     width: 1px;
@@ -588,20 +566,32 @@ time {
     border: 0;
 }
 
-/* Shared keyframes. Components reference these by name. */
+/* The highlighter. Laid behind text like a pen stroke: it hugs the x-height
+   rather than filling the line box, and it is drawn left to right when it
+   first appears. */
+.cm-mark {
+    background-image: linear-gradient(var(--mark), var(--mark));
+    background-repeat: no-repeat;
+    background-size: 100% 74%;
+    background-position: 0 70%;
+    color: var(--mark-ink);
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+    padding: 0 0.18em;
+    margin: 0 -0.18em;
+}
+
+/* ===== Keyframes =====
+   Few, and each with a job. */
 @keyframes cm-fade-in {
     from { opacity: 0; }
     to { opacity: 1; }
 }
 
-@keyframes cm-rise-in {
-    from { opacity: 0; transform: translateY(6px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
+/* A floating layer arriving from the control that opened it. */
 @keyframes cm-pop-in {
-    from { opacity: 0; transform: translateY(-4px) scale(0.98); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
+    from { opacity: 0; transform: translateY(-3px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes cm-sheet-in {
@@ -613,14 +603,29 @@ time {
     to { transform: rotate(360deg); }
 }
 
-@keyframes cm-shimmer {
-    from { background-position: 150% 0; }
-    to { background-position: -50% 0; }
+/* The highlighter being drawn. */
+@keyframes cm-mark-draw {
+    from { background-size: 0% 74%; }
+    to { background-size: 100% 74%; }
 }
 
-/* Guest mode: a locked control shaking off a tap (lib/guest.js refuse).
-   `translate` rather than transform, so it adds to an element's own transform
-   instead of replacing it. Small and quick — a nudge, not an alarm. */
+/* A timetable block being placed: it grows down from its start time. */
+@keyframes cm-place {
+    from { clip-path: inset(0 0 100% 0); }
+    to { clip-path: inset(0 0 0 0); }
+}
+
+/* A line being drawn along its path (stroke-dasharray set by the user). */
+@keyframes cm-draw {
+    to { stroke-dashoffset: 0; }
+}
+
+@keyframes cm-shimmer {
+    from { opacity: 0.55; }
+    to { opacity: 1; }
+}
+
+/* Guest mode: a locked control shaking off a tap (lib/guest.js refuse). */
 .guest-refuse {
     animation: guest-refuse 0.36s var(--ease-in-out);
 }
