@@ -1,62 +1,13 @@
-/* ===== Page Wrapper — Full screen with grid background ===== */
-.page {
-    min-height: 100vh;
-    min-height: 100dvh;
-    background: var(--auth-bg);
-    position: relative;
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background var(--transition-normal);
-}
-
-.page::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background-image:
-        linear-gradient(var(--auth-grid-color) 1px, transparent 1px),
-        linear-gradient(90deg, var(--auth-grid-color) 1px, transparent 1px);
-    background-size: 60px 60px;
-    mask-image: radial-gradient(ellipse 90% 90% at 50% 50%, black 20%, transparent 80%);
-    -webkit-mask-image: radial-gradient(ellipse 90% 90% at 50% 50%, black 20%, transparent 80%);
-    animation: gridPulse 8s ease-in-out infinite;
-    pointer-events: none;
-}
-
-.page::after {
-    content: '';
-    position: absolute;
-    width: 800px;
-    height: 800px;
-    border-radius: 50%;
-    background: radial-gradient(circle, var(--auth-orb-color) 0%, rgba(0, 195, 137, 0.02) 40%, transparent 70%);
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    animation: orbGlow 7s ease-in-out infinite;
-    pointer-events: none;
-}
-
-@keyframes gridPulse {
-    0%, 100% { opacity: 0.6; }
-    50% { opacity: 1; }
-}
-
-@keyframes orbGlow {
-    0%, 100% { transform: translate(-50%, -50%) scale(0.95); opacity: 0.5; }
-    50% { transform: translate(-50%, -50%) scale(1.1); opacity: 0.8; }
-}
+/* ===== Home — the student's command centre ===== */
 
 .transitionOverlay {
     position: fixed;
     inset: 0;
-    background: var(--color-primary-dark);
     z-index: 9999;
+    background: var(--canvas);
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.5s ease;
+    transition: opacity var(--dur-3) var(--ease-out);
 }
 
 .transitionOverlay.active {
@@ -64,443 +15,860 @@
     pointer-events: all;
 }
 
-/* ===== Dashboard container ===== */
-.pageInner {
-    position: relative;
-    z-index: 2;
-    width: 100%;
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 24px 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    min-height: calc(100vh - 48px);
-    min-height: calc(100dvh - 48px);
-    animation: pageEntrance 0.55s var(--ease-out-expo);
-}
-
-@keyframes pageEntrance {
-    from { opacity: 0; transform: translateY(16px) scale(0.99); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-/* ===== Hero strip ===== */
+/* ===== Today hero (forest) =====
+   The one place the brand is a surface: deep forest, a faint timetable grid
+   fading in from the right, mint for what's live. */
 .hero {
-    background: var(--glass-bg-dense);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    border-radius: var(--radius-xl);
-    padding: 20px 24px;
-    box-shadow: var(--shadow-md);
-    border: 1px solid var(--glass-border);
     position: relative;
-    /* Not hidden: the semester dropdown opens past the card's bottom edge and
-       would be clipped. The ::before ring is inset by only 1px, so letting it
-       show is the intended border glow rather than a bleed. */
-    overflow: visible;
-    /* backdrop-filter gives .hero its own stacking context, which traps the
-       dropdown's z-index inside it — so without an explicit z-index here the
-       later .quickAction siblings (also backdrop-filtered) paint on top of it. */
-    z-index: 5;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 20px;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+    gap: var(--space-7);
+    padding: 28px;
+    border-radius: 22px;
+    background:
+        radial-gradient(90% 120% at 100% 0%, rgba(46, 211, 156, 0.2), transparent 55%),
+        radial-gradient(60% 90% at 0% 100%, rgba(46, 211, 156, 0.08), transparent 60%),
+        var(--forest);
+    color: var(--forest-ink);
+    overflow: hidden;
+    isolation: isolate;
+    box-shadow: var(--e1);
 }
 
 .hero::before {
     content: '';
     position: absolute;
-    inset: -1px;
-    border-radius: var(--radius-xl);
-    background: var(--gradient-border);
+    inset: 0;
     z-index: -1;
-    opacity: 0.4;
-    pointer-events: none;
+    background-image:
+        linear-gradient(var(--forest-line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--forest-line) 1px, transparent 1px);
+    background-size: 32px 32px;
+    background-position: -1px -1px;
+    mask-image: linear-gradient(105deg, transparent 30%, #000 85%);
+    -webkit-mask-image: linear-gradient(105deg, transparent 30%, #000 85%);
+    opacity: 0.55;
 }
 
-.heroText {
+.heroMain {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+}
+
+.heroEyebrow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 20px;
+    font-size: var(--text-small);
+    font-weight: var(--weight-medium);
+    color: var(--forest-ink-2);
+}
+
+.heroDot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--accent);
+}
+
+.heroTitle {
+    font-family: var(--font-display);
+    font-size: 2.5rem;
+    font-weight: 650;
+    letter-spacing: -0.04em;
+    line-height: 1.04;
+    color: var(--forest-ink);
+    font-variation-settings: 'opsz' 72;
+    overflow-wrap: anywhere;
+}
+
+.heroBreak {
+    display: none;
+}
+
+.heroName {
+    color: var(--mint-400);
+}
+
+.heroStatus {
+    max-width: 46ch;
+    font-size: var(--text-subheading);
+    line-height: 1.5;
+    color: var(--forest-ink-2);
+    min-height: 1.5em;
+}
+
+.heroStatus a {
+    color: var(--forest-ink);
+    font-weight: var(--weight-semibold);
+    text-decoration: underline;
+    text-decoration-color: rgba(46, 211, 156, 0.6);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+}
+
+.heroStatus a:hover {
+    color: var(--mint-300);
+}
+
+.heroFoot {
+    display: flex;
+    align-items: center;
+    gap: var(--space-5);
+    margin-top: auto;
+    padding-top: var(--space-4);
+}
+
+.term {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    width: 180px;
+}
+
+.termLabel {
+    font-size: var(--text-caption);
+    color: var(--forest-ink-2);
+    font-variant-numeric: tabular-nums;
+}
+
+.termLabel strong {
+    color: var(--forest-ink);
+    font-weight: var(--weight-semibold);
+}
+
+.termTrack {
+    position: relative;
+    height: 4px;
+    border-radius: var(--r-full);
+    background: var(--forest-line);
+    overflow: hidden;
+}
+
+.termFill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    border-radius: inherit;
+    background: var(--mint-400);
+}
+
+/* The semester picker sits on forest here: restyle its chip to belong. */
+.heroPicker {
+    margin-left: auto;
+}
+
+.heroPicker button[aria-haspopup] {
+    background: var(--forest-raised);
+    border-color: var(--forest-line);
+    color: var(--forest-ink);
+    box-shadow: none;
+}
+
+.heroPicker button[aria-haspopup]:hover {
+    background: rgba(236, 247, 241, 0.12);
+}
+
+.heroPicker button[aria-haspopup] svg {
+    color: var(--forest-ink-2);
+}
+
+/* ===== Today panel ===== */
+.today {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+    padding: 18px 18px 14px;
+    border-radius: 16px;
+    background: rgba(4, 18, 13, 0.32);
+    box-shadow: inset 0 0 0 1px var(--forest-line);
+    backdrop-filter: blur(2px);
+}
+
+.todayHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.todayTitle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--text-small);
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.01em;
+}
+
+.todayTitle svg {
+    width: 16px;
+    height: 16px;
+    color: var(--mint-400);
+}
+
+.todayCount {
+    font-size: var(--text-caption);
+    color: var(--forest-ink-2);
+}
+
+.todayBody {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.upNext {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: var(--forest-raised);
+    box-shadow: inset 0 0 0 1px var(--forest-line);
+}
+
+.upNextTag {
+    flex-shrink: 0;
+    padding: 3px 8px;
+    border-radius: var(--r-full);
+    background: var(--forest-line);
+    color: var(--forest-ink);
+    font-size: 0.6875rem;
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.02em;
+}
+
+.upNextLive {
+    background: var(--accent);
+    color: var(--on-accent);
+}
+
+.upNextText {
+    display: flex;
+    flex-direction: column;
     min-width: 0;
     flex: 1;
+    line-height: 1.3;
+}
+
+.upNextName {
+    font-size: var(--text-small);
+    font-weight: var(--weight-semibold);
+    color: var(--forest-ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.upNextMeta {
+    font-size: var(--text-caption);
+    color: var(--forest-ink-2);
+    font-variant-numeric: tabular-nums;
+}
+
+.upNextRoom,
+.todayRoom {
+    flex-shrink: 0;
+    font-size: var(--text-caption);
+}
+
+.upNextRoom a,
+.todayRoom a {
+    background: var(--forest-line);
+    color: var(--forest-ink);
+}
+
+.todayEmpty {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.todayEmptyTitle {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 650;
+    letter-spacing: -0.025em;
+    color: var(--forest-ink);
+    font-variation-settings: 'opsz' 32;
+}
+
+.todayEmptyText {
+    font-size: var(--text-small);
+    line-height: 1.55;
+    color: var(--forest-ink-2);
+}
+
+.todayEmptyText strong {
+    color: var(--forest-ink);
+    font-weight: var(--weight-semibold);
+}
+
+.todayCta {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 38px;
+    margin-top: 6px;
+    padding: 0 14px 0 12px;
+    border-radius: var(--r-md);
+    background: var(--accent);
+    color: var(--on-accent);
+    font-size: var(--text-small);
+    font-weight: var(--weight-semibold);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    transition: background-color var(--dur-1) var(--ease-out);
+}
+
+.todayCta:hover {
+    background: var(--accent-hover);
+    color: var(--on-accent);
+}
+
+.todayCta svg {
+    width: 16px;
+    height: 16px;
+}
+
+.profileNote {
+    display: block;
+    color: var(--ink-2);
+}
+
+.profileProgress {
+    margin-top: 8px;
+    max-width: 320px;
+}
+
+/* ===== Signals =====
+   One surface, four readings, hairlines between — not four boxes. */
+.signals {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r-xl);
+    box-shadow: var(--e1), var(--highlight);
+    overflow: hidden;
+}
+
+.signal {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+    padding: 16px 18px 16px;
+    color: var(--ink);
+    text-decoration: none;
+    transition: background-color var(--dur-1) var(--ease-out);
+}
+
+.signal + .signal {
+    box-shadow: inset 1px 0 0 var(--line-subtle);
+}
+
+.signal:hover {
+    background: var(--surface-hover);
+    color: var(--ink);
+}
+
+.signal:focus-visible {
+    outline-offset: -2px;
+}
+
+.signalTop {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.signalIcon {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    background: var(--surface-2);
+    color: var(--ink-3);
+    flex-shrink: 0;
+}
+
+.signalIcon svg {
+    width: 14px;
+    height: 14px;
+}
+
+.signalLabel {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--text-small);
+    font-weight: var(--weight-medium);
+    color: var(--ink-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.signalArrow {
+    width: 15px;
+    height: 15px;
+    color: var(--ink-4);
+    opacity: 0;
+    transform: translateX(-3px);
+    transition: opacity var(--dur-1) var(--ease-out), transform var(--dur-1) var(--ease-out);
+}
+
+.signal:hover .signalArrow {
+    opacity: 1;
+    transform: none;
+}
+
+.signalValue {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 650;
+    letter-spacing: -0.045em;
+    line-height: 1;
+    font-variation-settings: 'opsz' 48;
+    font-variant-numeric: tabular-nums;
+}
+
+.signalMax {
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0;
+    color: var(--ink-4);
+}
+
+.signalNote {
+    font-size: var(--text-caption);
+    color: var(--ink-3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.signal_alert .signalIcon {
+    background: var(--warning-soft);
+    color: var(--warning-ink);
+}
+
+.signal_alert .signalValue {
+    color: var(--warning-ink);
+}
+
+.signal_alert .signalNote {
+    color: var(--warning-ink);
+    font-weight: var(--weight-medium);
+}
+
+.signal_accent .signalIcon {
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+}
+
+.signal_accent .signalValue {
+    color: var(--accent-ink);
+}
+
+.guestStrip {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: 16px 18px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-xl);
+    background: var(--surface);
+    box-shadow: var(--e1), var(--highlight);
+}
+
+.guestStripIcon {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+    flex-shrink: 0;
+}
+
+.guestStripIcon svg {
+    width: 20px;
+    height: 20px;
+}
+
+.guestStripText {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+    font-size: var(--text-small);
+    color: var(--ink-3);
+}
+
+.guestStripText strong {
+    font-size: var(--text-body);
+    color: var(--ink);
+    font-weight: var(--weight-semibold);
+}
+
+/* ===== Map + start ===== */
+.overview {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(320px, 1fr);
+    gap: var(--space-4);
+}
+
+/* The campus map, framed as a window onto the place: the still fills the
+   card edge to edge, a short fade at the foot keeps the caption readable,
+   and the rest of the art stays undimmed. */
+.mapCard {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 320px;
+    padding: var(--space-4);
+    border-radius: var(--r-xl);
+    overflow: hidden;
+    isolation: isolate;
+    background: var(--map-ground);
+    color: #fff;
+    text-decoration: none;
+    box-shadow: var(--e1), inset 0 0 0 1px var(--line);
+    transition: box-shadow var(--dur-2) var(--ease-out), transform var(--dur-1) var(--ease-out);
+}
+
+.mapCard:hover {
+    color: #fff;
+    box-shadow: var(--e1-hover), inset 0 0 0 1px var(--line-strong);
+}
+
+.mapCard:active {
+    transform: scale(0.995);
+}
+
+.mapCard:focus-visible {
+    outline-offset: 3px;
+}
+
+.mapArt {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    background: url('/map/banner-light.webp') center 62% / cover no-repeat;
+    transition: transform 900ms var(--ease-out);
+}
+
+[data-theme="dark"] .mapArt,
+[data-theme="black"] .mapArt {
+    background-image: url('/map/banner-dark.webp');
+}
+
+.mapCard:hover .mapArt {
+    transform: scale(1.035);
+}
+
+.mapShade {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(to top, rgba(5, 22, 16, 0.85) 0%, rgba(5, 22, 16, 0.4) 28%, rgba(5, 22, 16, 0) 54%);
+}
+
+.mapChip {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 11px 0 9px;
+    border-radius: var(--r-full);
+    background: rgba(255, 255, 255, 0.94);
+    color: #0F1D17;
+    font-size: var(--text-caption);
+    font-weight: var(--weight-semibold);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+}
+
+.mapChip svg {
+    width: 15px;
+    height: 15px;
+    color: #00754F;
+}
+
+.mapFooter {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--space-4);
+}
+
+.mapText {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.mapTitle {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 650;
+    letter-spacing: -0.035em;
+    line-height: 1.12;
+    text-shadow: 0 1px 12px rgba(0, 0, 0, 0.3);
+    font-variation-settings: 'opsz' 40;
+}
+
+.mapSub {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--text-small);
+    color: rgba(255, 255, 255, 0.84);
+}
+
+.mapSub svg {
+    width: 14px;
+    height: 14px;
+    color: var(--mint-300);
+}
+
+.mapCta {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    height: 38px;
+    padding: 0 14px 0 16px;
+    border-radius: var(--r-md);
+    background: var(--accent);
+    color: var(--on-accent);
+    font-size: var(--text-small);
+    font-weight: var(--weight-semibold);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 6px 16px -6px rgba(0, 0, 0, 0.5);
+    transition: background-color var(--dur-1) var(--ease-out);
+}
+
+.mapCta svg {
+    width: 16px;
+    height: 16px;
+    transition: transform var(--dur-1) var(--ease-out);
+}
+
+.mapCard:hover .mapCta {
+    background: var(--accent-hover);
+}
+
+.mapCard:hover .mapCta svg {
+    transform: translateX(2px);
+}
+
+.panelTitle {
+    font-size: var(--text-subheading);
+    font-weight: var(--weight-semibold);
+    letter-spacing: -0.01em;
+    color: var(--ink);
+}
+
+.actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 18px 10px 10px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r-xl);
+    box-shadow: var(--e1), var(--highlight);
+}
+
+.actions .panelTitle {
+    padding: 0 10px;
+}
+
+.actionList {
     display: flex;
     flex-direction: column;
     gap: 2px;
 }
 
-.heroEyebrow {
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-}
-
-.heroGreeting {
-    font-size: 1.5rem;
-    font-weight: 800;
-    color: var(--text-primary);
-    letter-spacing: -0.02em;
-    line-height: 1.15;
-}
-
-.heroAccent {
-    background: var(--gradient-accent-vivid);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    -webkit-text-fill-color: transparent;
-}
-
-.heroRight {
+.action {
     display: flex;
     align-items: center;
     gap: 12px;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-}
-
-/* ===== Profile completeness bar ===== */
-.profileBanner {
-    background: var(--glass-bg-dense);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    border-radius: var(--radius-xl);
-    padding: 16px 20px;
-    box-shadow: var(--shadow-md);
-    border: 1px solid var(--color-accent-muted);
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    flex-wrap: wrap;
-}
-
-.profileBannerText {
-    flex: 1;
-    min-width: 200px;
-}
-
-.profileBannerTitle {
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin-bottom: 4px;
-}
-
-.profileBannerSub {
-    font-size: 0.8125rem;
-    color: var(--text-muted);
-}
-
-.progressBar {
     width: 100%;
-    height: 8px;
-    background: var(--bg-tertiary);
-    border-radius: var(--radius-full);
-    overflow: hidden;
-    margin-top: 8px;
+    min-height: 60px;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: var(--r-lg);
+    background: none;
+    color: var(--ink);
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease-out);
 }
 
-.progressBarFill {
-    height: 100%;
-    background: var(--gradient-accent-vivid);
-    border-radius: var(--radius-full);
-    transition: width 0.6s var(--ease-out-expo);
-    box-shadow: 0 0 8px rgba(0, 195, 137, 0.4);
+.action:hover {
+    background: var(--surface-hover);
+    color: var(--ink);
 }
 
-/* ===== Quick actions row ===== */
-.quickActions {
+.action:focus-visible {
+    outline-offset: -2px;
+}
+
+.actionIcon {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: var(--surface-2);
+    color: var(--ink-2);
+    box-shadow: inset 0 0 0 1px var(--line-subtle);
+    flex-shrink: 0;
+    transition: transform var(--dur-2) var(--ease-out), background-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out);
 }
 
-.quickAction {
-    background: var(--glass-bg-dense);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-xl);
-    padding: 18px 16px;
+.action:hover .actionIcon {
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+    box-shadow: none;
+}
+
+.actionIcon svg {
+    width: 20px;
+    height: 20px;
+}
+
+.actionIconPrimary,
+.action:hover .actionIconPrimary {
+    background: var(--accent);
+    color: var(--on-accent);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 4px 10px -4px color-mix(in srgb, var(--accent) 80%, transparent);
+}
+
+.actionText {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-    cursor: pointer;
-    text-decoration: none;
-    color: var(--text-primary);
-    text-align: left;
-    transition: transform var(--transition-fast) var(--ease-out-expo),
-                box-shadow var(--transition-fast),
-                border-color var(--transition-fast);
-    box-shadow: var(--shadow-md);
-    position: relative;
+    gap: 1px;
+    flex: 1;
+    min-width: 0;
+}
+
+.actionLabel {
+    font-size: var(--text-body);
+    font-weight: var(--weight-semibold);
+    letter-spacing: -0.005em;
+}
+
+.actionSub {
+    font-size: var(--text-caption);
+    color: var(--ink-3);
     overflow: hidden;
-    font-family: inherit;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.quickAction::before {
-    content: '';
-    position: absolute;
-    inset: -1px;
-    border-radius: var(--radius-xl);
-    background: var(--gradient-border);
-    z-index: -1;
-    opacity: 0.3;
-    transition: opacity var(--transition-fast);
+.actionEnd {
+    width: 16px;
+    height: 16px;
+    color: var(--ink-4);
+    transition: transform var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out);
 }
 
-.quickAction:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-xl);
-    border-color: var(--color-accent);
+.action:hover .actionEnd {
+    color: var(--ink-2);
+    transform: translateX(2px);
 }
 
-.quickAction:hover::before {
-    opacity: 0.7;
-}
-
-/* Guest mode: the tile stays, blurred, with a lock over its middle. */
-.quickActionLocked {
+.actionLocked {
     cursor: not-allowed;
 }
 
-.quickActionLocked:hover {
+.actionLocked:hover {
+    background: none;
+}
+
+.actionLocked .actionIcon,
+.actionLocked:hover .actionIcon {
+    background: var(--surface-2);
+    color: var(--ink-4);
+    box-shadow: none;
+}
+
+.actionLocked .actionLabel {
+    color: var(--ink-3);
+}
+
+.actionLocked:hover .actionEnd {
     transform: none;
-    box-shadow: var(--shadow-md);
-    border-color: var(--glass-border);
 }
 
-.quickActionLocked > span {
-    filter: blur(3px);
-    opacity: 0.45;
-}
-
-.lockCenter {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    translate: -50% -50%;
-    color: var(--text-secondary);
-}
-
-.quickActionIcon {
-    width: 38px;
-    height: 38px;
-    border-radius: var(--radius-md);
-    background: var(--gradient-accent-vivid);
-    color: #fff;
+/* ===== Electives ===== */
+.electives {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: var(--shadow-accent);
-}
-
-.quickActionLabel {
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    letter-spacing: -0.01em;
-    line-height: 1.2;
-}
-
-.quickActionSub {
-    font-size: 0.78rem;
-    color: var(--text-muted);
-    line-height: 1.3;
-}
-
-/* ===== Campus map strip =====
-   A still of the 3D map (public/map/banner-*.webp, captured from /map turned
-   90 degrees so the campus runs across the strip), and a button to open it.
-   Recapture both images when the map changes. */
-.mapBanner {
-    position: relative;
-    display: block;
-    height: 210px;
-    border-radius: var(--radius-xl);
-    overflow: hidden;
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--shadow-md);
-    background: var(--bg-tertiary);
-    text-decoration: none;
-    color: var(--text-primary);
-    isolation: isolate;
-    transition: transform var(--transition-fast) var(--ease-out-expo),
-                box-shadow var(--transition-fast),
-                border-color var(--transition-fast);
-}
-
-.mapBannerArt {
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    background: url('/map/banner-light.webp') center 70% / cover no-repeat;
-    transition: transform 0.6s var(--ease-out-expo);
-}
-
-[data-theme="dark"] .mapBannerArt,
-[data-theme="black"] .mapBannerArt {
-    background-image: url('/map/banner-dark.webp');
-}
-
-/* The still's empty sky fades into the card. */
-.mapBannerArt::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(to bottom, var(--bg-card) 0%, transparent 34%);
-    opacity: 0.85;
-}
-
-.mapBanner:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-xl);
-    border-color: var(--color-accent);
-}
-
-.mapBanner:hover .mapBannerArt {
-    transform: scale(1.04);
-}
-
-.mapBannerOpen {
-    position: absolute;
-    right: 14px;
-    bottom: 14px;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 9px 16px;
-    border-radius: var(--radius-full);
-    background: var(--gradient-accent-vivid);
-    box-shadow: var(--shadow-accent);
-    color: #fff;
-    font-size: 0.875rem;
-    font-weight: 700;
-}
-
-.mapBannerOpen svg {
-    --icon-color: #fff;
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .mapBannerArt {
-        transition: none;
-    }
-}
-
-/* ===== Grid of dashboard cards ===== */
-.grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    flex-direction: column;
     gap: 14px;
+    padding: 20px 20px 8px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r-xl);
+    box-shadow: var(--e1), var(--highlight);
 }
 
-.gridFull { grid-column: 1 / -1; }
-
-/* ===== Activity / Schedule card stat layout ===== */
-.statRow {
+.electivesHead {
     display: flex;
-    gap: 16px;
-    align-items: stretch;
-}
-
-.statDivider {
-    width: 1px;
-    background: var(--border-color);
-    margin: 4px 0;
-}
-
-/* ===== Progress card ===== */
-.progressGroup {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.progressItem {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.progressLabel {
-    display: flex;
+    align-items: flex-end;
     justify-content: space-between;
-    align-items: baseline;
-    gap: 8px;
+    gap: var(--space-4);
+    flex-wrap: wrap;
 }
 
-.progressName {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--text-primary);
+.electivesNote {
+    margin-top: 3px;
+    font-size: var(--text-small);
+    color: var(--ink-3);
 }
 
-.progressCount {
-    font-size: 0.8125rem;
-    font-weight: 700;
-    color: var(--text-muted);
-    font-variant-numeric: tabular-nums;
-}
-
-.progressCountAccent { color: var(--color-accent); }
-
-/* ===== Dept electives card ===== */
 .electiveList {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    max-height: 320px;
+    max-height: 560px;
     overflow-y: auto;
-    padding-right: 4px;
-    margin-right: -4px;
-    scrollbar-width: thin;
-    scrollbar-color: var(--border-color) transparent;
+    margin: 0 -20px;
+    padding: 0 20px;
+    border-top: 1px solid var(--line-subtle);
 }
 
-.electiveList::-webkit-scrollbar {
-    width: 6px;
-}
-
-.electiveList::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.electiveList::-webkit-scrollbar-thumb {
-    background: var(--border-color);
-    border-radius: 3px;
-}
-
-/* Each elective is a card that expands to list its sections. The card owns the
-   border and background; .electiveRow inside it is the expand button and stays
-   transparent, so "click the box" hits the toggle everywhere except the
-   deliberately separate add-to-basket button. */
 .electiveItem {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    transition: border-color var(--transition-fast), background var(--transition-fast);
+    border-bottom: 1px solid var(--line-subtle);
 }
 
-.electiveItem:hover {
-    border-color: var(--color-accent);
-    background: var(--bg-elevated);
-}
-
-.electiveItemOpen {
-    border-color: var(--color-accent);
-    background: var(--bg-elevated);
+.electiveItem:last-child {
+    border-bottom: 0;
 }
 
 .electiveHead {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding-right: 8px;
+    gap: 8px;
 }
 
 .electiveRow {
@@ -508,186 +876,23 @@
     min-width: 0;
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 10px 2px 10px 12px;
+    gap: 12px;
+    padding: 12px 8px;
+    margin-left: -8px;
+    border: 0;
+    border-radius: var(--r-md);
     background: none;
-    border: none;
-    border-radius: var(--radius-md);
-    color: inherit;
-    font: inherit;
     text-align: left;
     cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease-out);
 }
 
-.electiveRow:focus-visible,
-.addBtn:focus-visible {
-    outline: 2px solid var(--color-accent);
+.electiveRow:hover {
+    background: var(--surface-hover);
+}
+
+.electiveRow:focus-visible {
     outline-offset: -2px;
-}
-
-.electiveChevron {
-    flex-shrink: 0;
-    color: var(--text-muted);
-    transition: transform var(--transition-fast) var(--ease-out-expo);
-}
-
-.electiveItemOpen .electiveChevron {
-    transform: rotate(180deg);
-    color: var(--color-accent);
-}
-
-/* Sits outside the toggle button so it is its own hit target — tapping the row
-   only expands it; adding to the schedule is always a deliberate second action. */
-.addBtn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-    flex-shrink: 0;
-    min-height: 32px;
-    padding: 0 10px;
-    border: 1px solid transparent;
-    border-radius: var(--radius-md);
-    background: var(--color-accent-muted);
-    color: var(--color-accent);
-    /* Icons.js strokes with var(--icon-color), which globals.css defines, so the
-       plus would ignore this button entirely without the local override. */
-    --icon-color: currentColor;
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: -0.01em;
-    text-decoration: none;
-    white-space: nowrap;
-    transition: background var(--transition-fast), color var(--transition-fast);
-}
-
-.addBtn:hover {
-    background: var(--gradient-accent-vivid);
-    color: #fff;
-}
-
-.addBtnLabel {
-    display: inline;
-}
-
-/* "to schedule" is dropped on phones, where the row has no width to spare. */
-.addBtnLabelLong {
-    display: none;
-}
-
-/* ===== Section list inside an expanded elective ===== */
-.sectionList {
-    list-style: none;
-    margin: 0;
-    padding: 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    border-top: 1px solid var(--border-color);
-}
-
-.sectionRow {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 10px;
-    background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
-}
-
-.sectionNum {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    flex-shrink: 0;
-    font-family: var(--font-mono), monospace;
-    font-size: 0.75rem;
-    font-weight: 800;
-    color: var(--text-primary);
-    font-variant-numeric: tabular-nums;
-}
-
-/* Labs and tutorials are listed alongside their lecture because the section
-   count above includes them; the tag keeps them from reading as standalone
-   offerings. */
-.sectionKind {
-    font-size: 0.55rem;
-    font-weight: 800;
-    letter-spacing: 0.06em;
-    padding: 1px 4px;
-    border-radius: var(--radius-sm);
-    background: var(--bg-tertiary);
-    color: var(--text-muted);
-    border: 1px solid var(--border-color);
-}
-
-.sectionMeta {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.sectionWhen {
-    display: flex;
-    align-items: baseline;
-    gap: 6px;
-    flex-wrap: wrap;
-}
-
-.sectionDays {
-    font-size: 0.75rem;
-    font-weight: 700;
-    color: var(--text-primary);
-}
-
-.sectionTime {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    font-variant-numeric: tabular-nums;
-}
-
-/* Instructor and room share a line. The room is short and fixed, so it holds
-   its width and the name is what truncates when the row runs out. */
-.sectionWho {
-    display: flex;
-    align-items: baseline;
-    gap: 5px;
-    min-width: 0;
-}
-
-.sectionDot {
-    flex-shrink: 0;
-    font-size: 0.7rem;
-    color: var(--text-muted);
-    opacity: 0.7;
-}
-
-.sectionRoom {
-    flex-shrink: 0;
-    font-size: 0.7rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-    white-space: nowrap;
-}
-
-.sectionInstructor {
-    font-size: 0.7rem;
-    color: var(--text-muted);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.sectionCrn {
-    flex-shrink: 0;
-    font-family: var(--font-mono), monospace;
-    font-size: 0.68rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    font-variant-numeric: tabular-nums;
 }
 
 .electiveMain {
@@ -695,333 +900,343 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 2px;
-}
-
-.electiveName,
-.electiveCode {
-    display: block;
+    gap: 3px;
 }
 
 .electiveName {
-    font-size: 0.875rem;
-    font-weight: 700;
-    color: var(--text-primary);
+    font-size: var(--text-body);
+    font-weight: var(--weight-semibold);
+    color: var(--ink);
+    letter-spacing: -0.005em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    letter-spacing: -0.01em;
+}
+
+.electiveMeta {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: var(--text-caption);
+    color: var(--ink-3);
+    min-width: 0;
+    white-space: nowrap;
 }
 
 .electiveCode {
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    font-variant-numeric: tabular-nums;
-    font-family: var(--font-mono), monospace;
-    letter-spacing: 0.02em;
+    font-family: var(--font-mono);
+    font-size: 0.71875rem;
+    color: var(--ink-2);
 }
 
-.electiveBadge {
-    font-size: 0.7rem;
-    font-weight: 700;
-    padding: 4px 8px;
-    border-radius: var(--radius-full);
+.kindLabel {
+    font-weight: var(--weight-medium);
+}
+
+.kind_major { color: var(--accent-ink); }
+.kind_support { color: var(--giveaway-ink); }
+.kind_univ { color: var(--request-ink); }
+
+.metaDot {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--ink-4);
+    flex-shrink: 0;
+}
+
+.electiveChevron {
+    width: 18px;
+    height: 18px;
+    color: var(--ink-4);
+    transition: transform var(--dur-2) var(--ease-out), color var(--dur-1) var(--ease-out);
+}
+
+.electiveItemOpen .electiveChevron {
+    transform: rotate(180deg);
+    color: var(--accent-ink);
+}
+
+.addBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    height: 32px;
+    padding: 0 12px 0 9px;
+    border-radius: 8px;
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+    font-size: var(--text-caption);
+    font-weight: var(--weight-semibold);
     white-space: nowrap;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    text-decoration: none;
+    transition: background-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out);
 }
 
-/* Second line of the row: course code, plus the section count on phones. */
-.electiveMeta {
+.addBtn svg {
+    width: 15px;
+    height: 15px;
+}
+
+.addBtn:hover {
+    background: var(--accent);
+    color: var(--on-accent);
+}
+
+.addLabelLong {
+    display: none;
+}
+
+.sectionList {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    margin: 0 0 12px 44px;
+    padding: 4px 0;
+    border-radius: var(--r-md);
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--line-subtle);
+    animation: cm-rise-in var(--dur-2) var(--ease-out);
+}
+
+.sectionRow {
+    display: grid;
+    grid-template-columns: 92px 168px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    font-size: var(--text-small);
+}
+
+.sectionRow + .sectionRow {
+    border-top: 1px solid var(--line-subtle);
+}
+
+.sectionId {
     display: flex;
     align-items: center;
     gap: 6px;
     min-width: 0;
 }
 
-.electiveBadgeRight {
-    flex-shrink: 0;
-}
-
-.electiveBadgeInline {
-    display: none;
-}
-
-.electiveBadgeOpen {
-    background: var(--color-accent-muted);
-    color: var(--color-accent);
-    border: 1px solid var(--color-accent-muted);
-}
-
-/* ===== Elective filter pills ===== */
-.electiveFilters {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-    margin-top: -2px;
-}
-
-.electiveFilter {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 11px;
-    border: 1px solid var(--border-color);
-    background: transparent;
-    color: var(--text-secondary);
-    border-radius: var(--radius-full);
-    font-size: 0.75rem;
+.sectionNum {
+    font-family: var(--font-mono);
+    font-size: 0.78125rem;
     font-weight: 600;
-    cursor: pointer;
-    transition: all var(--transition-fast) var(--ease-out-expo);
-    font-family: inherit;
+    color: var(--ink);
 }
 
-.electiveFilter:hover:not(:disabled) {
-    border-color: var(--color-accent);
-    color: var(--color-accent);
-    background: var(--color-accent-muted);
+.sectionKind {
+    font-size: 0.625rem;
+    font-weight: var(--weight-semibold);
+    padding: 1px 5px;
+    border-radius: var(--r-xs);
+    background: var(--surface-3);
+    color: var(--ink-3);
 }
 
-.electiveFilter:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
+.sectionWhen {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    white-space: nowrap;
 }
 
-.electiveFilterActive {
-    background: var(--gradient-accent-vivid) !important;
-    border-color: transparent !important;
-    color: #fff !important;
-    box-shadow: var(--shadow-accent);
+.sectionDays {
+    font-weight: var(--weight-semibold);
+    color: var(--ink);
 }
 
-.electiveFilterCount {
-    font-size: 0.7rem;
-    font-weight: 700;
-    background: var(--bg-tertiary);
-    color: var(--text-muted);
-    padding: 1px 7px;
-    border-radius: var(--radius-full);
+.sectionTime {
+    color: var(--ink-2);
     font-variant-numeric: tabular-nums;
 }
 
-.electiveFilterActive .electiveFilterCount {
-    background: rgba(255, 255, 255, 0.25);
-    color: #fff;
+.sectionWho {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
 }
 
-/* ===== Per-row category tag ===== */
-.kindTag {
-    font-size: 0.62rem;
-    font-weight: 800;
-    letter-spacing: 0.06em;
-    padding: 3px 7px;
-    border-radius: var(--radius-sm);
+.sectionInstructor {
+    color: var(--ink-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.sectionRoom {
     flex-shrink: 0;
-    border: 1px solid transparent;
-    font-family: var(--font-mono), monospace;
+    font-size: var(--text-caption);
 }
 
-.kindTag_major {
-    background: rgba(0, 195, 137, 0.12);
-    color: var(--color-accent);
-    border-color: rgba(0, 195, 137, 0.25);
+.sectionEnd {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
 }
 
-.kindTag_support {
-    background: rgba(245, 158, 11, 0.12);
-    color: #d97706;
-    border-color: rgba(245, 158, 11, 0.25);
+.sectionCrn {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--ink-3);
+    white-space: nowrap;
 }
 
-.kindTag_univ {
-    background: rgba(99, 102, 241, 0.12);
-    color: #6366f1;
-    border-color: rgba(99, 102, 241, 0.25);
+.electiveSkeletonRow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--line-subtle);
 }
 
-/* ===== Mobile ===== */
-@media (max-width: 767px) {
-    .page {
-        display: block;
-        align-items: unset;
-        justify-content: unset;
-        overflow-y: auto;
-    }
-
-    .page::before { background-size: 50px 50px; }
-
-    .pageInner {
-        padding: 12px 14px;
-        padding-bottom: calc(var(--nav-height) + 20px);
-        gap: 12px;
-        min-height: 100vh;
-        min-height: 100dvh;
-    }
-
-    /* Stays a single row: the term switch belongs beside the greeting, not
-       stacked under it. nowrap + an ellipsising greeting keeps that true for
-       long names instead of silently wrapping back to two lines. */
-    .hero {
-        padding: 14px 16px;
-        flex-wrap: nowrap;
-        gap: 10px;
-    }
-
-    .heroText {
-        min-width: 0;
-    }
-
-    .heroRight {
-        width: auto;
-        flex-shrink: 0;
-        gap: 8px;
-    }
-
-    .heroGreeting {
-        display: block;
-        font-size: 1.25rem;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    .quickActions {
-        grid-template-columns: repeat(2, 1fr);
-    }
-
-    .quickAction {
-        padding: 14px;
-    }
-
-    .mapBanner {
-        height: 170px;
-    }
-
-    /* A narrower strip shows the still's full height, sky and all: grow it
-       from the bottom so the empty sky falls off the top. */
-    .mapBannerArt {
-        background-size: auto 122%;
-        background-position: center bottom;
-    }
-
-    .grid {
-        grid-template-columns: 1fr;
-    }
-
-    .electiveList {
-        max-height: 50vh;
-    }
-
-    .electiveRow {
-        gap: 8px;
-        padding-left: 10px;
-    }
-
-    /* Swap which copy of the count is shown — see the note in page.js. */
-    .electiveBadgeRight {
-        display: none;
-    }
-
-    .electiveBadgeInline {
-        display: inline-block;
-        font-size: 0.62rem;
-        padding: 2px 6px;
-    }
-
-    .sectionRow {
-        gap: 8px;
-        padding: 8px;
-    }
-
-    .sectionCrn {
-        font-size: 0.62rem;
-    }
-
-    /* The instructor and the room's Map chip don't both fit on one line
-       here: the chip wraps under the name instead of squeezing it away. */
-    .sectionWho {
-        flex-wrap: wrap;
-        row-gap: 3px;
-    }
-
-    .sectionWho .sectionDot {
-        display: none;
-    }
+.electiveSkeletonText {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
 }
 
+/* ===== Responsive ===== */
 @media (min-width: 768px) {
-    .pageInner {
-        padding: 32px;
-        padding-bottom: 40px;
-    }
-
-    .addBtnLabelLong {
+    .addLabelLong {
         display: inline;
     }
 }
 
-/* Hamburger and bell, carried inside the hero so they sit on the greeting's
-   line. Named to match PageHeader's slot of the same name: shown on phone and
-   tablet, stood down from 1024px up where TopBar owns both. */
-.mobileChrome {
-    display: inline-flex;
-    align-items: center;
-    flex-shrink: 0;
+@media (max-width: 1100px) {
+    .sectionRow {
+        grid-template-columns: 84px minmax(0, 1fr) auto;
+        grid-template-areas:
+            'id when end'
+            'id who who';
+        row-gap: 3px;
+    }
+
+    .sectionId { grid-area: id; align-self: start; padding-top: 1px; }
+    .sectionWhen { grid-area: when; }
+    .sectionWho { grid-area: who; }
+    .sectionEnd { grid-area: end; }
 }
 
-@media (min-width: 1024px) {
-    .mobileChrome {
+@media (max-width: 1000px) {
+    .hero {
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--space-5);
+    }
+
+    .signals {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .signal:nth-child(3) {
+        box-shadow: inset 0 1px 0 var(--line-subtle);
+    }
+
+    .signal:nth-child(4) {
+        box-shadow: inset 1px 0 0 var(--line-subtle), inset 0 1px 0 var(--line-subtle);
+    }
+
+    .overview {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 767px) {
+    .hero {
+        padding: 20px 18px 18px;
+        border-radius: 18px;
+    }
+
+    .heroTitle {
+        font-size: 2rem;
+    }
+
+    .heroBreak {
+        display: inline;
+    }
+
+    .heroStatus {
+        font-size: var(--text-body);
+    }
+
+    .heroFoot {
+        padding-top: var(--space-2);
+        gap: var(--space-4);
+    }
+
+    .term {
+        width: auto;
+        flex: 1;
+    }
+
+    .today {
+        padding: 14px 14px 12px;
+    }
+
+    .signal {
+        padding: 14px;
+    }
+
+    .signalValue {
+        font-size: 1.625rem;
+    }
+
+    .guestStrip {
+        flex-wrap: wrap;
+    }
+
+    .guestStrip > a {
+        width: 100%;
+    }
+
+    .mapCard {
+        min-height: 220px;
+        padding: 12px;
+        border-radius: var(--r-lg);
+    }
+
+    .mapTitle {
+        font-size: 1.125rem;
+    }
+
+    .mapSub {
         display: none;
     }
-}
 
-/* Desktop: stack the top bar above the dashboard column. */
-@media (min-width: 1024px) {
-    .page {
-        flex-direction: column;
-        align-items: stretch;
-        justify-content: flex-start;
+    .mapCta {
+        height: 34px;
+        padding: 0 12px;
     }
 
-    .pageInner {
-        min-height: 0;
-        padding-bottom: 48px;
+    .electives {
+        padding: 16px 16px 6px;
     }
-}
 
-/* Seat availability. Banner reports negative seats on over-enrolled sections,
-   so seats.js clamps those to "Full" -- these styles never show a number
-   below 1. */
-.sectionSeats {
-    margin-left: 6px;
-    padding: 1px 6px;
-    border-radius: 3px;
-    font-size: 11px;
-    font-weight: 600;
-    line-height: 1.5;
-    white-space: nowrap;
-    vertical-align: middle;
-}
+    .electiveList {
+        margin: 0 -16px;
+        padding: 0 16px;
+        max-height: 70vh;
+    }
 
-.seats_open {
-    background: rgba(27, 110, 82, 0.12);
-    color: #1b6e52;
-}
+    .electiveFilter {
+        width: 100%;
+    }
 
-.seats_low {
-    background: rgba(168, 78, 21, 0.14);
-    color: #a84e15;
-}
+    .sectionList {
+        margin-left: 0;
+    }
 
-.seats_full {
-    background: rgba(120, 120, 130, 0.16);
-    color: #6b7280;
-}
-
-@media (prefers-color-scheme: dark) {
-    .seats_open { background: rgba(98, 195, 155, 0.16); color: #62c39b; }
-    .seats_low { background: rgba(224, 146, 86, 0.18); color: #e09256; }
-    .seats_full { background: rgba(150, 155, 165, 0.18); color: #9aa3ad; }
+    .sectionRow {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            'id end'
+            'when when'
+            'who who';
+    }
 }
