@@ -1,41 +1,38 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { CheckIcon } from '@/components/Icons';
 import styles from './ThemeToggle.module.css';
 
-// "dark" still means the navy theme so anyone's saved choice survives; "black"
-// is the true-black variant. "system" follows the OS and keeps following it.
+// Stored values stay as they were ("dark" is the navy theme), so everyone's
+// saved choice survives the renaming. "system" follows the OS.
 const OPTIONS = [
-    { value: 'system', label: 'Auto', title: 'Follow your device setting', note: 'Matches your device' },
-    { value: 'light', label: 'Light', title: 'Light theme', note: 'Bright and crisp' },
-    { value: 'dark', label: 'Navy', title: 'Dark theme, navy background', note: 'Deep and calm' },
-    { value: 'black', label: 'Black', title: 'True black, best on OLED screens', note: 'Pure black, for OLED' },
+    { value: 'system', label: 'Auto', note: 'Paper by day, Blueprint by night' },
+    { value: 'light', label: 'Paper', note: 'Warm paper, ink type' },
+    { value: 'dark', label: 'Blueprint', note: 'Navy, drawn in light' },
+    { value: 'black', label: 'Night', note: 'True black, for OLED' },
 ];
 
-// A miniature of the app in a given theme: the bar, the forest panel every
-// page leads with, a card with two lines and a mint action.
-function Miniature({ theme, className = '' }) {
+// A specimen of the theme: a corner of the timetable as it would print in
+// it — ruled day columns, three classes, and the now line.
+function Specimen({ theme, className = '' }) {
     return (
-        <span className={`${styles.preview} ${styles[`preview_${theme}`]} ${className}`}>
-            <span className={styles.pvBar}><span className={styles.pvDot} /><span className={styles.pvBarLine} /></span>
-            <span className={styles.pvForest}><span className={styles.pvForestLine} /></span>
-            <span className={styles.pvCard}>
-                <span className={styles.pvLines}>
-                    <span className={styles.pvLine} />
-                    <span className={`${styles.pvLine} ${styles.pvLineShort}`} />
-                </span>
-                <span className={styles.pvPill} />
+        <span className={`${styles.specimen} ${styles[`sp_${theme}`]} ${className}`}>
+            <span className={styles.spTitle} />
+            <span className={styles.spGrid}>
+                <span className={`${styles.spBlock} ${styles.spBlockA}`} />
+                <span className={`${styles.spBlock} ${styles.spBlockB}`} />
+                <span className={`${styles.spBlock} ${styles.spBlockC}`} />
+                <span className={styles.spNow} />
             </span>
         </span>
     );
 }
 
 const DARK_QUERY = '(prefers-color-scheme: dark)';
-const THEME_COLORS = { light: '#F5F4EF', dark: '#070D16', black: '#000000' };
+const THEME_COLORS = { light: '#F3F1EA', dark: '#0C1826', black: '#000000' };
 
-// System dark resolves to navy, not black: navy is the app's dark identity and
-// black is a deliberate choice for OLED or low light.
+// System dark resolves to Blueprint, not Night: navy is the app's dark
+// identity and black is a deliberate choice for OLED or low light.
 function resolveTheme(preference) {
     if (preference !== 'system') return preference;
     if (typeof window === 'undefined') return 'light';
@@ -63,9 +60,8 @@ export function setThemePreference(value) {
 /**
  * The theme picker.
  *
- *   compact   four swatches in a segmented control — the account menu and
- *             the admin bar
- *   default   four preview cards, each a miniature of the app in that theme —
+ *   compact   the four names as a choice line — the account menu, admin
+ *   default   four specimens, each a corner of the timetable in that theme —
  *             Profile's Appearance section
  */
 export default function ThemeToggle({ compact = false }) {
@@ -102,25 +98,23 @@ export default function ThemeToggle({ compact = false }) {
     }, []);
 
     // Nothing renders until the saved choice is known, so the control never
-    // shows the wrong option selected for a frame. The placeholder holds the
-    // space so the layout doesn't jump.
+    // shows the wrong option selected for a frame.
     if (!mounted) return <div className={compact ? styles.compactPlaceholder : styles.gridPlaceholder} aria-hidden="true" />;
 
     if (compact) {
         return (
-            <div className={styles.compact} role="radiogroup" aria-label="Colour theme">
+            <div className={styles.compact} role="radiogroup" aria-label="Theme">
                 {OPTIONS.map(option => (
                     <button
                         key={option.value}
                         type="button"
                         role="radio"
                         aria-checked={preference === option.value}
-                        aria-label={option.label}
-                        title={option.label}
-                        className={styles.swatchBtn}
+                        title={option.note}
+                        className={styles.word}
                         onClick={() => choose(option.value)}
                     >
-                        <span className={`${styles.swatch} ${styles[`swatch_${option.value}`]}`} aria-hidden="true" />
+                        <span>{option.label}</span>
                     </button>
                 ))}
             </div>
@@ -128,7 +122,7 @@ export default function ThemeToggle({ compact = false }) {
     }
 
     return (
-        <div className={styles.grid} role="radiogroup" aria-label="Colour theme">
+        <div className={styles.grid} role="radiogroup" aria-label="Theme">
             {OPTIONS.map(option => {
                 const selected = preference === option.value;
                 return (
@@ -137,27 +131,21 @@ export default function ThemeToggle({ compact = false }) {
                         type="button"
                         role="radio"
                         aria-checked={selected}
-                        title={option.title}
                         className={styles.card}
                         onClick={() => choose(option.value)}
                     >
-                        <span className={styles.previewFrame} aria-hidden="true">
+                        <span className={styles.frame} aria-hidden="true">
                             {option.value === 'system' ? (
                                 <>
-                                    <Miniature theme="light" />
-                                    <Miniature theme="dark" className={styles.previewHalf} />
+                                    <Specimen theme="light" />
+                                    <Specimen theme="dark" className={styles.half} />
                                 </>
                             ) : (
-                                <Miniature theme={option.value} />
+                                <Specimen theme={option.value} />
                             )}
                         </span>
-                        <span className={styles.cardText}>
-                            <span className={styles.cardLabel}>
-                                {option.label}
-                                {selected && <span className={styles.check}><CheckIcon strokeWidth={2.5} /></span>}
-                            </span>
-                            <span className={styles.cardNote}>{option.note}</span>
-                        </span>
+                        <span className={styles.cardLabel}><span>{option.label}</span></span>
+                        <span className={styles.cardNote}>{option.note}</span>
                     </button>
                 );
             })}
