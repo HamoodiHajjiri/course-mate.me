@@ -1,697 +1,327 @@
-/* ===== Campus map =====
-   The 3D scene fills a card; search, the area buttons and the building panel
-   float over it. */
+/* ===== Campus map — the atlas =====
+   The map is the page: a directory down the left, the campus filling the
+   rest to the edges. Buildings are sign plates in their area's colour from
+   the campus legend; places are square pictogram signs. */
 
-.mapCard {
-    position: relative;
-    height: calc(100dvh - 200px);
-    min-height: 460px;
-    border-radius: var(--radius-xl);
-    overflow: hidden;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--shadow-md);
-    /* The canvas owns every gesture: no page scroll or zoom while panning. */
-    touch-action: none;
-}
-
-.loading {
-    position: absolute;
-    inset: 0;
+.atlas {
     display: grid;
-    place-items: center;
-    color: var(--text-secondary);
-    font-size: 0.95rem;
+    grid-template-columns: 380px minmax(0, 1fr);
+    height: calc(100dvh - var(--topbar-h));
 }
 
-/* ----- Search and area buttons ----- */
+/* ===== The directory ===== */
+.directory {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border-right: 1px solid var(--rule);
+    background: var(--canvas);
+}
 
-.topBar {
-    position: absolute;
-    z-index: 10;
-    top: 12px;
-    left: 12px;
-    right: 12px;
+.directoryHead {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 22px 24px 14px;
+    border-bottom: 1px solid var(--rule-strong);
+}
+
+.title {
+    font-size: 2rem;
+    font-weight: 400;
+    letter-spacing: -0.02em;
+}
+
+.directoryBody {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 4px 24px 32px;
+}
+
+.sheet {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding-top: 14px;
+}
+
+.sheetHead {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.sheetTitle {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.sheetTitle h2 {
+    font-family: var(--font-serif);
+    font-size: 1.5rem;
+    font-weight: 400;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+}
+
+.sheetTitle p {
+    font-size: var(--text-small);
+    color: var(--ink-3);
+}
+
+.back,
+.close {
+    align-self: flex-start;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-size: var(--text-small);
+    color: var(--ink-2);
+    text-decoration: underline;
+    text-decoration-color: var(--rule-control);
+    text-underline-offset: 3px;
+}
+
+.back:hover,
+.close:hover {
+    color: var(--ink);
+}
+
+.buildingHead {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+}
+
+.block {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 10px;
+    border-top: 1px solid var(--rule);
+}
+
+.blockTitle {
+    font-family: var(--font-cond);
+    font-size: var(--text-micro);
+    font-weight: 600;
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+    color: var(--ink-3);
+}
+
+/* ----- Sign plates ----- */
+.plate {
+    display: inline-grid;
+    place-items: center;
+    flex-shrink: 0;
+    min-width: 40px;
+    height: 30px;
+    padding: 0 7px;
+    background: var(--ink);
+    color: #FFFFFF;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    line-height: 1;
+}
+
+.plate_lg {
+    min-width: 64px;
+    height: 52px;
+    padding: 0 10px;
+    font-size: 1.375rem;
+}
+
+/* Area colours from the university's own campus legend. */
+.zoneA { background: #403b61; }
+.zoneB { background: #e05a2b; }
+.zoneC { background: #305cab; }
+.zoneD { background: #785e47; }
+.zoneE { background: #00875f; }
+.zoneF { background: #404042; }
+.zoneG { background: #4d788c; }
+.zoneH { background: #8a4d9e; }
+
+.plates {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    align-items: flex-start;
-    pointer-events: none;
+    gap: 4px;
 }
 
-.topBar > * {
-    pointer-events: auto;
+.plateBtn {
+    padding: 0;
+    border: 0;
+    background: none;
+    transition: transform var(--dur-1) var(--ease-out);
 }
 
-.search {
-    position: relative;
-    flex: 1 1 260px;
-    max-width: 400px;
+.plateBtn:hover {
+    transform: translateY(-2px);
 }
 
-.search input {
-    width: 100%;
-    padding: 11px 14px;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--glass-border);
-    background: var(--glass-bg-dense);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
-    color: var(--text-primary);
-    font: inherit;
-    font-size: 0.95rem;
-    box-shadow: var(--shadow-sm);
-    outline: none;
-}
-
-.search input:focus {
-    border-color: var(--color-accent);
-    box-shadow: 0 0 0 3px var(--color-accent-muted);
-}
-
-.results {
-    position: absolute;
-    top: calc(100% + 6px);
-    left: 0;
-    right: 0;
-    margin: 0;
-    padding: 6px;
-    list-style: none;
-    border-radius: var(--radius-md);
-    background: var(--glass-bg-dense);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--shadow-lg);
-    max-height: 320px;
-    overflow-y: auto;
-    z-index: 3;
-}
-
-.results button {
+/* ----- Kinds of place ----- */
+.kinds {
     display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.kind {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr) auto;
     align-items: center;
     gap: 10px;
     width: 100%;
-    padding: 8px;
+    padding: 6px 0;
     border: 0;
-    border-radius: var(--radius-sm);
     background: none;
-    color: var(--text-primary);
-    font: inherit;
     text-align: left;
-    cursor: pointer;
+    color: var(--ink);
 }
 
-.results button:hover,
-.results button:focus-visible {
-    background: var(--color-accent-muted);
-    outline: none;
+.kind:hover .kindName {
+    text-decoration: underline;
+    text-decoration-color: var(--rule-control);
+    text-underline-offset: 3px;
 }
 
-.resultText {
+.kindName {
+    font-size: var(--text-small);
+    font-weight: 500;
+}
+
+.kindCount {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--ink-3);
+}
+
+/* ----- Results ----- */
+.resultList {
     display: flex;
     flex-direction: column;
-    min-width: 0;
-}
-
-.resultText strong {
-    font-size: 0.9rem;
-    font-weight: 600;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.resultText small {
-    color: var(--text-secondary);
-    font-size: 0.78rem;
-}
-
-.noResult {
-    padding: 8px;
-    color: var(--text-secondary);
-    font-size: 0.88rem;
-}
-
-.zones {
-    display: flex;
-    gap: 2px;
-    padding: 3px;
-    border-radius: var(--radius-md);
-    background: var(--glass-bg-dense);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--shadow-sm);
-    overflow-x: auto;
-}
-
-.zones button {
-    padding: 7px 12px;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: none;
-    color: var(--text-secondary);
-    font: inherit;
-    font-size: 0.85rem;
-    font-weight: 600;
-    white-space: nowrap;
-    cursor: pointer;
-    transition: background var(--transition-fast), color var(--transition-fast);
-}
-
-.zones button:hover {
-    color: var(--text-primary);
-}
-
-.zones .zoneActive {
-    background: var(--color-accent);
-    color: #fff;
-}
-
-/* ----- Filter chips: show every place of a kind ----- */
-
-/* The row of chips on its own line, with Clear held at its end. */
-.filtersBar {
-    flex-basis: 100%;
-    min-width: 0;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.filtersTrack {
-    position: relative;
-    flex: 1;
-    min-width: 0;
-}
-
-.filters {
-    display: flex;
-    gap: 6px;
-    overflow-x: auto;
-    scrollbar-width: none;
-    padding: 2px;
-    /* A chip scrolled into view clears the arrow over the row's edge. */
-    scroll-padding-inline: 40px;
-}
-
-/* A cut edge fades out, so a chip half off the row reads as "more this way". */
-.fadeRight {
-    mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent);
-    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent);
-}
-
-.fadeLeft {
-    mask-image: linear-gradient(to left, #000 calc(100% - 56px), transparent);
-    -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 56px), transparent);
-}
-
-.fadeLeft.fadeRight {
-    mask-image: linear-gradient(to right, transparent, #000 56px, #000 calc(100% - 56px), transparent);
-    -webkit-mask-image: linear-gradient(to right, transparent, #000 56px, #000 calc(100% - 56px), transparent);
-}
-
-.filterArrow {
-    position: absolute;
-    top: 50%;
-    display: grid;
-    place-items: center;
-    width: 30px;
-    height: 30px;
-    margin-top: -15px;
-    padding: 0;
-    border-radius: 50%;
-    border: 1px solid var(--glass-border);
-    background: var(--glass-bg-dense);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
-    box-shadow: var(--shadow-md);
-    color: var(--text-primary);
-    cursor: pointer;
-}
-
-.filterArrow:hover {
-    border-color: var(--color-accent);
-    color: var(--color-accent);
-}
-
-.filterArrow svg {
-    width: 16px;
-    height: 16px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2.4;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
-
-.filterArrowLeft {
-    left: 0;
-}
-
-.filterArrowRight {
-    right: 0;
-}
-
-/* On a touchscreen the row is swiped; the fade alone says there's more. */
-@media (hover: none) {
-    .filterArrow {
-        display: none;
-    }
-}
-
-.filters::-webkit-scrollbar {
-    display: none;
-}
-
-.filter {
-    flex: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 10px 4px 4px;
-    border-radius: var(--radius-full);
-    border: 1px solid var(--glass-border);
-    background: var(--glass-bg-dense);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
-    box-shadow: var(--shadow-sm);
-    color: var(--text-primary);
-    font: inherit;
-    font-size: 0.82rem;
-    font-weight: 600;
-    white-space: nowrap;
-    cursor: pointer;
-    transition: background var(--transition-fast), border-color var(--transition-fast);
-}
-
-.filter:hover {
-    border-color: var(--kind);
-}
-
-.filterOn,
-.filterOn:hover {
-    border-color: var(--kind);
-    background: color-mix(in srgb, var(--kind) 14%, var(--bg-card));
-}
-
-/* Some category colours (Security's navy, the coffee shops' brown) vanish
-   against a dark page, so there the outline and tint are lightened. */
-[data-theme="dark"] .filter:hover,
-[data-theme="black"] .filter:hover {
-    border-color: color-mix(in srgb, var(--kind) 55%, #fff);
-}
-
-[data-theme="dark"] .filterOn,
-[data-theme="dark"] .filterOn:hover,
-[data-theme="black"] .filterOn,
-[data-theme="black"] .filterOn:hover {
-    border-color: color-mix(in srgb, var(--kind) 55%, #fff);
-    background: color-mix(in srgb, var(--kind) 35%, var(--bg-card));
-}
-
-.filterCount {
-    min-width: 18px;
-    padding: 1px 5px;
-    border-radius: var(--radius-full);
-    background: var(--bg-tertiary);
-    color: var(--text-secondary);
-    font-size: 0.72rem;
-    text-align: center;
-}
-
-.filterClear {
-    flex: none;
-    padding: 6px 12px;
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-full);
-    /* Over the map rather than a plain card, so it needs a backing to read. */
-    background: var(--glass-bg-dense);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
-    box-shadow: var(--shadow-sm);
-    color: var(--text-secondary);
-    font: inherit;
-    font-size: 0.82rem;
-    font-weight: 600;
-    cursor: pointer;
-}
-
-.filterClear:hover {
-    color: var(--text-primary);
-}
-
-/* ----- Pins for the categories switched on -----
-   Drawn by the scene over the canvas; the point of the pin is the place. */
-
-.marker {
-    position: relative;
-    display: grid;
-    place-items: center;
-    padding: 3px;
-    border: 0;
-    border-radius: 50% 50% 50% 0;
-    background: var(--marker);
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
-    transform: translate(-50%, calc(-100% - 6px)) rotate(-45deg);
-    pointer-events: auto;
-    cursor: pointer;
-    transition: transform var(--transition-fast);
-}
-
-/* The icon stays upright inside the turned teardrop. */
-.marker > span:first-child {
-    transform: rotate(45deg);
-    border: 2px solid #fff;
-}
-
-.marker:hover {
-    transform: translate(-50%, calc(-100% - 6px)) rotate(-45deg) scale(1.12);
-}
-
-.markerOpen,
-.markerOpen:hover {
-    transform: translate(-50%, calc(-100% - 6px)) rotate(-45deg) scale(1.3);
-    box-shadow: 0 0 0 3px #fff, 0 0 0 6px var(--color-accent), 0 4px 10px rgba(0, 0, 0, 0.35);
-}
-
-.markerCount {
-    position: absolute;
-    top: -6px;
-    right: -6px;
-    min-width: 18px;
-    height: 18px;
-    padding: 0 4px;
-    border-radius: var(--radius-full);
-    background: #fff;
-    color: #0f1729;
-    font-size: 0.7rem;
-    font-weight: 800;
-    line-height: 18px;
-    transform: rotate(45deg);
-    box-shadow: var(--shadow-sm);
-}
-
-/* ----- Results for the categories switched on ----- */
-
-.resultList {
-    margin: 12px 0 0;
+    margin: 0;
     padding: 0;
     list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
 }
 
 .resultList button {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     width: 100%;
-    padding: 8px;
+    padding: 9px 0;
     border: 0;
-    border-radius: var(--radius-sm);
+    border-bottom: 1px solid var(--rule-soft);
     background: none;
-    color: var(--text-primary);
-    font: inherit;
     text-align: left;
-    cursor: pointer;
+    color: var(--ink);
 }
 
-.resultList button:hover,
-.resultList button:focus-visible {
-    background: var(--color-accent-muted);
-    outline: none;
+.resultList button:hover strong {
+    text-decoration: underline;
+    text-decoration-color: var(--rule-control);
+    text-underline-offset: 3px;
 }
 
-.resultLogo {
-    flex: none;
-    width: 34px;
-    height: 34px;
-    object-fit: contain;
-    border-radius: 50%;
-    background: #fff;
-    border: 1px solid var(--border-color);
-}
-
-.resultStatus {
-    font-weight: 600;
-}
-
-/* ----- Turning: compass and turn buttons ----- */
-
-.turnControls {
-    position: absolute;
-    z-index: 10;
-    right: 12px;
-    bottom: 12px;
+.resultText {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    padding: 3px;
-    border-radius: var(--radius-md);
-    background: var(--glass-bg-dense);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--shadow-sm);
-}
-
-.turnControls button {
-    display: grid;
-    place-items: center;
-    width: 38px;
-    height: 38px;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: none;
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: background var(--transition-fast), color var(--transition-fast);
-}
-
-.turnControls button:hover {
-    background: var(--color-accent-muted);
-    color: var(--text-primary);
-}
-
-.turnControls button > svg {
-    width: 20px;
-    height: 20px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
-
-/* The needle is turned by the scene every frame, so no transition here. */
-.needle {
-    position: relative;
-    display: grid;
-    place-items: center;
-    width: 30px;
-    height: 30px;
-}
-
-.needle svg {
-    width: 30px;
-    height: 30px;
-}
-
-.needleNorth {
-    fill: #e5484d;
-}
-
-.needleSouth {
-    fill: var(--text-muted);
-}
-
-.needleLetter {
-    position: absolute;
-    top: -7px;
-    font-size: 0.6rem;
-    font-weight: 800;
-    color: var(--text-primary);
-}
-
-/* ----- Building panel ----- */
-
-.panel {
-    position: absolute;
-    z-index: 10;
-    left: 12px;
-    bottom: 12px;
-    width: min(380px, calc(100% - 24px));
-    max-height: 58%;
-    overflow-y: auto;
-    padding: 16px;
-    border-radius: var(--radius-lg);
-    background: var(--glass-bg-dense);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--shadow-elevated);
-    color: var(--text-primary);
-    animation: panelIn 0.35s var(--ease-out-expo);
-}
-
-@keyframes panelIn {
-    from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.panelHead {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-}
-
-.panelTitle {
-    flex: 1;
+    gap: 1px;
     min-width: 0;
 }
 
-.panelTitle h2 {
-    margin: 0;
-    font-size: 1.05rem;
-    font-weight: 700;
-    line-height: 1.3;
+.resultText strong {
+    font-size: var(--text-body);
+    font-weight: 500;
 }
 
-.panelTitle p {
-    margin: 2px 0 0;
-    color: var(--text-secondary);
-    font-size: 0.85rem;
+.resultText small {
+    font-size: var(--text-caption);
+    color: var(--ink-3);
 }
 
-.close {
-    flex: none;
-    width: 30px;
-    height: 30px;
-    border: 0;
-    border-radius: var(--radius-full);
-    background: var(--bg-tertiary);
-    color: var(--text-secondary);
-    font-size: 1.2rem;
-    line-height: 1;
-    cursor: pointer;
+.resultLogo {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    flex-shrink: 0;
 }
 
-.close:hover {
-    color: var(--text-primary);
+.resultStatus {
+    color: var(--ink-3);
 }
 
-.code {
-    flex: none;
-    min-width: 40px;
-    padding: 6px 8px;
-    border-radius: var(--radius-sm);
-    background: var(--color-primary-light);
-    color: #fff;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.85rem;
-    font-weight: 700;
-    text-align: center;
+.noResult {
+    padding: 12px 0;
+    font-size: var(--text-small);
+    color: var(--ink-3);
 }
 
-/* The zone colours of the university's own map. */
-.zoneA { background: #403b61; }
-.zoneB { background: #f26b3d; }
-.zoneC { background: #305cab; }
-.zoneD { background: #785e47; }
-.zoneE { background: #00a878; }
-.zoneF { background: #404042; }
-.zoneG { background: #4d788c; }
-.zoneH { background: #8a4d9e; }
-
+/* ----- A building ----- */
 .roomBanner {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 12px 0 0;
-    padding: 8px 10px;
-    border-radius: var(--radius-sm);
-    background: var(--color-accent-muted);
-    font-size: 0.88rem;
+    padding: 8px 0 8px 12px;
+    border-left: 2px solid var(--mark);
+    font-size: var(--text-small);
+    color: var(--ink-2);
 }
 
-.roomBanner svg {
-    flex: none;
-    width: 18px;
-    height: 18px;
-    fill: none;
-    stroke: var(--color-accent-dark);
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+.roomBanner strong {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    color: var(--ink);
 }
 
 .colleges {
-    margin: 12px 0 0;
-    padding: 0;
-    list-style: none;
     display: flex;
     flex-direction: column;
     gap: 4px;
-    font-size: 0.88rem;
-}
-
-.colleges li::before {
-    content: '';
-    display: inline-block;
-    width: 6px;
-    height: 6px;
-    margin-right: 8px;
-    border-radius: 50%;
-    background: var(--color-accent);
-    vertical-align: middle;
-}
-
-/* ----- Places inside a building ----- */
-
-.insideSection {
-    margin-top: 14px;
-}
-
-.insideSection h3 {
-    margin: 0 0 8px;
-    font-size: 0.78rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-}
-
-.places {
     margin: 0;
     padding: 0;
     list-style: none;
+}
+
+.colleges li {
+    font-family: var(--font-serif);
+    font-size: 1rem;
+    color: var(--ink);
+}
+
+.places {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
 }
 
 .place {
-    padding: 12px;
-    border-radius: var(--radius-md);
-    background: var(--bg-tertiary);
-    border: 1px solid transparent;
-    scroll-margin: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--rule-soft);
+    scroll-margin: 16px;
 }
 
-/* The place a search or a pin opened. */
 .placeFocused {
-    border-color: var(--color-accent);
-    box-shadow: 0 0 0 3px var(--color-accent-muted);
+    padding-left: 12px;
+    border-left: 3px solid var(--mark);
 }
 
 .placeBare {
-    margin-top: 12px;
-    padding: 0;
-    background: none;
+    padding-top: 0;
+    border-bottom: 0;
 }
 
 .placeHead {
@@ -701,233 +331,316 @@
 }
 
 .placeLogo {
-    flex: none;
-    width: 64px;
+    width: 34px;
     height: 34px;
     object-fit: contain;
-    border-radius: var(--radius-xs);
-    background: #fff;
-    border: 1px solid var(--border-color);
+    flex-shrink: 0;
 }
 
 .placeTitle {
     display: flex;
     flex-direction: column;
+    gap: 1px;
     min-width: 0;
 }
 
 .placeTitle strong {
-    font-size: 0.92rem;
-    font-weight: 700;
+    font-size: var(--text-body);
+    font-weight: 600;
+    color: var(--ink);
 }
 
 .placeTitle small {
-    color: var(--text-secondary);
-    font-size: 0.8rem;
+    font-size: var(--text-caption);
+    color: var(--ink-3);
 }
 
 .placeStatus {
     display: flex;
     align-items: center;
     gap: 7px;
-    margin: 10px 0 0;
-    font-size: 0.84rem;
-    font-weight: 600;
-    color: var(--text-secondary);
+    font-size: var(--text-small);
+    font-weight: 500;
+    color: var(--ink-3);
 }
 
 .statusDot {
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
-    background: var(--text-muted);
+    background: var(--ink-4);
 }
 
 .isOpen {
-    color: var(--status-active);
+    color: var(--go-ink);
 }
 
 .isOpen .statusDot {
-    background: var(--status-active);
-    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+    background: var(--go);
 }
 
 .placeText,
 .placeNote {
-    margin: 8px 0 0;
-    font-size: 0.86rem;
-    line-height: 1.45;
+    font-size: var(--text-small);
+    line-height: 1.5;
+    color: var(--ink-2);
 }
 
 .placeNote {
-    color: var(--text-secondary);
-    font-size: 0.8rem;
+    color: var(--ink-3);
 }
 
 .placeToggle {
-    margin-top: 8px;
+    align-self: flex-start;
     padding: 0;
     border: 0;
     background: none;
-    color: var(--color-accent-dark);
-    font: inherit;
-    font-size: 0.84rem;
-    font-weight: 600;
-    cursor: pointer;
-}
-
-[data-theme="dark"] .placeToggle,
-[data-theme="black"] .placeToggle,
-[data-theme="dark"] .placeLinks a,
-[data-theme="black"] .placeLinks a {
-    color: var(--color-accent);
+    font-size: var(--text-small);
+    color: var(--ink-2);
+    text-decoration: underline;
+    text-decoration-color: var(--rule-control);
+    text-underline-offset: 3px;
 }
 
 .hoursTable {
     width: 100%;
-    margin-top: 6px;
     border-collapse: collapse;
-    font-size: 0.84rem;
+    font-size: var(--text-small);
 }
 
 .hoursTable th,
 .hoursTable td {
-    padding: 3px 0;
+    padding: 4px 0;
+    border-bottom: 1px dotted var(--rule);
     text-align: left;
-    font-weight: 500;
+    font-weight: 400;
 }
 
 .hoursTable th {
-    width: 48px;
-    color: var(--text-secondary);
+    width: 44%;
+    color: var(--ink-3);
+}
+
+.hoursTable td {
+    font-family: var(--font-cond);
+    color: var(--ink);
 }
 
 .hoursTable .today th,
 .hoursTable .today td {
-    font-weight: 700;
-    color: var(--text-primary);
+    font-weight: 600;
+    color: var(--ink);
 }
 
 .placeLinks {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px 14px;
-    margin-top: 10px;
-    font-size: 0.84rem;
+    gap: 4px 14px;
 }
 
 .placeLinks a {
-    color: var(--color-accent-dark);
-    font-weight: 600;
-    text-decoration: none;
-    overflow-wrap: anywhere;
-}
-
-.placeLinks a:hover {
+    font-size: var(--text-small);
+    color: var(--ink);
     text-decoration: underline;
-}
-
-.resultsLabel {
-    padding: 8px 8px 4px;
-    color: var(--text-muted);
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    text-decoration-color: var(--rule-control);
+    text-underline-offset: 3px;
 }
 
 .muted {
-    margin: 12px 0 0;
-    color: var(--text-secondary);
-    font-size: 0.88rem;
-}
-
-.classes {
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid var(--border-color);
-}
-
-.classes .muted {
-    margin: 0;
+    font-size: var(--text-small);
+    color: var(--ink-3);
 }
 
 .classesSummary {
-    margin: 0 0 8px;
-    font-size: 0.88rem;
-    color: var(--text-secondary);
+    font-size: var(--text-small);
+    color: var(--ink-2);
 }
 
 .courseList {
+    display: flex;
+    flex-direction: column;
     margin: 0;
     padding: 0;
     list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    font-size: 0.86rem;
 }
 
 .courseList li {
     display: flex;
-    gap: 10px;
-    align-items: baseline;
+    flex-direction: column;
+    gap: 2px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--rule-soft);
 }
 
-.courseId {
-    flex: none;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.78rem;
-    color: var(--text-secondary);
+/* ===== The stage ===== */
+.stage {
+    position: relative;
+    min-width: 0;
+    background: var(--map-ground);
+    overflow: hidden;
 }
 
-@media (max-width: 767px) {
-    .mapCard {
-        height: calc(100dvh - var(--nav-height) - 110px);
-        min-height: 380px;
-        border-radius: var(--radius-lg);
-    }
-
-    .search {
-        flex-basis: 100%;
-        max-width: none;
-    }
-
-    .zones {
-        flex-basis: 100%;
-    }
-
-    .zones button {
-        flex: 1;
-        padding: 7px 4px;
-        font-size: 0.8rem;
-    }
-
-    /* The building panel takes the bottom on a phone, so the turn controls
-       move up under the search and area buttons. */
-    .turnControls {
-        right: 8px;
-        bottom: auto;
-        top: 152px;
-    }
-
-    .panel {
-        left: 8px;
-        right: 8px;
-        bottom: 8px;
-        width: auto;
-        max-height: 44%;
-    }
+.loading {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 1.125rem;
+    color: var(--ink-3);
 }
 
-@media (min-width: 1024px) {
-    .mapCard {
-        height: calc(100dvh - 190px);
-    }
+/* ----- Turning: flat square buttons in the corner ----- */
+.turnControls {
+    position: absolute;
+    right: 16px;
+    bottom: 16px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    background: var(--sheet);
+    box-shadow: var(--float);
 }
 
-@media (prefers-reduced-motion: reduce) {
-    .panel {
-        animation: none;
+.turnControls button {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border: 0;
+    border-bottom: 1px solid var(--rule);
+    background: none;
+    color: var(--ink-2);
+}
+
+.turnControls button:last-child {
+    border-bottom: 0;
+}
+
+.turnControls button:hover {
+    background: var(--wash);
+    color: var(--ink);
+}
+
+.turnControls button > svg {
+    width: 17px;
+    height: 17px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: square;
+}
+
+.needle {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+}
+
+.needle svg {
+    width: 22px;
+    height: 22px;
+}
+
+.needleNorth {
+    fill: var(--danger);
+}
+
+.needleSouth {
+    fill: var(--ink-4);
+}
+
+/* ----- Place signs on the map: a square plate on a stem ----- */
+.marker {
+    position: relative;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 2px solid #FFFFFF;
+    background: var(--marker);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    transform: translate(-50%, calc(-100% - 10px));
+    pointer-events: auto;
+    cursor: pointer;
+    transition: transform var(--dur-1) var(--ease-out);
+}
+
+/* The stem down to the spot. */
+.marker::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    width: 2px;
+    height: 10px;
+    margin-left: -1px;
+    background: #FFFFFF;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.marker > span:first-child {
+    border-radius: 0 !important;
+}
+
+.marker:hover {
+    transform: translate(-50%, calc(-100% - 14px));
+}
+
+.markerOpen,
+.markerOpen:hover {
+    outline: 3px solid var(--mark);
+    transform: translate(-50%, calc(-100% - 14px)) scale(1.15);
+}
+
+.markerCount {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 3px;
+    background: #FFFFFF;
+    color: #131B17;
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    font-weight: 600;
+    line-height: 16px;
+    text-align: center;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* ===== Phones: the campus above, the directory under it ===== */
+@media (max-width: 860px) {
+    .atlas {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: 58dvh auto;
+        height: auto;
+    }
+
+    .stage {
+        grid-row: 1;
+        height: 58dvh;
+    }
+
+    .directory {
+        grid-row: 2;
+        border-right: 0;
+        border-top: 1px solid var(--rule-strong);
+    }
+
+    .directoryHead {
+        padding: 16px 16px 12px;
+    }
+
+    .title {
+        font-size: 1.5rem;
+    }
+
+    .directoryBody {
+        overflow: visible;
+        padding: 4px 16px calc(var(--tabbar-h) + 40px + env(safe-area-inset-bottom));
     }
 }
