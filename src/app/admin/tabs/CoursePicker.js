@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import styles from '../admin.module.css';
 
+/** Search the catalogue and add courses one at a time, as rows of code and name. */
 export default function CoursePicker({ selected, onAdd, excludeIds = [] }) {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState([]);
@@ -32,27 +33,30 @@ export default function CoursePicker({ selected, onAdd, excludeIds = [] }) {
     const visible = results.filter(c => !exclude.has(c.course_id));
 
     return (
-        <div>
+        <div className={styles.picker}>
             <input
+                type="search"
                 className={styles.input}
-                placeholder="Search courses by code or name..."
+                placeholder="Course code or name"
+                aria-label="Find a course to add"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
             />
             {query.trim().length >= 2 && (
-                <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 220, overflowY: 'auto' }}>
-                    {loading && <div className={styles.rowMeta}>Searching...</div>}
-                    {!loading && visible.length === 0 && <div className={styles.rowMeta}>No matches</div>}
+                <div className={styles.pickerList}>
+                    {loading && <div className={styles.previewMuted}>Searching…</div>}
+                    {!loading && visible.length === 0 && <div className={styles.previewMuted}>No course matches.</div>}
                     {visible.map(c => (
                         <button
                             type="button"
                             key={c.course_id}
-                            className={styles.btn}
-                            style={{ justifyContent: 'flex-start', textAlign: 'left' }}
+                            className={styles.pickerItem}
                             onClick={() => { onAdd(c); setQuery(''); setResults([]); }}
                         >
-                            <strong>{c.course_id}</strong> · {c.course_name}
-                            {c.credit_hours != null && <span style={{ color: 'var(--text-secondary)', marginLeft: 6 }}>· {c.credit_hours} cr</span>}
+                            <span className={styles.mono}>{c.course_id}</span>
+                            <span className={styles.pickerName}>{c.course_name}</span>
+                            {c.credit_hours != null && <span className={styles.pickerCr}>{c.credit_hours} cr</span>}
+                            <span className={styles.pickerAdd} aria-hidden="true">add</span>
                         </button>
                     ))}
                 </div>
