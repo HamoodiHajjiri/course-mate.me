@@ -1,6 +1,6 @@
 'use client';
 
-import { Children, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -8,7 +8,7 @@ import { getGuest, guestProfile } from '@/lib/guest';
 import { decodeHtmlEntities } from '@/lib/text';
 import { useSemester } from '@/lib/SemesterContext';
 import PageShell from '@/components/PageShell';
-import PageHeader from '@/components/PageHeader';
+import { CourseCode, CourseName, SearchInput, SegmentedControl } from '@/components/ui';
 import { BUILDING_IDS, focusOnBuilding, focusOnPin, focusOnPoints, focusOnZone, overview, sizedInfo, findBuilding } from './view';
 import { buildingOfRoom, floorOfRoom, fromOldCode } from './buildings';
 import { PLACE_KINDS, openStatus } from './places';
@@ -22,77 +22,6 @@ const CampusScene = dynamic(() => import('./CampusScene'), {
     loading: () => <div className={styles.loading}>Loading the campus…</div>,
 });
 
-/**
- * The filter chips in one row that scrolls sideways, as Google Maps does it.
- * There are more chips than fit, so the row says so: arrows on whichever side
- * has more (on screens with a mouse), a fade at a cut edge, and the wheel
- * scrolls it sideways. `after` stays put at the row's end.
- */
-function ChipRow({ label, children, after }) {
-    const ref = useRef(null);
-    const [more, setMore] = useState({ left: false, right: false });
-    // Re-measured when chips come or go, not on every render of the page.
-    const chipCount = Children.count(children);
-
-    useEffect(() => {
-        const row = ref.current;
-        if (!row) return undefined;
-        const measure = () => setMore({
-            left: row.scrollLeft > 1,
-            right: row.scrollLeft + row.clientWidth < row.scrollWidth - 1,
-        });
-        // A vertical wheel moves the row sideways. React's own wheel handler
-        // is passive, so it couldn't stop the page scrolling at the same time.
-        const onWheel = (e) => {
-            if (row.scrollWidth <= row.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
-            e.preventDefault();
-            row.scrollLeft += e.deltaY;
-        };
-        measure();
-        row.addEventListener('scroll', measure, { passive: true });
-        row.addEventListener('wheel', onWheel, { passive: false });
-        const resize = new ResizeObserver(measure);
-        resize.observe(row);
-        for (const chip of row.children) resize.observe(chip);
-        return () => {
-            row.removeEventListener('scroll', measure);
-            row.removeEventListener('wheel', onWheel);
-            resize.disconnect();
-        };
-    }, [chipCount]);
-
-    const page = (dir) => {
-        const row = ref.current;
-        row.scrollBy({ left: dir * row.clientWidth * 0.7, behavior: 'smooth' });
-    };
-
-    return (
-        <div className={styles.filtersBar}>
-            <div className={styles.filtersTrack}>
-                <div
-                    ref={ref}
-                    className={`${styles.filters} ${more.left ? styles.fadeLeft : ''} ${more.right ? styles.fadeRight : ''}`}
-                    role="group"
-                    aria-label={label}
-                >
-                    {children}
-                </div>
-                {more.left && (
-                    <button type="button" className={`${styles.filterArrow} ${styles.filterArrowLeft}`} onClick={() => page(-1)} aria-label="Earlier filters">
-                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
-                    </button>
-                )}
-                {more.right && (
-                    <button type="button" className={`${styles.filterArrow} ${styles.filterArrowRight}`} onClick={() => page(1)} aria-label="More filters">
-                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
-                    </button>
-                )}
-            </div>
-            {after}
-        </div>
-    );
-}
-
 const ZONE_BUTTONS = [
     { zone: 'all', label: 'Campus' },
     { zone: 'A', label: "Men's" },
@@ -101,18 +30,32 @@ const ZONE_BUTTONS = [
     { zone: 'E', label: 'Medical' },
 ];
 
-// Below this width the building panel sits along the bottom of the map.
-const PHONE_QUERY = '(max-width: 767px)';
-const onPhone = () => window.matchMedia(PHONE_QUERY).matches;
-const focusFor = (id) => focusOnBuilding(id, { panelBelow: onPhone() });
+// The directory sits beside the map (or under it on a phone), never over it,
+// so the camera never has to make room for a panel.
+const focusFor = (id) => focusOnBuilding(id);
 
 /** Where to fly for a place: its own pin if it has one, else its building. */
 function focusForPlace(place) {
-    if (place.pin_x != null) return focusOnPin(place.pin_x, place.pin_y, { panelBelow: onPhone() });
+    if (place.pin_x != null) return focusOnPin(place.pin_x, place.pin_y);
     return focusFor(place.building_id);
 }
 
 const INFOS = Object.fromEntries(BUILDING_IDS.map(id => [id, sizedInfo(findBuilding(id))]));
+
+// The building index, by area, in code order (A2 before A10).
+const ZONES = (() => {
+    const byZone = new Map();
+    BUILDING_IDS.forEach(id => {
+        const info = INFOS[id];
+        const key = info.zone || '?';
+        if (!byZone.has(key)) byZone.set(key, { zone: key, name: info.zoneName || 'Elsewhere', ids: [] });
+        byZone.get(key).ids.push(id);
+    });
+    const order = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+    return [...byZone.values()]
+        .map(z => ({ ...z, ids: z.ids.sort((a, b) => (INFOS[a].code || a).localeCompare(INFOS[b].code || b, undefined, { numeric: true })) }))
+        .sort((a, b) => order.indexOf(a.zone) - order.indexOf(b.zone));
+})();
 
 /** The 2019/2020 code a query uses ("M10", or the "M10" of "M10-102"), if any. */
 function oldCodeIn(query) {
@@ -164,21 +107,27 @@ function pointOf(place) {
     return findBuilding(place.building_id)?.center || null;
 }
 
-/**
- * Everything in the categories switched on, like a maps app's list of nearby
- * coffee shops: what each is, where, and whether it's open now.
- */
-function ResultsPanel({ places, kinds, onPick, onClear }) {
+/** A building's code as a sign plate, in its area's colour from the campus legend. */
+function Plate({ info, size = 'md' }) {
+    return (
+        <span className={`${styles.plate} ${styles[`plate_${size}`]} ${styles[`zone${info.zone}`] || ''}`}>
+            {info.code || 'H'}
+        </span>
+    );
+}
+
+/** Everything in the categories switched on: what each is, where, and whether it's open. */
+function ResultsSheet({ places, kinds, onPick, onClear }) {
     const title = kinds.map(k => PLACE_KINDS[k].plural).join(', ');
     return (
-        <aside className={styles.panel} aria-label={title}>
-            <div className={styles.panelHead}>
-                <div className={styles.panelTitle}>
+        <section className={styles.sheet} aria-label={title}>
+            <header className={styles.sheetHead}>
+                <div className={styles.sheetTitle}>
                     <h2>{title}</h2>
                     <p>{places.length} on the map</p>
                 </div>
-                <button type="button" className={styles.close} onClick={onClear} aria-label="Clear the filter">×</button>
-            </div>
+                <button type="button" className={styles.close} onClick={onClear}>Clear</button>
+            </header>
             <ul className={styles.resultList}>
                 {places.map(place => {
                     const status = openStatus(place.hours);
@@ -188,24 +137,22 @@ function ResultsPanel({ places, kinds, onPick, onClear }) {
                                 {place.logo_url
                                     // eslint-disable-next-line @next/next/no-img-element
                                     ? <img src={place.logo_url} alt="" className={styles.resultLogo} />
-                                    : <PlaceIcon kind={place.kind} size={34} />}
+                                    : <PlaceIcon kind={place.kind} size={28} />}
                                 <span className={styles.resultText}>
                                     <strong>{place.name}</strong>
                                     <small>{whereIs(place)}</small>
-                                    {status && (
-                                        <small className={`${styles.resultStatus} ${status.open ? styles.isOpen : ''}`}>{status.text}</small>
-                                    )}
+                                    {status && <small className={`${styles.resultStatus} ${status.open ? styles.isOpen : ''}`}>{status.text}</small>}
                                 </span>
                             </button>
                         </li>
                     );
                 })}
             </ul>
-        </aside>
+        </section>
     );
 }
 
-function BuildingPanel({ id, term, places, openPlace, room, onClose }) {
+function BuildingSheet({ id, term, places, openPlace, room, onClose }) {
     const info = INFOS[id];
     const [classes, setClasses] = useState(null);
 
@@ -238,26 +185,20 @@ function BuildingPanel({ id, term, places, openPlace, room, onClose }) {
     }, [info, term]);
 
     return (
-        <aside className={styles.panel} aria-label={titleOf(info)}>
-            <div className={styles.panelHead}>
-                {info.code && <span className={`${styles.code} ${styles[`zone${info.zone}`] || ''}`}>{info.code}</span>}
-                <div className={styles.panelTitle}>
+        <section className={styles.sheet} aria-label={titleOf(info)}>
+            <button type="button" className={styles.back} onClick={onClose}>← Campus directory</button>
+            <header className={styles.buildingHead}>
+                <Plate info={info} size="lg" />
+                <div className={styles.sheetTitle}>
                     <h2>{titleOf(info)}</h2>
                     <p>{[info.zoneName, info.note].filter(Boolean).join(' · ')}</p>
                 </div>
-                <button type="button" className={styles.close} onClick={onClose} aria-label="Close">×</button>
-            </div>
+            </header>
 
             {/* Arrived from a room somewhere else in the app: say which. */}
             {room && (
                 <p className={styles.roomBanner}>
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z" />
-                        <circle cx="12" cy="9.5" r="2.5" />
-                    </svg>
-                    <span>
-                        Room <strong>{room}</strong> is {floorOfRoom(room) ? `on the ${floorOfRoom(room).name} of` : 'in'} this building.
-                    </span>
+                    Room <strong>{room}</strong> is {floorOfRoom(room) ? `on the ${floorOfRoom(room).name} of` : 'in'} this building.
                 </p>
             )}
 
@@ -268,8 +209,8 @@ function BuildingPanel({ id, term, places, openPlace, room, onClose }) {
             )}
 
             {places.length > 0 && (
-                <section className={styles.insideSection}>
-                    <h3>Inside</h3>
+                <section className={styles.block}>
+                    <h3 className={styles.blockTitle}>Inside</h3>
                     <ul className={styles.places}>
                         {places.map(p => <PlaceCard key={p.id} place={p} startOpen={p.id === openPlace} />)}
                     </ul>
@@ -281,7 +222,8 @@ function BuildingPanel({ id, term, places, openPlace, room, onClose }) {
             )}
 
             {info.teaching && (
-                <div className={styles.classes}>
+                <section className={styles.block}>
+                    <h3 className={styles.blockTitle}>Taught here this term</h3>
                     {!classes ? (
                         <p className={styles.muted}>Looking up classes…</p>
                     ) : classes.sections === 0 ? (
@@ -289,46 +231,52 @@ function BuildingPanel({ id, term, places, openPlace, room, onClose }) {
                     ) : (
                         <>
                             <p className={styles.classesSummary}>
-                                {classes.sections} section{classes.sections === 1 ? '' : 's'} of {classes.courses.length} course{classes.courses.length === 1 ? '' : 's'} meet here this term, in {classes.rooms} room{classes.rooms === 1 ? '' : 's'}.
+                                {classes.sections} section{classes.sections === 1 ? '' : 's'} of {classes.courses.length} course{classes.courses.length === 1 ? '' : 's'}, in {classes.rooms} room{classes.rooms === 1 ? '' : 's'}.
                             </p>
                             <ul className={styles.courseList}>
                                 {classes.courses.map(c => (
                                     <li key={c.id}>
-                                        <span className={styles.courseId}>{c.id}</span>
-                                        <span>{c.name}</span>
+                                        <CourseCode id={c.id} size="sm" />
+                                        <CourseName size="sm">{c.name}</CourseName>
                                     </li>
                                 ))}
                             </ul>
                         </>
                     )}
-                </div>
+                </section>
             )}
-        </aside>
+        </section>
     );
 }
 
 /** A place that isn't inside a building, like a corridor coffee shop. */
-function PlacePanel({ place, onClose }) {
+function PlaceSheet({ place, onClose }) {
     return (
-        <aside className={styles.panel} aria-label={place.name}>
-            <div className={styles.panelHead}>
+        <section className={styles.sheet} aria-label={place.name}>
+            <button type="button" className={styles.back} onClick={onClose}>← Campus directory</button>
+            <header className={styles.buildingHead}>
                 {place.logo_url
                     // eslint-disable-next-line @next/next/no-img-element
                     ? <img src={place.logo_url} alt="" className={styles.placeLogo} />
-                    : <PlaceIcon kind={place.kind} size={38} />}
-                <div className={styles.panelTitle}>
+                    : <PlaceIcon kind={place.kind} size={40} />}
+                <div className={styles.sheetTitle}>
                     <h2>{place.name}</h2>
                     <p>{[PLACE_KINDS[place.kind]?.label, place.room && `Room ${place.room}`, place.location_note].filter(Boolean).join(' · ')}</p>
                 </div>
-                <button type="button" className={styles.close} onClick={onClose} aria-label="Close">×</button>
-            </div>
+            </header>
             <ul className={styles.places}>
                 <PlaceCard place={place} startOpen bare />
             </ul>
-        </aside>
+        </section>
     );
 }
 
+/**
+ * The campus map is the page: a directory down one side — search, areas,
+ * the kinds of place, every building as a sign plate — and the campus
+ * itself filling the rest. Picking anything turns the directory to its
+ * sheet and flies the camera there.
+ */
 function CampusMap() {
     const router = useRouter();
     const params = useSearchParams();
@@ -345,14 +293,14 @@ function CampusMap() {
     const needle = useRef(null);
     // Every visible row of map_places, which the admin Map tab edits.
     const [places, setPlaces] = useState([]);
-    // The place a search or a pin opened: unfolded in its building's panel,
-    // or in a panel of its own when it has no building.
+    // The place a search or a pin opened: unfolded in its building's sheet,
+    // or on a sheet of its own when it has no building.
     const [openPlace, setOpenPlace] = useState(null);
-    // The categories switched on in the filter row. Their places get pins;
-    // with none on, the map shows no pins at all.
+    // The categories switched on. Their places get pins; with none on, the
+    // map shows no pins at all.
     const [activeKinds, setActiveKinds] = useState(() => new Set());
-    // The room a link elsewhere in the app came for (?room=A3-007), shown in
-    // its building's panel until another building is picked.
+    // The room a link elsewhere in the app came for (?room=A3-007), shown on
+    // its building's sheet until another building is picked.
     const [linkedRoom, setLinkedRoom] = useState(null);
 
     const results = useMemo(() => searchMap(query, places), [query, places]);
@@ -362,7 +310,7 @@ function CampusMap() {
     const resultCount = results.buildings.length + results.places.length;
 
     const placesIn = (id) => places.filter(p => p.building_id === id);
-    // Only the categories something is filed under get a chip.
+    // Only the categories something is filed under are listed.
     const kindsPresent = Object.keys(PLACE_KINDS).filter(k => places.some(p => p.kind === k));
     const filtered = places
         .filter(p => activeKinds.has(p.kind))
@@ -376,18 +324,17 @@ function CampusMap() {
         else {
             next.add(kind);
             const points = places.filter(p => next.has(p.kind)).map(pointOf).filter(Boolean);
-            const view = focusOnPoints(points, { panelBelow: onPhone() });
+            const view = focusOnPoints(points);
             if (view) setFocus(view);
             setZone(null);
         }
         setActiveKinds(next);
-        // The list of results takes the place of any open panel.
         setSelected(null);
         setOpenPlace(null);
     };
     const soloPlace = !selected && openPlace ? places.find(p => p.id === openPlace) : null;
 
-    // Flying to one building leaves no area button lit.
+    // Flying to one building leaves no area lit.
     const select = (id) => {
         setSelected(id);
         setOpenPlace(null);
@@ -463,177 +410,160 @@ function CampusMap() {
         else if (results.places[0]) pickPlace(results.places[0]);
     };
 
-    return (
-        <PageShell width="wide">
-            <PageHeader title="Campus map" subtitle="Tap a building to see what's in it" />
-
-            <div className={styles.mapCard}>
-                {ready && (
-                    <CampusScene
-                        selected={selected}
-                        onSelect={select}
-                        focus={focus}
-                        turn={turn}
-                        highlight={highlight}
-                        needle={needle}
-                        places={places}
-                        openPlace={openPlace}
-                        activeKinds={activeKinds}
-                        onSelectPlace={(id) => {
-                            const place = places.find(p => p.id === id);
-                            if (place) selectPlace(place);
-                        }}
-                    />
+    let sheet;
+    if (query.trim()) {
+        sheet = (
+            <section className={styles.sheet} aria-label="Search results">
+                <ul className={styles.resultList}>
+                    {resultCount === 0 && <li className={styles.noResult}>Nothing on the map matches &ldquo;{query.trim()}&rdquo;.</li>}
+                    {results.buildings.map(id => (
+                        <li key={id}>
+                            <button type="button" onClick={() => pick(id)}>
+                                <Plate info={INFOS[id]} />
+                                <span className={styles.resultText}>
+                                    <strong>{titleOf(INFOS[id])}</strong>
+                                    {/* Says why an old code found this, so a student
+                                        learns the building's name today. */}
+                                    <small>{renamedFrom ? `Was ${renamedFrom} · ${INFOS[id].zoneName}` : INFOS[id].zoneName}</small>
+                                </span>
+                            </button>
+                        </li>
+                    ))}
+                    {results.places.map(place => (
+                        <li key={place.id}>
+                            <button type="button" onClick={() => pickPlace(place)}>
+                                <PlaceIcon kind={place.kind} size={28} />
+                                <span className={styles.resultText}>
+                                    <strong>{place.name}</strong>
+                                    <small>{whereIs(place)}</small>
+                                </span>
+                            </button>
+                        </li>
+                    ))}
+                </ul>
+            </section>
+        );
+    } else if (selected) {
+        sheet = (
+            <BuildingSheet
+                key={`${selected}:${openPlace || ''}`}
+                id={selected}
+                term={selectedTerm}
+                places={placesIn(selected)}
+                openPlace={openPlace}
+                room={linkedRoom}
+                onClose={() => select(null)}
+            />
+        );
+    } else if (soloPlace) {
+        sheet = <PlaceSheet key={soloPlace.id} place={soloPlace} onClose={() => setOpenPlace(null)} />;
+    } else if (filtered.length > 0) {
+        sheet = (
+            <ResultsSheet
+                places={filtered}
+                kinds={kindsPresent.filter(k => activeKinds.has(k))}
+                onPick={selectPlace}
+                onClear={() => setActiveKinds(new Set())}
+            />
+        );
+    } else {
+        sheet = (
+            <section className={styles.sheet} aria-label="Campus directory">
+                {kindsPresent.length > 0 && (
+                    <div className={styles.block}>
+                        <h3 className={styles.blockTitle}>Places</h3>
+                        <ul className={styles.kinds}>
+                            {kindsPresent.map(kind => (
+                                <li key={kind}>
+                                    <button type="button" className={styles.kind} onClick={() => toggleKind(kind)} aria-pressed={activeKinds.has(kind)}>
+                                        <PlaceIcon kind={kind} size={22} solid />
+                                        <span className={styles.kindName}>{PLACE_KINDS[kind].plural}</span>
+                                        <span className={styles.kindCount}>{places.filter(p => p.kind === kind).length}</span>
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
                 )}
+                {ZONES.map(z => (
+                    <div key={z.zone} className={styles.block}>
+                        <h3 className={styles.blockTitle}>{z.name}</h3>
+                        <div className={styles.plates}>
+                            {z.ids.map(id => (
+                                <button key={id} type="button" className={styles.plateBtn} onClick={() => pick(id)} title={titleOf(INFOS[id])} aria-label={titleOf(INFOS[id])}>
+                                    <Plate info={INFOS[id]} />
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                ))}
+            </section>
+        );
+    }
 
-                <div className={styles.topBar}>
-                    <div className={styles.search}>
-                        <input
-                            type="search"
+    return (
+        <PageShell width="full">
+            <div className={styles.atlas}>
+                <aside className={styles.directory} aria-label="Campus directory">
+                    <div className={styles.directoryHead}>
+                        <h1 className={styles.title}>Campus</h1>
+                        <SearchInput
                             value={query}
                             onChange={e => setQuery(e.target.value)}
                             onKeyDown={e => { if (e.key === 'Enter') pickFirst(); }}
-                            placeholder="Search A3, C12-002, library, coffee…"
+                            placeholder="A3, C12-002, library, coffee"
                             aria-label="Find a building, room or place"
                         />
-                        {query.trim() && (
-                            <ul className={styles.results}>
-                                {resultCount === 0 && <li className={styles.noResult}>Nothing on the map matches that</li>}
-                                {results.buildings.map(id => (
-                                    <li key={id}>
-                                        <button type="button" onClick={() => pick(id)}>
-                                            <span className={`${styles.code} ${styles[`zone${INFOS[id].zone}`] || ''}`}>{INFOS[id].code || 'H'}</span>
-                                            <span className={styles.resultText}>
-                                                <strong>{titleOf(INFOS[id])}</strong>
-                                                <small>
-                                                    {/* Says why an old code found this, so a student
-                                                        learns the building's name today. */}
-                                                    {renamedFrom ? `Was ${renamedFrom} · ${INFOS[id].zoneName}` : INFOS[id].zoneName}
-                                                </small>
-                                            </span>
-                                        </button>
-                                    </li>
-                                ))}
-                                {results.places.length > 0 && results.buildings.length > 0 && (
-                                    <li className={styles.resultsLabel}>Places</li>
-                                )}
-                                {results.places.map(place => (
-                                    <li key={place.id}>
-                                        <button type="button" onClick={() => pickPlace(place)}>
-                                            <PlaceIcon kind={place.kind} size={34} />
-                                            <span className={styles.resultText}>
-                                                <strong>{place.name}</strong>
-                                                <small>{whereIs(place)}</small>
-                                            </span>
-                                        </button>
-                                    </li>
-                                ))}
-                            </ul>
+                        <SegmentedControl
+                            size="sm"
+                            label="Jump to an area"
+                            value={zone}
+                            onChange={showZone}
+                            options={ZONE_BUTTONS.map(b => ({ value: b.zone, label: b.label }))}
+                        />
+                        {activeKinds.size > 0 && !query.trim() && (selected || soloPlace) && (
+                            <button type="button" className={styles.close} onClick={() => setActiveKinds(new Set())}>Hide place pins</button>
                         )}
                     </div>
+                    <div className={styles.directoryBody}>{sheet}</div>
+                </aside>
 
-                    <div className={styles.zones} role="group" aria-label="Jump to an area">
-                        {ZONE_BUTTONS.map(b => (
-                            <button
-                                key={b.label}
-                                type="button"
-                                className={zone === b.zone ? styles.zoneActive : ''}
-                                onClick={() => showZone(b.zone)}
-                            >
-                                {b.label}
-                            </button>
-                        ))}
-                    </div>
-                    {kindsPresent.length > 0 && (
-                        <ChipRow
-                            label="Show places on the map"
-                            after={activeKinds.size > 0 && (
-                                <button type="button" className={styles.filterClear} onClick={() => { setActiveKinds(new Set()); }}>
-                                    Clear
-                                </button>
-                            )}
-                        >
-                            {kindsPresent.map(kind => {
-                                const on = activeKinds.has(kind);
-                                const count = places.filter(p => p.kind === kind).length;
-                                return (
-                                    <button
-                                        key={kind}
-                                        type="button"
-                                        className={`${styles.filter} ${on ? styles.filterOn : ''}`}
-                                        style={{ '--kind': PLACE_KINDS[kind].color }}
-                                        aria-pressed={on}
-                                        onClick={(e) => {
-                                            toggleKind(kind);
-                                            // Clear appearing narrows the row; keep this chip in full view.
-                                            const chip = e.currentTarget;
-                                            requestAnimationFrame(() => chip.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' }));
-                                        }}
-                                    >
-                                        <PlaceIcon kind={kind} size={22} solid={on} />
-                                        {PLACE_KINDS[kind].plural}
-                                        <span className={styles.filterCount}>{count}</span>
-                                    </button>
-                                );
-                            })}
-                        </ChipRow>
+                <div className={styles.stage}>
+                    {ready && (
+                        <CampusScene
+                            selected={selected}
+                            onSelect={select}
+                            focus={focus}
+                            turn={turn}
+                            highlight={highlight}
+                            needle={needle}
+                            places={places}
+                            openPlace={openPlace}
+                            activeKinds={activeKinds}
+                            onSelectPlace={(id) => {
+                                const place = places.find(p => p.id === id);
+                                if (place) selectPlace(place);
+                            }}
+                        />
                     )}
-                </div>
 
-                <div className={styles.turnControls} role="group" aria-label="Turn the map">
-                    <button
-                        type="button"
-                        className={styles.compass}
-                        onClick={() => setTurn({ by: null })}
-                        aria-label="Face north"
-                        title="Face north"
-                    >
-                        <span ref={needle} className={styles.needle}>
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M12 2.5 16 12h-8z" className={styles.needleNorth} />
-                                <path d="M12 21.5 8 12h8z" className={styles.needleSouth} />
-                            </svg>
-                            <span className={styles.needleLetter}>N</span>
-                        </span>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setTurn({ by: -Math.PI / 4 })}
-                        aria-label="Turn left"
-                        title="Turn left (or Shift + drag the map)"
-                    >
-                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /></svg>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setTurn({ by: Math.PI / 4 })}
-                        aria-label="Turn right"
-                        title="Turn right (or Shift + drag the map)"
-                    >
-                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 4v5h-5" /></svg>
-                    </button>
+                    <div className={styles.turnControls} role="group" aria-label="Turn the map">
+                        <button type="button" className={styles.compass} onClick={() => setTurn({ by: null })} aria-label="Face north" title="Face north">
+                            <span ref={needle} className={styles.needle}>
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M12 3 15.5 12h-7z" className={styles.needleNorth} />
+                                    <path d="M12 21 8.5 12h7z" className={styles.needleSouth} />
+                                </svg>
+                            </span>
+                        </button>
+                        <button type="button" onClick={() => setTurn({ by: -Math.PI / 4 })} aria-label="Turn left" title="Turn left (or Shift + drag the map)">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /></svg>
+                        </button>
+                        <button type="button" onClick={() => setTurn({ by: Math.PI / 4 })} aria-label="Turn right" title="Turn right (or Shift + drag the map)">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 4v5h-5" /></svg>
+                        </button>
+                    </div>
                 </div>
-
-                {selected && (
-                    <BuildingPanel
-                        key={`${selected}:${openPlace || ''}`}
-                        id={selected}
-                        term={selectedTerm}
-                        places={placesIn(selected)}
-                        openPlace={openPlace}
-                        room={linkedRoom}
-                        onClose={() => select(null)}
-                    />
-                )}
-                {soloPlace && <PlacePanel key={soloPlace.id} place={soloPlace} onClose={() => setOpenPlace(null)} />}
-                {!selected && !soloPlace && filtered.length > 0 && (
-                    <ResultsPanel
-                        places={filtered}
-                        kinds={kindsPresent.filter(k => activeKinds.has(k))}
-                        onPick={selectPlace}
-                        onClear={() => setActiveKinds(new Set())}
-                    />
-                )}
             </div>
         </PageShell>
     );
