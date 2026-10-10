@@ -2,49 +2,29 @@
    Builds on admin.module.css; this is only what the places editor adds. */
 
 /* ----- Sidebar ----- */
-
 .buildingList {
     max-height: 52vh;
     overflow-y: auto;
-    margin-top: 8px;
-}
-
-/* Buildings stay one to a row on a phone too: side by side, their names
-   were cut down to a letter. */
-@media (max-width: 900px) {
-    button.navWide {
-        flex-basis: 100%;
-    }
-}
-
-/* A phone on its side has the sidebar beside the list, scrolling on its own,
-   so the building list doesn't need a scroll box of its own inside it. */
-@media (max-width: 900px) and (min-width: 640px) and (orientation: landscape) {
-    button.navWide {
-        flex-basis: auto;
-    }
-    .buildingList {
-        max-height: none;
-    }
+    margin-top: 4px;
 }
 
 .navEntry {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     gap: 8px;
     min-width: 0;
 }
 
+/* The building's code as a small sign plate. */
 .navCode {
     flex: none;
     min-width: 34px;
-    padding: 2px 5px;
-    border-radius: var(--radius-xs);
-    /* Tinted from the text colour, so it reads on the green selected row too. */
-    background: color-mix(in srgb, currentColor 14%, transparent);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.72rem;
-    font-weight: 700;
+    padding: 2px 4px;
+    background: var(--ink);
+    color: var(--on-ink);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
     text-align: center;
 }
 
@@ -56,24 +36,24 @@
 
 .navSplit {
     height: 1px;
-    margin: 6px 4px;
-    background: var(--border-color);
+    margin: 6px 0;
+    background: var(--rule-strong);
+}
+
+.sidebarGap {
+    margin-top: 10px;
 }
 
 /* ----- Main list ----- */
-
 .mainHead {
     display: flex;
-    align-items: flex-start;
+    flex-wrap: wrap;
+    align-items: flex-end;
     justify-content: space-between;
-    gap: 16px;
-    padding-bottom: 12px;
-    margin-bottom: 4px;
-    border-bottom: 1px solid var(--border-color);
+    gap: 12px 16px;
+    padding: 10px 0 12px;
 }
 
-/* The title side gives way, so a long description wraps instead of pushing
-   Add place off the edge. */
 .mainHead > div:first-child {
     flex: 1;
     min-width: 0;
@@ -83,10 +63,6 @@
     flex: none;
 }
 
-/* Below the desktop layout the building list comes first and the header
-   can sit a long scroll down, so Add place floats in the corner instead.
-   It's rendered on the body: the card's backdrop blur would pin a fixed
-   child to the card rather than the screen. */
 .addFab {
     display: none;
 }
@@ -95,75 +71,66 @@
     .mainHead .addBtn {
         display: none;
     }
-    /* Room under the last place, so the button never sits on its Delete. */
+
     .placeList {
         padding-bottom: 64px;
     }
+
     .addFab {
         display: inline-flex;
         position: fixed;
         right: 16px;
         bottom: calc(16px + env(safe-area-inset-bottom));
         z-index: 50;
-        padding: 12px 20px;
-        border-radius: var(--radius-full);
-        box-shadow: var(--shadow-accent-lg);
+        height: 40px;
+        padding: 0 18px;
+        box-shadow: var(--float);
     }
 }
 
 .mainTitle {
-    font-size: 1.05rem;
-    font-weight: 700;
-    color: var(--text-primary);
+    font-family: var(--font-serif);
+    font-size: 1.375rem;
+    font-weight: 400;
+    line-height: 1.15;
+    color: var(--ink);
 }
 
-/* Type filter: one chip per kind of place, in the kind's own colour once on. */
+/* Type filter: a line of kinds, each with its pictogram. */
 .kindChips {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
-    padding: 4px 0 8px;
+    gap: 4px 16px;
+    padding: 0 0 10px;
 }
 
 .kindChip {
-    --kind: var(--color-accent);
+    --kind: var(--ink);
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 10px 4px 5px;
-    border-radius: var(--radius-full);
-    border: 1px solid var(--border-color);
-    background: var(--bg-secondary);
-    color: var(--text-secondary);
-    font: inherit;
-    font-size: 0.8rem;
-    font-weight: 600;
+    padding: 3px 0;
+    border: 0;
+    background: none;
+    font-size: var(--text-small);
+    font-weight: 500;
+    color: var(--ink-3);
     cursor: pointer;
-    transition: border-color var(--transition-fast), background var(--transition-fast);
-}
-
-/* "All types" has no icon, so it doesn't need the icon's tighter left edge. */
-.kindChip:first-child {
-    padding-left: 12px;
 }
 
 .kindChip:hover {
-    border-color: color-mix(in srgb, var(--kind) 55%, var(--border-color));
+    color: var(--ink);
 }
 
 .kindChipOn {
-    border-color: var(--kind);
-    background: color-mix(in srgb, var(--kind) 14%, transparent);
-    color: var(--text-primary);
+    color: var(--ink);
+    box-shadow: inset 0 -2px 0 var(--kind);
 }
 
 .kindCount {
-    min-width: 18px;
-    padding: 0 5px;
-    border-radius: var(--radius-full);
-    background: color-mix(in srgb, currentColor 12%, transparent);
-    font-size: 0.7rem;
-    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--ink-4);
 }
 
 .rowLogo {
@@ -171,22 +138,28 @@
     width: 64px;
     height: 36px;
     object-fit: contain;
-    border-radius: var(--radius-xs);
-    background: #fff;
+    background: #FFFFFF;
+    border: 1px solid var(--rule);
 }
 
 /* ----- Editor dialog ----- */
+.dialogBody {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
 
 .overlay {
     position: fixed;
     inset: 0;
-    z-index: 100;
+    z-index: var(--z-modal);
     display: flex;
     justify-content: center;
     align-items: flex-start;
     padding: 40px 16px;
     overflow-y: auto;
-    background: rgba(0, 0, 0, 0.55);
+    background: var(--overlay);
+    animation: cm-fade-in var(--dur-2) var(--ease-out);
 }
 
 .dialog {
@@ -195,12 +168,12 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
-    padding: 20px;
-    border-radius: 16px;
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    box-shadow: var(--shadow-xl);
-    color: var(--text-primary);
+    padding: 22px 24px;
+    border-radius: var(--r-3);
+    background: var(--sheet);
+    box-shadow: var(--float-lg);
+    color: var(--ink);
+    animation: cm-pop-in var(--dur-2) var(--ease-out);
 }
 
 .dialogHead,
@@ -213,14 +186,16 @@
 
 .dialogFoot {
     justify-content: flex-end;
+    padding-top: 14px;
+    border-top: 1px solid var(--rule);
 }
 
 .section {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    padding-top: 14px;
-    border-top: 1px solid var(--border-color);
+    padding-top: 12px;
+    border-top: 1px solid var(--rule);
 }
 
 .section:first-of-type {
@@ -236,13 +211,13 @@
 }
 
 .sectionTitle {
-    font-size: 0.9rem;
-    font-weight: 700;
+    font-size: var(--text-small);
+    font-weight: 600;
 }
 
 .optional {
-    color: var(--text-muted);
-    font-weight: 500;
+    font-weight: 400;
+    color: var(--ink-4);
 }
 
 .grid2 {
@@ -251,7 +226,6 @@
     gap: 10px;
 }
 
-/* Building gets the room it needs; the room code is short. */
 .grid2Wide {
     display: grid;
     grid-template-columns: 2fr 1fr;
@@ -267,8 +241,8 @@
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    font-size: 0.875rem;
-    color: var(--text-secondary);
+    font-size: var(--text-small);
+    color: var(--ink-2);
     cursor: pointer;
 }
 
@@ -276,48 +250,53 @@
     padding: 0;
     border: 0;
     background: none;
-    color: var(--color-accent-dark);
-    font: inherit;
-    font-size: 0.82rem;
-    font-weight: 600;
+    font-size: var(--text-small);
+    color: var(--ink-2);
+    text-decoration: underline;
+    text-decoration-color: var(--rule-control);
+    text-underline-offset: 3px;
     cursor: pointer;
     white-space: nowrap;
 }
 
 .linkBtn:hover {
-    text-decoration: underline;
+    color: var(--ink);
 }
 
 .iconBtn {
     width: 24px;
     height: 24px;
-    border: 0;
-    border-radius: 50%;
-    background: var(--bg-tertiary);
-    color: var(--text-secondary);
-    font-size: 1rem;
+    border: 1px solid var(--rule-control);
+    background: none;
+    color: var(--ink-2);
+    font-size: 0.875rem;
     line-height: 1;
     cursor: pointer;
 }
 
-/* ----- Hours ----- */
+.iconBtn:hover {
+    border-color: var(--ink);
+    color: var(--ink);
+}
 
+/* ----- Hours ----- */
 .hours {
     display: flex;
     flex-direction: column;
-    gap: 6px;
 }
 
 .hoursRow {
     display: grid;
-    grid-template-columns: 40px 1fr auto;
+    grid-template-columns: 44px 1fr auto;
     align-items: center;
     gap: 10px;
-    min-height: 34px;
+    min-height: 36px;
+    border-bottom: 1px solid var(--rule-soft);
 }
 
 .hoursDay {
-    font-size: 0.85rem;
+    font-family: var(--font-cond);
+    font-size: var(--text-small);
     font-weight: 600;
 }
 
@@ -335,28 +314,28 @@
 
 .hoursTo,
 .hoursClosed {
-    color: var(--text-muted);
-    font-size: 0.82rem;
+    font-size: var(--text-caption);
+    color: var(--ink-3);
 }
 
 .timeInput {
-    padding: 5px 8px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border-color);
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    font: inherit;
-    font-size: 0.85rem;
+    height: 28px;
+    padding: 0 6px;
+    border: 1px solid var(--rule-control);
+    border-radius: var(--r-2);
+    background: var(--sheet);
+    font-family: var(--font-mono);
+    font-size: var(--text-caption);
+    color: var(--ink);
 }
 
 .hoursActions {
     display: flex;
     gap: 16px;
-    padding-left: 50px;
+    padding: 8px 0 0 54px;
 }
 
 /* ----- Logo ----- */
-
 .logoRow {
     display: flex;
     align-items: center;
@@ -367,24 +346,22 @@
 .logoEmpty {
     width: 120px;
     height: 58px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--rule);
 }
 
 .logoPreview {
     object-fit: contain;
-    background: #fff;
+    background: #FFFFFF;
 }
 
 .logoEmpty {
     display: grid;
     place-items: center;
-    color: var(--text-muted);
-    font-size: 0.8rem;
+    font-size: var(--text-caption);
+    color: var(--ink-3);
 }
 
 /* ----- Pin picker ----- */
-
 .picker {
     display: flex;
     flex-direction: column;
@@ -406,9 +383,8 @@
 .pickerScroll {
     height: 360px;
     overflow: auto;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--border-color);
-    background: #f5f2eb;
+    border: 1px solid var(--rule);
+    background: var(--map-ground);
 }
 
 .pickerMap {
@@ -425,26 +401,32 @@
 
 .pickerBuilding {
     position: absolute;
-    border: 2px dashed var(--color-accent-dark);
-    border-radius: 4px;
-    background: rgba(0, 195, 137, 0.12);
+    border: 2px dashed var(--ink);
+    background: color-mix(in srgb, var(--mark) 60%, transparent);
     pointer-events: none;
 }
 
-/* A teardrop pin whose point is the chosen spot. */
+/* The chosen spot: a square sign on a stem, like the map's own markers. */
 .pickerPin {
     position: absolute;
-    width: 22px;
-    height: 22px;
-    /* Turned 45 degrees, the point sits 4.5px below the box: lift it onto the spot. */
-    margin: -26.5px 0 0 -11px;
-    border-radius: 50% 50% 50% 0;
-    transform: rotate(-45deg);
-    transform-origin: 50% 50%;
-    background: #e5484d;
-    border: 2px solid #fff;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    width: 16px;
+    height: 16px;
+    margin: -28px 0 0 -8px;
+    background: var(--danger);
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
     pointer-events: none;
+}
+
+.pickerPin::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    width: 2px;
+    height: 10px;
+    margin-left: -1px;
+    background: #FFFFFF;
 }
 
 @media (max-width: 640px) {
