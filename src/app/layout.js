@@ -21,7 +21,7 @@ export const viewport = {
 };
 
 // Browser chrome colour per theme, matching --canvas in globals.css.
-const THEME_COLORS = { light: '#F5F4EF', dark: '#070D16', black: '#000000' };
+const THEME_COLORS = { light: '#F3F1EA', dark: '#0C1826', black: '#000000' };
 
 export default function RootLayout({ children }) {
     return (
@@ -32,7 +32,7 @@ export default function RootLayout({ children }) {
                 {/* Loaded by family name rather than next/font: the schedule
                     PNG export draws on a canvas with these exact names. */}
                 <link
-                    href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap"
+                    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400..500&display=swap"
                     rel="stylesheet"
                 />
                 <meta name="theme-color" content={THEME_COLORS.light} />
