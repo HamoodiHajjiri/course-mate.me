@@ -1,94 +1,142 @@
-/* ===== Week grid — the one timetable ===== */
+/* ===== The timetable =====
+   Drawn like the printed sheet: no outer box, an ink rule under the day
+   heads, hairline columns, dotted half hours. Classes are square blocks in
+   their course's tint with the course colour as a tab along the top. */
 
 .timetable {
     overflow-x: auto;
     min-width: 0;
+    scrollbar-width: thin;
 }
 
 .grid {
     display: grid;
-    grid-template-columns: 50px repeat(var(--cols), minmax(92px, 1fr));
-    min-width: calc(50px + var(--cols) * 92px);
+    grid-template-columns: 44px repeat(var(--cols), minmax(104px, 1fr));
+    min-width: calc(44px + var(--cols) * 104px);
+}
+
+.corner {
+    border-bottom: 1px solid var(--rule-strong);
 }
 
 .dayHeader {
-    display: grid;
-    place-items: center;
-    height: 40px;
-    font-size: var(--text-caption);
-    font-weight: var(--weight-semibold);
+    display: flex;
+    align-items: flex-end;
+    height: 34px;
+    padding: 0 8px 7px;
+    border-bottom: 1px solid var(--rule-strong);
+    font-family: var(--font-cond);
+    font-size: var(--text-micro);
+    font-weight: 600;
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
     color: var(--ink-2);
+}
+
+.dayToday span {
+    background-image: linear-gradient(var(--mark), var(--mark));
+    background-repeat: no-repeat;
+    background-size: 100% 90%;
+    background-position: 0 70%;
+    padding: 0 3px;
+    margin: 0 -3px;
+    color: var(--mark-ink);
 }
 
 .dayShort {
     display: none;
 }
 
+/* ----- Hours ----- */
 .timeAxis {
     position: relative;
 }
 
 .timeLabel {
     position: absolute;
-    right: 10px;
-    transform: translateY(-50%);
-    font-size: 0.65625rem;
-    font-weight: var(--weight-medium);
+    left: 0;
+    padding-top: 3px;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
     color: var(--ink-3);
-    white-space: nowrap;
     font-variant-numeric: tabular-nums;
+    line-height: 1;
 }
 
-.timeLabel:first-child {
-    transform: none;
+.timeLabel:last-child {
+    display: none;
+}
+
+.nowLabel {
+    position: absolute;
+    left: 0;
+    padding: 1px 3px;
+    transform: translateY(-50%);
+    background: var(--go);
+    color: var(--canvas);
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    font-weight: 500;
+    line-height: 1.2;
+    z-index: 2;
 }
 
 .dayBody {
     position: relative;
-    border-left: 1px solid var(--line-subtle);
+    border-left: 1px solid var(--rule);
 }
 
-.dayBody:last-child {
-    border-right: 1px solid var(--line-subtle);
+.dayBodyToday {
+    background: var(--wash);
 }
 
-.gridLine {
+.hourLine,
+.halfLine {
     position: absolute;
     left: 0;
     right: 0;
     height: 0;
-    border-top: 1px solid var(--line-subtle);
+    pointer-events: none;
 }
 
-.gridLineHalf {
-    border-top-style: dashed;
-    opacity: 0.55;
+.hourLine {
+    border-top: 1px solid var(--rule-soft);
 }
 
+.halfLine {
+    border-top: 1px dotted var(--rule-soft);
+}
+
+/* ----- A class ----- */
 .block {
     --c: var(--course-1);
     position: absolute;
-    left: 3px;
-    right: 3px;
+    left: 1px;
+    right: 1px;
+    z-index: 1;
     display: flex;
     flex-direction: column;
-    gap: 1px;
-    padding: 5px 7px 5px 9px;
-    border-radius: 8px;
-    background: color-mix(in srgb, var(--c) var(--course-tint), var(--surface));
-    box-shadow: inset 3px 0 0 var(--c), inset 0 0 0 1px color-mix(in srgb, var(--c) 22%, transparent);
+    gap: 2px;
+    padding: 5px 6px 5px 7px;
+    background: color-mix(in srgb, var(--c) var(--course-tint), var(--canvas));
+    border-top: 2px solid var(--c);
     color: color-mix(in srgb, var(--c) var(--course-ink), var(--course-ink-base));
     overflow: hidden;
-    z-index: 1;
-    transition: box-shadow var(--dur-1) var(--ease-out);
+    transition:
+        top var(--dur-3) var(--ease-out),
+        height var(--dur-3) var(--ease-out),
+        left var(--dur-3) var(--ease-out),
+        width var(--dur-3) var(--ease-out);
+    animation: cm-place var(--dur-3) var(--ease-out) both;
+    animation-delay: calc(var(--d, 0) * 45ms);
 }
 
 .block:hover {
     z-index: 3;
-    box-shadow: inset 3px 0 0 var(--c), inset 0 0 0 1px color-mix(in srgb, var(--c) 45%, transparent), var(--e2);
+    outline: 1px solid var(--c);
 }
 
-.blockTop {
+.blockHead {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
@@ -99,62 +147,121 @@
 .blockCode {
     font-family: var(--font-mono);
     font-size: 0.6875rem;
-    font-weight: 600;
+    font-weight: 500;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
+.blockDept {
+    margin-right: 0.3em;
+    opacity: 0.55;
+    font-weight: 400;
+}
+
 .blockSection {
     flex-shrink: 0;
     font-family: var(--font-mono);
-    font-size: 0.625rem;
-    opacity: 0.8;
+    font-size: 0.6875rem;
+}
+
+.blockSection span {
+    font-family: var(--font-serif);
+    opacity: 0.6;
 }
 
 .blockName {
     display: -webkit-box;
     -webkit-box-orient: vertical;
     overflow: hidden;
-    overflow-wrap: anywhere;
-    font-size: 0.6875rem;
-    font-weight: var(--weight-semibold);
-    line-height: 1.2;
+    overflow-wrap: break-word;
+    hyphens: auto;
+    font-family: var(--font-serif);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1.15;
     color: var(--ink);
 }
 
-.blockMeta {
+.blockFoot {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 6px;
     margin-top: auto;
+    min-width: 0;
+}
+
+.blockTime {
+    font-family: var(--font-cond);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.blockRoom {
+    font-family: var(--font-mono);
     font-size: 0.625rem;
-    font-weight: var(--weight-medium);
-    opacity: 0.85;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    font-variant-numeric: tabular-nums;
+    opacity: 0.85;
+}
+
+.blockNarrow .blockFoot .blockRoom {
+    display: none;
+}
+
+/* A clash: hatched, the way a drawing marks two things in one place. */
+.blockConflict {
+    border-top-color: var(--danger);
+    background-image: repeating-linear-gradient(-45deg, var(--hatch) 0 1px, transparent 1px 6px);
+    background-color: color-mix(in srgb, var(--c) var(--course-tint), var(--canvas));
 }
 
 /* Office hours: present, but not a class. */
 .office {
     position: absolute;
-    left: 3px;
-    right: 3px;
+    left: 1px;
+    right: 1px;
     display: flex;
     align-items: flex-start;
-    padding: 4px 7px;
-    border-radius: 8px;
-    border: 1.5px dashed var(--line-strong);
-    background: repeating-linear-gradient(135deg, transparent 0 6px, var(--surface-2) 6px 12px);
+    padding: 4px 6px;
+    border: 1px dashed var(--rule-control);
     color: var(--ink-3);
-    font-size: 0.625rem;
-    font-weight: var(--weight-semibold);
+    font-family: var(--font-cond);
+    font-size: 0.6875rem;
+    font-weight: 500;
     overflow: hidden;
+}
+
+/* ----- Now ----- */
+.now {
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 4;
+    height: 0;
+    border-top: 1.5px solid var(--go);
+    pointer-events: none;
+}
+
+.now::before {
+    content: '';
+    position: absolute;
+    left: -4px;
+    top: -4.75px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--go);
 }
 
 @media (max-width: 767px) {
     .grid {
-        grid-template-columns: 38px repeat(var(--cols), minmax(62px, 1fr));
-        min-width: calc(38px + var(--cols) * 62px);
+        grid-template-columns: 26px repeat(var(--cols), minmax(56px, 1fr));
+        min-width: calc(26px + var(--cols) * 56px);
     }
 
     .dayLong {
@@ -163,24 +270,34 @@
 
     .dayShort {
         display: inline;
-        text-transform: uppercase;
-        letter-spacing: var(--tracking-overline);
-        font-size: var(--text-micro);
     }
 
-    .timeLabel {
-        right: 6px;
-        font-size: 0.5625rem;
+    .dayHeader {
+        padding: 0 5px 6px;
     }
 
     .block {
-        left: 2px;
-        right: 2px;
-        padding: 4px 4px 4px 6px;
-        border-radius: 6px;
+        padding: 4px 4px 4px 5px;
     }
 
-    .blockSection {
+    .blockDept,
+    .blockSection,
+    .blockRoom {
         display: none;
+    }
+
+    .blockName {
+        font-size: 0.71875rem;
+        line-height: 1.1;
+    }
+
+    .blockTime {
+        font-size: 0.625rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .block {
+        animation: none;
     }
 }
