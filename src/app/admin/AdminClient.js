@@ -15,18 +15,40 @@ import announcementsTab from './tabs/AnnouncementsTab';
 import mapTab from './tabs/MapTab';
 import styles from './admin.module.css';
 
-const TABS = [
-    { id: 'overview', label: 'Overview', module: overviewTab },
-    { id: 'users', label: 'Users', module: usersTab },
-    { id: 'posts', label: 'Posts', module: postsTab },
-    { id: 'semesters', label: 'Semesters', module: semestersTab },
-    { id: 'majors', label: 'Majors', module: majorsTab },
-    { id: 'courses', label: 'Courses', module: coursesTab },
-    { id: 'rooms', label: 'Rooms', module: roomsTab },
-    { id: 'announcements', label: 'Announcements', module: announcementsTab },
-    { id: 'map', label: 'Map', module: mapTab },
+// Grouped by the job each section is for, not alphabetically.
+const GROUPS = [
+    {
+        label: 'People and activity',
+        tabs: [
+            { id: 'overview', label: 'Overview', note: 'How the platform is being used', module: overviewTab },
+            { id: 'users', label: 'Users', note: 'Students, their details and saved schedules', module: usersTab },
+            { id: 'posts', label: 'Posts', note: 'Everything on the board, any status', module: postsTab },
+            { id: 'announcements', label: 'Announcements', note: 'Notices shown to students on Home', module: announcementsTab },
+        ],
+    },
+    {
+        label: 'Catalogue',
+        tabs: [
+            { id: 'semesters', label: 'Semesters', note: 'Terms, which are live, registration windows', module: semestersTab },
+            { id: 'majors', label: 'Majors', note: 'Majors and the courses in each plan', module: majorsTab },
+            { id: 'courses', label: 'Courses', note: 'The course list and its details', module: coursesTab },
+        ],
+    },
+    {
+        label: 'Campus',
+        tabs: [
+            { id: 'rooms', label: 'Rooms', note: 'Every room’s week, and which are free', module: roomsTab },
+            { id: 'map', label: 'Map', note: 'Places on the campus map', module: mapTab },
+        ],
+    },
 ];
 
+const TABS = GROUPS.flatMap(g => g.tabs);
+
+/**
+ * The admin: operations, not a page of the student app. A dark rail of
+ * sections grouped by job, then each section's tools beside its data.
+ */
 export default function AdminClient() {
     const [active, setActive] = useState('overview');
     const activeTab = TABS.find(t => t.id === active);
@@ -34,44 +56,42 @@ export default function AdminClient() {
 
     return (
         <div className={styles.page}>
-            <div className={styles.pageInner}>
-                <header className={styles.topbar}>
-                    <div className={styles.topbarBrand}>
-                        <span className={styles.logoFrame}>
-                            <Image src="/logo.png" alt="" width={64} height={64} className={styles.logoImage} />
-                        </span>
-                        <span className={styles.topbarTitle}>Admin</span>
-                    </div>
+            <aside className={styles.rail}>
+                <div className={styles.railBrand}>
+                    <Image src="/logo.png" alt="" width={48} height={48} className={styles.railLogo} />
+                    <span className={styles.railName}>CourseMate</span>
+                    <span className={styles.railRole}>Admin</span>
+                </div>
 
-                    {/* Scrolls sideways on a narrow window rather than wrapping or
-                        running under the brand. */}
-                    <nav className={styles.topTabs} aria-label="Admin sections">
-                        {TABS.map(t => (
-                            <button
-                                key={t.id}
-                                className={`${styles.topTab} ${active === t.id ? styles.activeTopTab : ''}`}
-                                aria-current={active === t.id ? 'page' : undefined}
-                                onClick={() => setActive(t.id)}
-                            >
-                                {t.label}
-                            </button>
-                        ))}
-                    </nav>
+                <nav className={styles.railNav} aria-label="Admin sections">
+                    {GROUPS.map(g => (
+                        <div key={g.label} className={styles.railGroup}>
+                            <span className={styles.railGroupLabel}>{g.label}</span>
+                            {g.tabs.map(t => (
+                                <button
+                                    key={t.id}
+                                    type="button"
+                                    className={styles.railItem}
+                                    aria-current={active === t.id ? 'page' : undefined}
+                                    onClick={() => setActive(t.id)}
+                                >
+                                    {t.label}
+                                </button>
+                            ))}
+                        </div>
+                    ))}
+                </nav>
 
-                    <div className={styles.topbarRight}>
-                        {/* Swatches only: the names are on hover, and the labelled
-                            version crowded the tabs off the bar. */}
-                        <ThemeToggle compact />
-                        <span className={styles.topbarDivider} aria-hidden="true" />
-                        <Link href="/" className={styles.exitLink}>
-                            <span className={styles.exitLabel}>Exit admin</span>
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                                <polyline points="16 17 21 12 16 7" />
-                                <line x1="21" y1="12" x2="9" y2="12" />
-                            </svg>
-                        </Link>
-                    </div>
+                <div className={styles.railFoot}>
+                    <ThemeToggle compact />
+                    <Link href="/" className={styles.exit}>Exit to CourseMate →</Link>
+                </div>
+            </aside>
+
+            <div className={styles.content}>
+                <header className={styles.contentHead}>
+                    <h1 className={styles.contentTitle}>{activeTab.label}</h1>
+                    <p className={styles.contentNote}>{activeTab.note}</p>
                 </header>
 
                 <Provider>
