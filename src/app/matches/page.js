@@ -4,11 +4,21 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { fetchAllRows } from '@/lib/supabase/fetchAll';
-import { useSemester } from '@/lib/SemesterContext';
 import { ACTIVITY_TYPES } from '@/lib/useUnreadCount';
 import PageShell from '@/components/PageShell';
 import PageHeader from '@/components/PageHeader';
+import MatchCard from './MatchCard';
+import { POST_TYPE_CONFIG } from '@/components/PostCard';
+import {
+    Avatar, Badge, Button, Callout, CourseSwatch, EmptyState, Skeleton, Tabs, Ticket, useConfirm, useToast,
+} from '@/components/ui';
+import {
+    ActivityIcon, ArrowRightIcon, CheckIcon, ClockIcon, CopyIcon, HistoryIcon, LayersIcon, PhoneIcon, PlusIcon,
+    SearchIcon,
+} from '@/components/Icons';
 import styles from './matches.module.css';
+
+const DAY = 24 * 60 * 60 * 1000;
 
 export default function MatchesPage() {
     const [matches, setMatches] = useState([]);
@@ -20,10 +30,12 @@ export default function MatchesPage() {
     const [user, setUser] = useState(null);
     const [courses, setCourses] = useState({});
     const [contactInfoMap, setContactInfoMap] = useState({});
+    const [busy, setBusy] = useState(null);
     const router = useRouter();
     const supabase = createClient();
-    const { selectedTerm } = useSemester();
     const liveChannelRef = useRef(null);
+    const confirm = useConfirm();
+    const toast = useToast();
 
     useEffect(() => {
         checkAuth();
@@ -224,20 +236,33 @@ export default function MatchesPage() {
     };
 
     const handleAccept = async (match) => {
+        setBusy(`accept-${match.id}`);
         const { error } = await supabase.rpc('accept_match', { p_match_id: match.id });
+        setBusy(null);
         if (error) {
             console.error('Accept error:', error);
-            alert('Failed to accept: ' + error.message);
+            toast.error(`Couldn't accept: ${error.message}`);
             return;
         }
+        toast.success('Accepted. We’ll tell you when everyone has.');
         fetchMatches(user.id);
     };
 
     const handleDecline = async (match) => {
+        const ok = await confirm({
+            title: 'Decline this swap?',
+            body: 'Everyone in the match is told, and your post goes straight back on the marketplace for another match.',
+            confirmLabel: 'Decline swap',
+            cancelLabel: 'Keep it',
+            tone: 'danger',
+        });
+        if (!ok) return;
+        setBusy(`decline-${match.id}`);
         const { error } = await supabase.rpc('decline_match', { p_match_id: match.id });
+        setBusy(null);
         if (error) {
             console.error('Decline error:', error);
-            alert('Failed to decline: ' + error.message);
+            toast.error(`Couldn't decline: ${error.message}`);
             return;
         }
 
@@ -248,12 +273,19 @@ export default function MatchesPage() {
             body: JSON.stringify({ matchId: match.id }),
         }).catch(() => { });
 
+        toast.info('Declined. Your post is back on the marketplace.');
         fetchMatches(user.id);
         fetchMyPosts(user.id);
         fetchDeclinedMatches(user.id);
     };
 
     const handleComplete = async (postId) => {
+        const ok = await confirm({
+            title: 'Mark this post as done?',
+            body: 'It comes off the marketplace and moves to your history.',
+            confirmLabel: 'Mark as swapped',
+        });
+        if (!ok) return;
         await supabase
             .from('posts')
             .update({ status: 'completed' })
@@ -263,6 +295,7 @@ export default function MatchesPage() {
             !(m.participants || []).some(p => p.user_id === user.id && p.post?.id === postId)
         ));
 
+        toast.success('Moved to history');
         fetchMyPosts(user.id);
         fetchHistory(user.id);
     };
@@ -270,56 +303,71 @@ export default function MatchesPage() {
     // Completing from an accepted match goes through the RPC so the whole match
     // closes (status + completed_at) once every member has marked their leg done.
     const handleCompleteMatch = async (match) => {
+        const ok = await confirm({
+            title: 'Did the swap go through?',
+            body: 'Only mark it once you’ve both dropped and added the sections in the university portal.',
+            confirmLabel: 'Yes, it’s done',
+        });
+        if (!ok) return;
+        setBusy(`complete-${match.id}`);
         const { error } = await supabase.rpc('complete_match_leg', { p_match_id: match.id });
+        setBusy(null);
         if (error) {
             console.error('Complete error:', error);
-            alert('Failed to complete: ' + error.message);
+            toast.error(`Couldn't complete: ${error.message}`);
             return;
         }
+        toast.success('Swap completed. Nice one.');
         setMatches(prev => prev.filter(m => m.id !== match.id));
         fetchMyPosts(user.id);
         fetchHistory(user.id);
     };
 
     const handleDelete = async (postId) => {
+        const ok = await confirm({
+            title: 'Cancel this post?',
+            body: 'It will be removed from Browse for everyone.',
+            confirmLabel: 'Cancel post',
+            cancelLabel: 'Keep it',
+            tone: 'danger',
+        });
+        if (!ok) return;
         // Goes through cancel_post so stale match_participant rows are cleaned up
         // (the FK used to silently block the delete) and live matches are guarded.
         const { error } = await supabase.rpc('cancel_post', { p_post_id: postId });
         if (error) {
-            alert(error.message || 'Failed to cancel this post.');
+            toast.error(error.message || 'Failed to cancel this post.');
             return;
         }
+        toast.success('Post cancelled');
         fetchMyPosts(user.id);
-    };
-
-    const getTimeRemaining = (expiresAt) => {
-        const now = new Date();
-        const expiry = new Date(expiresAt);
-        const diff = expiry - now;
-
-        if (diff <= 0) return 'Expired';
-
-        const hours = Math.floor(diff / (1000 * 60 * 60));
-        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-
-        return `${hours}h ${minutes}m left`;
     };
 
     // Compact "time left" label for a user's own active post (turns urgent < 24h).
     const getPostExpiry = (expiresAt) => {
         if (!expiresAt) return null;
         const diff = new Date(expiresAt) - new Date();
-        if (diff <= 0) return { text: 'Expiring…', urgent: true };
+        if (diff <= 0) return { text: 'Expiring…', urgent: true, pct: 0 };
         const days = Math.floor(diff / (1000 * 60 * 60 * 24));
         const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        if (days >= 1) return { text: `${days}d left`, urgent: false };
-        if (hours >= 1) return { text: `${hours}h left`, urgent: true };
-        return { text: '<1h left', urgent: true };
+        const pct = Math.min(100, (diff / (7 * DAY)) * 100);
+        if (days >= 1) return { text: `${days}d left`, urgent: false, pct };
+        if (hours >= 1) return { text: `${hours}h left`, urgent: true, pct };
+        return { text: '<1h left', urgent: true, pct };
     };
 
     const formatDate = (dateString) => {
         if (!dateString) return '';
         return new Date(dateString).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    };
+
+    const copy = async (text) => {
+        try {
+            await navigator.clipboard.writeText(text);
+            toast.success('Copied');
+        } catch {
+            toast.error('Your browser blocked the clipboard.');
+        }
     };
 
     const sortedParts = (match) => [...(match.participants || [])].sort((a, b) => a.position - b.position);
@@ -329,311 +377,239 @@ export default function MatchesPage() {
         (m.participants || []).some(p => p.user_id === user?.id && !p.accepted)
     ).length;
 
-    return (
-        <PageShell>
-                <PageHeader title="Activity" />
+    const needsMe = matches.filter(m => m.status === 'pending' && (m.participants || []).some(p => p.user_id === user?.id && !p.accepted));
+    const waiting = matches.filter(m => m.status === 'pending' && !needsMe.includes(m));
+    const accepted = matches.filter(m => m.status === 'accepted');
 
-                {/* Tabs */}
-                <div className={styles.tabsCard}>
-                    <div className={styles.tabs}>
-                        <button
-                            className={`${styles.tab} ${activeTab === 'matches' ? styles.activeTab : ''}`}
-                            onClick={() => setActiveTab('matches')}
-                        >
-                            Matches
-                            {pendingCount > 0 && (
-                                <span className={styles.countBadge}>{pendingCount}</span>
+    const renderMatch = (match) => (
+        <MatchCard
+            key={match.id}
+            match={match}
+            user={user}
+            courses={courses}
+            contactInfoMap={contactInfoMap}
+            busy={busy}
+            onAccept={handleAccept}
+            onDecline={handleDecline}
+            onComplete={handleCompleteMatch}
+            onCopy={copy}
+        />
+    );
+
+    const postRow = (post, history = false) => {
+        const cfg = POST_TYPE_CONFIG[post.type] || POST_TYPE_CONFIG.swap;
+        const TypeIcon = cfg.icon;
+        const exp = !history && post.status === 'active' ? getPostExpiry(post.expires_at) : null;
+        return (
+            <li key={post.id} className={`${styles.postRow} ${history ? styles.postRowHistory : ''}`}>
+                <CourseSwatch courseId={post.course_code} />
+                <div className={styles.postMain}>
+                    <span className={styles.postName}>{post.course_name || courses[post.course_code] || post.course_code}</span>
+                    <span className={styles.postMeta}>
+                        <Badge size="sm" tone={cfg.tone} icon={<TypeIcon />}>{cfg.label}</Badge>
+                        <span className={styles.postSections}>
+                            <Ticket size="sm" label={post.type === 'swap' ? 'Has' : post.type === 'giveaway' ? 'Gives' : 'Needs'} section={post.have_section} />
+                            {post.want_section && (
+                                <>
+                                    <ArrowRightIcon className={styles.postArrow} />
+                                    <Ticket size="sm" label="Wants" section={post.want_section} tone="accent" />
+                                </>
                             )}
-                        </button>
-                        <button
-                            className={`${styles.tab} ${activeTab === 'posts' ? styles.activeTab : ''}`}
-                            onClick={() => setActiveTab('posts')}
-                        >
-                            Posts
-                            {myPosts.length > 0 && (
-                                <span className={styles.countBadge}>{myPosts.length}</span>
-                            )}
-                        </button>
-                        <button
-                            className={`${styles.tab} ${activeTab === 'history' ? styles.activeTab : ''}`}
-                            onClick={() => setActiveTab('history')}
-                        >
-                            History
-                        </button>
-                    </div>
+                        </span>
+                    </span>
                 </div>
-
-                <main className={styles.main}>
-                    {loading ? (
-                        <div className={styles.loading}>
-                            <div className={styles.spinner}></div>
-                        </div>
-                    ) : (
+                <div className={styles.postSide}>
+                    {history ? (
                         <>
-                            {/* Decline Notifications */}
-                            {declinedMatches.length > 0 && (
-                                <section className={styles.declineNotifications}>
-                                    {declinedMatches.map((match) => {
-                                        const parts = sortedParts(match);
-                                        const mine = parts.find(p => p.user_id === user?.id);
-                                        const others = parts.filter(p => p.user_id !== user?.id);
-                                        // Prefer the actual decliner's name; fall back to listing
-                                        // the others (e.g. legacy matches with no declined_by).
-                                        const decliner = parts.find(p => p.user_id === match.declined_by);
-                                        const declinerName = decliner?.profile?.name
-                                            || others.map(o => o.profile?.name || 'Someone').join(', ');
-
-                                        return (
-                                            <div key={match.id} className={styles.declineCard}>
-                                                <div className={styles.declineContent}>
-                                                    <span className={styles.declineIcon}>⚠️</span>
-                                                    <div className={styles.declineText}>
-                                                        <span><strong>{declinerName}</strong> declined your {match.size > 2 ? `${match.size}-way ` : ''}swap request</span>
-                                                        <span className={styles.declineCourse}>
-                                                            {mine?.post?.course_name ? `${mine.post.course_name} (${mine.post.course_code})` : mine?.post?.course_code} • give {mine?.gives_section} ↔ get {mine?.gets_section}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <button onClick={() => dismissDecline(match.id)} className={styles.dismissBtn}>Dismiss</button>
-                                            </div>
-                                        );
-                                    })}
-                                </section>
-                            )}
-
-                            {/* Active Matches */}
-                            {activeTab === 'matches' && (
-                                <section className={styles.section}>
-                                    <h2 className={styles.sectionTitle}>Active Matches</h2>
-
-                                    {matches.length === 0 ? (
-                                        <div className={styles.empty}>
-                                            <p>No active matches yet</p>
-                                            <p className={styles.hint}>When a swap (direct or a 3-way loop) opens up for one of your posts, it'll appear here</p>
-                                        </div>
-                                    ) : (
-                                        <div className={styles.matchList}>
-                                            {matches.map((match) => {
-                                                const parts = sortedParts(match);
-                                                const me = parts.find(p => p.user_id === user?.id);
-                                                if (!me) return null;
-
-                                                const size = match.size || parts.length;
-                                                const isCycle = size > 2;
-                                                const others = parts.filter(p => p.user_id !== user?.id);
-                                                const allAccepted = match.status === 'accepted';
-                                                const acceptedCount = parts.filter(p => p.accepted).length;
-                                                const myAccepted = me.accepted;
-                                                const waitingOn = size - acceptedCount;
-                                                const course = me.post;
-
-                                                return (
-                                                    <div key={match.id} className={styles.matchCard}>
-                                                        <div className={styles.matchHeader}>
-                                                            <span className={`${styles.matchBadge} ${allAccepted ? styles.matchBadgeAccepted : ''}`}>
-                                                                {allAccepted ? 'Matched!' : 'Pending'}
-                                                                {isCycle && ` · ${size}-way`}
-                                                            </span>
-                                                            {!allAccepted && match.expires_at && (
-                                                                <span className={styles.matchTimer}>
-                                                                    {getTimeRemaining(match.expires_at)}
-                                                                </span>
-                                                            )}
-                                                        </div>
-
-                                                        {isCycle ? (
-                                                            <div className={styles.cycleChain}>
-                                                                {parts.map((p) => {
-                                                                    const isMe = p.user_id === user?.id;
-                                                                    return (
-                                                                        <div key={p.position} className={`${styles.cycleStep} ${isMe ? styles.cycleStepMe : ''}`}>
-                                                                            <span className={styles.cycleName}>{isMe ? 'You' : p.profile?.name}</span>
-                                                                            <span className={styles.cycleFlow}>give <b className={styles.cycleNum}>{p.gives_section}</b> <span className={styles.cycleArrow}>→</span> get <b className={styles.cycleNum}>{p.gets_section}</b></span>
-                                                                        </div>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        ) : (
-                                                            <div className={styles.matchContent}>
-                                                                <div className={styles.matchSide}>
-                                                                    <span className={styles.matchLabel}>You give</span>
-                                                                    <span className={styles.matchSection}>{me.gives_section}</span>
-                                                                </div>
-                                                                <span className={styles.matchArrow}>⇄</span>
-                                                                <div className={styles.matchSide}>
-                                                                    <span className={styles.matchLabel}>You get</span>
-                                                                    <span className={styles.matchSection}>{me.gets_section}</span>
-                                                                </div>
-                                                            </div>
-                                                        )}
-
-                                                        <div className={styles.matchCourse}>
-                                                            <span className={styles.courseId}>{course?.course_code}</span>
-                                                            <span className={styles.courseName}>{course?.course_name || courses[course?.course_code]}</span>
-                                                        </div>
-
-                                                        {!isCycle && (
-                                                            <div className={styles.matchUser}>
-                                                                <span className={styles.userName}>{others[0]?.profile?.name}</span>
-                                                                <span className={styles.userMeta}>{others[0]?.profile?.student_id}</span>
-                                                            </div>
-                                                        )}
-
-                                                        {allAccepted && (
-                                                            <div className={styles.contactList}>
-                                                                {others.map((p) => {
-                                                                    const ci = contactInfoMap[p.profile?.id];
-                                                                    return (
-                                                                        <div key={p.position} className={styles.contactInfo}>
-                                                                            <span>{p.profile?.name}: </span>
-                                                                            {ci?.phone ? (
-                                                                                <a href={`tel:${ci.phone}`}>{ci.phone}</a>
-                                                                            ) : (
-                                                                                <span>contact unlocked</span>
-                                                                            )}
-                                                                        </div>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        )}
-
-                                                        {!allAccepted && myAccepted && (
-                                                            <div className={styles.matchStatus}>
-                                                                <span className={styles.waitingThem}>
-                                                                    You accepted. Waiting for {waitingOn} {waitingOn === 1 ? 'other' : 'others'} to accept
-                                                                </span>
-                                                            </div>
-                                                        )}
-
-                                                        {!myAccepted && match.status === 'pending' && (
-                                                            <div className={styles.matchActions}>
-                                                                <button onClick={() => handleAccept(match)} className={styles.acceptBtn}>Accept</button>
-                                                                <button onClick={() => handleDecline(match)} className={styles.declineBtn}>Decline</button>
-                                                            </div>
-                                                        )}
-
-                                                        {allAccepted && (
-                                                            <button onClick={() => handleCompleteMatch(match)} className={styles.completeBtn}>Mark as Completed</button>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                </section>
-                            )}
-
-                            {/* History */}
-                            {activeTab === 'history' && (
-                                <section className={styles.section}>
-                                    <h2 className={styles.sectionTitle}>Past Posts</h2>
-
-                                    {historyPosts.length === 0 ? (
-                                        <div className={styles.empty}>
-                                            <p>No past posts yet</p>
-                                            <p className={styles.hint}>Completed swaps and expired posts will show up here</p>
-                                        </div>
-                                    ) : (
-                                        <div className={styles.postList}>
-                                            {historyPosts.map((post) => (
-                                                <div key={post.id} className={`${styles.postCard} ${styles[`postCard${post.type}`]}`}>
-                                                    <div className={styles.postHeader}>
-                                                        <span className={`${styles.postBadge} ${styles[`postBadge${post.type}`]}`}>
-                                                            {post.type?.charAt(0).toUpperCase() + post.type?.slice(1)}
-                                                        </span>
-                                                        <span className={`${styles.postStatus} ${styles[`postStatus${post.status}`]}`}>
-                                                            {post.status === 'completed' ? 'Swapped' : 'Expired'}
-                                                        </span>
-                                                    </div>
-
-                                                    <div className={styles.postDetails}>
-                                                        <span className={styles.courseId}>{post.course_code}</span>
-                                                        <span className={styles.courseName}>
-                                                            {post.course_name || courses[post.course_code]}
-                                                        </span>
-                                                        <div className={styles.sections}>
-                                                            <span>Section {post.have_section}</span>
-                                                            {post.want_section && (
-                                                                <>
-                                                                    <span className={styles.arrow}>→</span>
-                                                                    <span>Section {post.want_section}</span>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                        <span className={styles.postExpiry}>{formatDate(post.updated_at)}</span>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </section>
-                            )}
-
-                            {/* My Posts */}
-                            {activeTab === 'posts' && (
-                                <section className={styles.section}>
-                                    <h2 className={styles.sectionTitle}>My Active Posts ({myPosts.length}/5)</h2>
-
-                                    {myPosts.length === 0 ? (
-                                        <div className={styles.empty}>
-                                            <p>No active posts</p>
-                                        </div>
-                                    ) : (
-                                        <div className={styles.postList}>
-                                            {myPosts.map((post) => (
-                                                <div key={post.id} className={`${styles.postCard} ${styles[`postCard${post.type}`]}`}>
-                                                    <div className={styles.postHeader}>
-                                                        <span className={`${styles.postBadge} ${styles[`postBadge${post.type}`]}`}>
-                                                            {post.type?.charAt(0).toUpperCase() + post.type?.slice(1)}
-                                                        </span>
-                                                        <span className={`${styles.postStatus} ${styles[`postStatus${post.status}`]}`}>
-                                                            {post.status}
-                                                        </span>
-                                                    </div>
-
-                                                    <div className={styles.postDetails}>
-                                                        <span className={styles.courseId}>{post.course_code}</span>
-                                                        <span className={styles.courseName}>
-                                                            {post.course_name || courses[post.course_code]}
-                                                        </span>
-                                                        <div className={styles.sections}>
-                                                            <span>Section {post.have_section}</span>
-                                                            {post.want_section && (
-                                                                <>
-                                                                    <span className={styles.arrow}>→</span>
-                                                                    <span>Section {post.want_section}</span>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                        {post.status === 'active' && post.expires_at && (() => {
-                                                            const exp = getPostExpiry(post.expires_at);
-                                                            return exp ? (
-                                                                <span className={`${styles.postExpiry} ${exp.urgent ? styles.postExpiryUrgent : ''}`}>
-                                                                    Expires · {exp.text}
-                                                                </span>
-                                                            ) : null;
-                                                        })()}
-                                                    </div>
-
-                                                    <div className={styles.postFooter}>
-                                                        {post.status === 'active' ? (
-                                                            <div className={styles.postActions}>
-                                                                <button onClick={() => handleComplete(post.id)} className={styles.completePostBtn} title="Mark this post as completed/swapped">Swapped</button>
-                                                                <button onClick={() => handleDelete(post.id)} className={styles.deletePostBtn} title="Cancel and remove this post">Cancel</button>
-                                                            </div>
-                                                        ) : (
-                                                            <p className={styles.hint}>Part of a pending match. Accept, decline, or complete it from the Matches tab.</p>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </section>
-                            )}
+                            <Badge tone={post.status === 'completed' ? 'success' : 'neutral'} dot>
+                                {post.status === 'completed' ? 'Swapped' : 'Expired'}
+                            </Badge>
+                            <span className={styles.postDate}>{formatDate(post.updated_at)}</span>
                         </>
+                    ) : post.status === 'active' ? (
+                        <>
+                            {exp && (
+                                <span className={`${styles.expiry} ${exp.urgent ? styles.expiryUrgent : ''}`} title="Posts expire after a week">
+                                    <span className={styles.expiryTrack}><span style={{ width: `${exp.pct}%` }} /></span>
+                                    {exp.text}
+                                </span>
+                            )}
+                            <div className={styles.postActions}>
+                                <Button size="sm" variant="soft" onClick={() => handleComplete(post.id)} title="Mark this post as completed/swapped">Swapped</Button>
+                                <Button size="sm" variant="dangerGhost" onClick={() => handleDelete(post.id)} title="Cancel and remove this post">Cancel</Button>
+                            </div>
+                        </>
+                    ) : (
+                        <Badge tone="warning" dot title="Accept, decline, or complete it from the Matches tab.">In a pending match</Badge>
                     )}
-                </main>
+                </div>
+            </li>
+        );
+    };
+
+    return (
+        <PageShell width="standard">
+            <PageHeader
+                title="Activity"
+                subtitle="Matches waiting on you, your live posts, and everything that’s finished."
+            >
+                <Button variant="primary" href="/post" icon={<PlusIcon strokeWidth={2.1} />} className={styles.headerPost}>New post</Button>
+            </PageHeader>
+
+            {/* Swaps that fell through since you last looked. */}
+            {declinedMatches.length > 0 && (
+                <div className={styles.declines}>
+                    {declinedMatches.map((match) => {
+                        const parts = sortedParts(match);
+                        const mine = parts.find(p => p.user_id === user?.id);
+                        const others = parts.filter(p => p.user_id !== user?.id);
+                        // Prefer the actual decliner's name; fall back to listing
+                        // the others (e.g. legacy matches with no declined_by).
+                        const decliner = parts.find(p => p.user_id === match.declined_by);
+                        const declinerName = decliner?.profile?.name
+                            || others.map(o => o.profile?.name || 'Someone').join(', ');
+
+                        return (
+                            <Callout
+                                key={match.id}
+                                tone="warning"
+                                title={`${declinerName} declined your ${match.size > 2 ? `${match.size}-way ` : ''}swap`}
+                                action={<Button size="sm" variant="ghost" onClick={() => dismissDecline(match.id)}>Dismiss</Button>}
+                            >
+                                {mine?.post?.course_name ? `${mine.post.course_name} (${mine.post.course_code})` : mine?.post?.course_code}
+                                {' · '}give {mine?.gives_section} for {mine?.gets_section}. Your post is back on the marketplace.
+                            </Callout>
+                        );
+                    })}
+                </div>
+            )}
+
+            <Tabs
+                label="Activity"
+                value={activeTab}
+                onChange={setActiveTab}
+                tabs={[
+                    { value: 'matches', label: 'Matches', icon: <ActivityIcon />, count: loading ? null : matches.length, alert: pendingCount > 0 },
+                    { value: 'posts', label: 'My posts', icon: <LayersIcon />, count: loading ? null : `${myPosts.length}/5` },
+                    { value: 'history', label: 'History', icon: <HistoryIcon />, count: loading ? null : historyPosts.length },
+                ]}
+            />
+
+            <main className={styles.main}>
+                {loading ? (
+                    <div className={styles.skeletons} aria-busy="true">
+                        {[0, 1].map(i => (
+                            <div key={i} className={styles.skeletonCard}>
+                                <Skeleton width={160} height={22} radius={6} />
+                                <div className={styles.skeletonRow}>
+                                    <Skeleton width={32} height={32} radius={9} />
+                                    <Skeleton width="45%" height={16} />
+                                </div>
+                                <div className={styles.skeletonTickets}>
+                                    <Skeleton height={64} radius={12} />
+                                    <Skeleton height={64} radius={12} />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <>
+                        {activeTab === 'matches' && (
+                            matches.length === 0 ? (
+                                <section className={styles.emptyMatches}>
+                                    <EmptyState
+                                        icon={<ActivityIcon />}
+                                        title="No matches yet"
+                                        actions={(
+                                            <>
+                                                <Button variant="primary" href="/post?type=swap" icon={<PlusIcon />}>Post a swap</Button>
+                                                <Button variant="secondary" href="/browse" icon={<SearchIcon />}>Browse posts</Button>
+                                            </>
+                                        )}
+                                    >
+                                        When one of your swap posts lines up with someone else&rsquo;s, the match lands here and we notify you.
+                                    </EmptyState>
+                                    <ol className={styles.how}>
+                                        <li>
+                                            <span className={styles.howNum}>1</span>
+                                            <strong>Post a swap</strong>
+                                            <span>Say which section you have and which you want.</span>
+                                        </li>
+                                        <li>
+                                            <span className={styles.howNum}>2</span>
+                                            <strong>We find the match</strong>
+                                            <span>A direct swap, or a loop of three where everyone ends up happy.</span>
+                                        </li>
+                                        <li>
+                                            <span className={styles.howNum}>3</span>
+                                            <strong>Accept within 24 hours</strong>
+                                            <span>Once everyone accepts, contacts unlock so you can swap in the portal.</span>
+                                        </li>
+                                    </ol>
+                                </section>
+                            ) : (
+                                <div className={styles.groups}>
+                                    {needsMe.length > 0 && (
+                                        <section className={styles.group}>
+                                            <h2 className={styles.groupTitle}><span className={styles.groupDot} />Needs your answer</h2>
+                                            {needsMe.map(renderMatch)}
+                                        </section>
+                                    )}
+                                    {accepted.length > 0 && (
+                                        <section className={styles.group}>
+                                            <h2 className={styles.groupTitle}>Matched</h2>
+                                            {accepted.map(renderMatch)}
+                                        </section>
+                                    )}
+                                    {waiting.length > 0 && (
+                                        <section className={styles.group}>
+                                            <h2 className={styles.groupTitle}>Waiting on others</h2>
+                                            {waiting.map(renderMatch)}
+                                        </section>
+                                    )}
+                                </div>
+                            )
+                        )}
+
+                        {activeTab === 'posts' && (
+                            myPosts.length === 0 ? (
+                                <EmptyState
+                                    icon={<LayersIcon />}
+                                    title="No live posts"
+                                    actions={<Button variant="primary" href="/post" icon={<PlusIcon />}>Create a post</Button>}
+                                >
+                                    Posts you make show up here while they&rsquo;re on the marketplace. You can have five at a time, and each lasts a week.
+                                </EmptyState>
+                            ) : (
+                                <section className={styles.listCard}>
+                                    <div className={styles.listHead}>
+                                        <span>{myPosts.length} of 5 posts live</span>
+                                        <span className={styles.quota}>
+                                            {Array.from({ length: 5 }).map((_, i) => <span key={i} className={i < myPosts.length ? styles.quotaOn : ''} />)}
+                                        </span>
+                                    </div>
+                                    <ul className={styles.postList}>{myPosts.map(p => postRow(p))}</ul>
+                                </section>
+                            )
+                        )}
+
+                        {activeTab === 'history' && (
+                            historyPosts.length === 0 ? (
+                                <EmptyState tone="neutral" icon={<ClockIcon />} title="Nothing here yet">
+                                    Completed swaps and expired posts collect here, so you can see what you&rsquo;ve traded.
+                                </EmptyState>
+                            ) : (
+                                <section className={styles.listCard}>
+                                    <div className={styles.listHead}>
+                                        <span>Your last {historyPosts.length} finished {historyPosts.length === 1 ? 'post' : 'posts'}</span>
+                                    </div>
+                                    <ul className={styles.postList}>{historyPosts.map(p => postRow(p, true))}</ul>
+                                </section>
+                            )
+                        )}
+                    </>
+                )}
+            </main>
         </PageShell>
     );
 }
