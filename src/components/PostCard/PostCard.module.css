@@ -1,379 +1,318 @@
-/* ===== Post card =====
-   Reads top to bottom: which course (its colour swatch), what kind, the
-   section tickets, who posted it. The type colours only the badge and the
-   ticket that matters, so the three types are told apart without three
-   differently painted boxes. */
+/* ===== A board row =====
+   Every post shares one column grid, so a page of posts reads down its
+   columns: which sections, when, who teaches, whether there are seats. The
+   same template is used by the board's column heads (browse/page.module.css),
+   so keep the two in step. */
 
-.card {
-    --type: var(--swap);
-    --type-soft: var(--swap-soft);
-    --type-ink: var(--swap-ink);
+.row {
     position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    min-width: 0;
-    padding: 16px 16px 14px;
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: var(--r-lg);
-    box-shadow: var(--e1), var(--highlight);
-    animation: cm-rise-in var(--dur-3) var(--ease-out) both;
-    transition: border-color var(--dur-1) var(--ease-out), box-shadow var(--dur-2) var(--ease-out);
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr) minmax(150px, 0.34fr) 168px;
+    align-items: start;
+    gap: 0 20px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--rule-soft);
 }
 
-.card:hover {
-    border-color: var(--line-strong);
-    box-shadow: var(--e1-hover), var(--highlight);
+.row:last-child {
+    border-bottom: 0;
 }
 
-.card_giveaway {
-    --type: var(--giveaway);
-    --type-soft: var(--giveaway-soft);
-    --type-ink: var(--giveaway-ink);
+/* Yours: the highlighter down the row's edge. */
+.rowOwn::before {
+    content: '';
+    position: absolute;
+    left: -14px;
+    top: 12px;
+    bottom: 12px;
+    width: 4px;
+    background: var(--mark);
 }
 
-.card_request {
-    --type: var(--request);
-    --type-soft: var(--request-soft);
-    --type-ink: var(--request-ink);
+.standalone {
+    padding: 14px 0;
+    border-top: 1px solid var(--rule-strong);
+    border-bottom: 1px solid var(--rule);
 }
 
-/* ===== Head ===== */
-.head {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    min-width: 0;
+.standalone.rowOwn::before {
+    display: none;
 }
 
-.course {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    flex: 1;
-    min-width: 0;
-}
-
-.courseName {
-    font-size: var(--text-subheading);
-    font-weight: var(--weight-semibold);
-    letter-spacing: -0.01em;
-    line-height: 1.3;
-    color: var(--ink);
-    overflow: hidden;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-}
-
-.courseMeta {
-    display: flex;
+/* ----- Kind ----- */
+.kind {
+    display: inline-flex;
     align-items: center;
-    flex-wrap: wrap;
-    gap: 2px 7px;
-    font-size: var(--text-caption);
-    color: var(--ink-3);
-}
-
-.courseCode {
-    font-family: var(--font-mono);
-    font-size: 0.71875rem;
+    gap: 7px;
+    padding-top: 2px;
+    font-family: var(--font-cond);
+    font-size: var(--text-micro);
+    font-weight: 600;
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
     color: var(--ink-2);
 }
 
-.metaDot {
-    width: 3px;
-    height: 3px;
-    border-radius: 50%;
-    background: var(--ink-4);
-}
-
-.status {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    white-space: nowrap;
-}
-
-.statusDot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--ink-4);
-}
-
-.dot_success { background: var(--success); }
-.dot_warning { background: var(--warning); }
-
-.expiry {
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-}
-
-.expiryUrgent {
-    color: var(--warning-ink);
-    font-weight: var(--weight-semibold);
-}
-
-.typeBadge {
+.glyph {
     flex-shrink: 0;
 }
 
-/* ===== Tickets ===== */
-.exchange {
-    position: relative;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 10px;
+.kind_swap .glyph { color: var(--swap); }
+.kind_giveaway .glyph { color: var(--giveaway); }
+.kind_request .glyph { color: var(--request); }
+
+/* ----- Section lines ----- */
+.lines {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
 }
 
-.single {
+.line {
     display: grid;
+    grid-template-columns: 46px 60px minmax(130px, 1fr) minmax(110px, 1fr) 104px;
+    align-items: baseline;
+    gap: 0 12px;
+    min-width: 0;
 }
 
-/* The ticket shape: a notch cut from the middle of each side. */
-.ticket {
-    --t-bg: var(--surface-2);
-    --t-line: var(--line);
-    position: relative;
+.lineLabel {
+    font-family: var(--font-cond);
+    font-size: var(--text-micro);
+    font-weight: 500;
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+    color: var(--ink-4);
+}
+
+.when {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+    white-space: nowrap;
+}
+
+.days {
+    font-family: var(--font-cond);
+    font-size: var(--text-small);
+    font-weight: 500;
+    color: var(--ink-2);
+}
+
+.clock {
+    font-family: var(--font-cond);
+    font-size: var(--text-small);
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+}
+
+.instructor {
+    font-size: var(--text-small);
+    color: var(--ink-2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.none {
+    color: var(--ink-3);
+    font-style: italic;
+}
+
+.seats {
+    min-width: 0;
+}
+
+/* ----- Who ----- */
+.who {
     display: flex;
     flex-direction: column;
     gap: 2px;
     min-width: 0;
-    padding: 10px 14px 11px;
-    border-radius: 11px;
-    background: var(--t-bg);
-    box-shadow: inset 0 0 0 1px var(--t-line);
-    -webkit-mask:
-        radial-gradient(circle 6px at 0 50%, transparent 96%, #000 100%) left / 51% 100% no-repeat,
-        radial-gradient(circle 6px at 100% 50%, transparent 96%, #000 100%) right / 51% 100% no-repeat;
-    mask:
-        radial-gradient(circle 6px at 0 50%, transparent 96%, #000 100%) left / 51% 100% no-repeat,
-        radial-gradient(circle 6px at 100% 50%, transparent 96%, #000 100%) right / 51% 100% no-repeat;
 }
 
-/* The section someone wants is the one that matters to a reader who has it. */
-.ticketEmphasis,
-.ticket_giveaway,
-.ticket_request {
-    --t-bg: var(--type-soft);
-    --t-line: color-mix(in srgb, var(--type) 28%, transparent);
-}
-
-.ticketLabel {
-    font-size: 0.625rem;
-    font-weight: var(--weight-semibold);
-    letter-spacing: var(--tracking-overline);
-    text-transform: uppercase;
-    color: var(--ink-3);
-}
-
-.ticketEmphasis .ticketLabel,
-.ticket_giveaway .ticketLabel,
-.ticket_request .ticketLabel {
-    color: var(--type-ink);
-}
-
-.ticketSection {
-    font-family: var(--font-mono);
-    font-size: 1.375rem;
-    font-weight: 600;
-    letter-spacing: -0.03em;
+.name {
+    font-size: var(--text-small);
+    font-weight: 500;
     color: var(--ink);
-    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.ticketTime {
+.rowOwn .name {
+    font-weight: 600;
+}
+
+.meta {
     display: flex;
     flex-wrap: wrap;
-    gap: 0 6px;
-    margin-top: 2px;
-    font-size: var(--text-caption);
-    color: var(--ink-2);
-    font-variant-numeric: tabular-nums;
-}
-
-.ticketDays {
-    font-weight: var(--weight-semibold);
-    color: var(--ink);
-}
-
-.ticketInstructor {
+    gap: 0 8px;
     font-size: var(--text-caption);
     color: var(--ink-3);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
-.ticketSeats {
-    align-self: flex-start;
-    margin-top: 5px;
-    padding: 1px 6px;
-    border-radius: 5px;
-    font-size: 0.65625rem;
-    font-weight: var(--weight-semibold);
-    white-space: nowrap;
-}
-
-.seats_open { background: var(--success-soft); color: var(--success-ink); }
-.seats_low { background: var(--warning-soft); color: var(--warning-ink); }
-.seats_full { background: var(--surface-3); color: var(--ink-3); }
-
-.exchangeArrow {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    display: grid;
-    place-items: center;
-    width: 26px;
-    height: 26px;
-    margin: -13px 0 0 -13px;
-    border-radius: 50%;
-    background: var(--type);
-    color: var(--on-accent);
-    box-shadow: 0 0 0 4px var(--surface);
-    z-index: 1;
-}
-
-.exchangeArrow svg {
-    width: 14px;
-    height: 14px;
-}
-
-/* ===== Contact ===== */
-.contact {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 6px 6px 6px 12px;
-    border-radius: var(--r-md);
-    background: var(--accent-soft);
-}
-
-.contactIcon {
-    width: 16px;
-    height: 16px;
-    color: var(--accent-ink);
-}
-
-.contactValue {
-    flex: 1;
+.id {
     font-family: var(--font-mono);
-    font-size: var(--text-small);
-    font-weight: 600;
-    color: var(--ink);
-    letter-spacing: 0.01em;
+    font-size: 0.6875rem;
 }
 
-.contactValue:hover {
-    color: var(--accent-ink);
+.urgent {
+    color: var(--warn-ink);
+    font-weight: 500;
 }
 
-.copyBtn {
-    display: grid;
-    place-items: center;
-    width: 30px;
-    height: 30px;
-    border: 0;
-    border-radius: 8px;
-    background: transparent;
-    color: var(--ink-3);
-    cursor: pointer;
-    transition: background-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out);
-}
-
-.copyBtn:hover {
-    background: var(--surface);
-    color: var(--ink);
-}
-
-.copyBtn svg {
-    width: 15px;
-    height: 15px;
-}
-
-.copyBtnDone,
-.copyBtnDone:hover {
-    color: var(--accent-ink);
-}
-
-.copyBtnDone svg {
-    animation: cm-pop-in var(--dur-2) var(--ease-out);
-}
-
-/* ===== Foot ===== */
-.foot {
+/* ----- Action ----- */
+.action {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    margin-top: auto;
-    padding-top: 12px;
-    border-top: 1px solid var(--line-subtle);
-    min-height: 45px;
-}
-
-.poster {
-    display: flex;
-    align-items: center;
-    gap: 9px;
+    justify-content: flex-end;
+    padding-top: 1px;
     min-width: 0;
-}
-
-.posterText {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    line-height: 1.3;
-}
-
-.posterName {
-    font-size: var(--text-small);
-    font-weight: var(--weight-semibold);
-    color: var(--ink);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.posterMeta {
-    font-size: var(--text-caption);
-    color: var(--ink-3);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-variant-numeric: tabular-nums;
-}
-
-.interest,
-.actions {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
-}
-
-.interestError {
-    margin-top: -6px;
-    font-size: var(--text-caption);
-    font-weight: var(--weight-medium);
-    color: var(--danger-ink);
     text-align: right;
 }
 
-@media (max-width: 420px) {
-    .foot {
+.interest {
+    height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--rule-control);
+    border-radius: var(--r-2);
+    background: none;
+    font-size: var(--text-small);
+    font-weight: 500;
+    color: var(--ink);
+    white-space: nowrap;
+}
+
+.interest:hover:not(:disabled) {
+    border-color: var(--ink);
+    background: var(--wash);
+}
+
+.interest:disabled {
+    color: var(--ink-3);
+}
+
+.phone {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 10px;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+}
+
+.phone a {
+    color: var(--ink);
+    text-decoration: underline;
+    text-decoration-color: var(--rule-control);
+    text-underline-offset: 3px;
+}
+
+.auto {
+    font-size: var(--text-caption);
+    color: var(--ink-4);
+}
+
+.ownActions {
+    display: inline-flex;
+    gap: 12px;
+}
+
+.textBtn {
+    padding: 0;
+    border: 0;
+    background: none;
+    font-family: var(--font-sans);
+    font-size: var(--text-small);
+    color: var(--ink-2);
+    text-decoration: underline;
+    text-decoration-color: var(--rule-control);
+    text-underline-offset: 3px;
+    white-space: nowrap;
+}
+
+.textBtn:hover {
+    color: var(--ink);
+    text-decoration-color: currentColor;
+}
+
+.textBtnDanger:hover {
+    color: var(--danger-ink);
+}
+
+.error {
+    grid-column: 2 / -1;
+    margin-top: 6px;
+    font-size: var(--text-caption);
+    color: var(--danger-ink);
+}
+
+/* ----- Narrower: who moves under the lines ----- */
+@media (max-width: 1180px) {
+    .row {
+        grid-template-columns: 88px minmax(0, 1fr) 150px;
+    }
+
+    .who {
+        grid-column: 2;
+        grid-row: 2;
+        flex-direction: row;
         flex-wrap: wrap;
+        align-items: baseline;
+        gap: 2px 10px;
+        margin-top: 8px;
     }
 
-    .actions,
-    .interest {
-        margin-left: auto;
+    .action {
+        grid-column: 3;
+        grid-row: 1 / span 2;
+    }
+}
+
+@media (max-width: 760px) {
+    .row {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px 12px;
+        padding: 14px 0;
     }
 
-    .ticketSection {
-        font-size: 1.25rem;
+    .kind {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .action {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    .lines {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+
+    .who {
+        grid-column: 1 / -1;
+        grid-row: 3;
+        margin-top: 0;
+    }
+
+    .line {
+        grid-template-columns: 46px 52px minmax(0, 1fr);
+        row-gap: 2px;
+    }
+
+    .instructor {
+        grid-column: 3;
+    }
+
+    .seats {
+        grid-column: 3;
+    }
+
+    .rowOwn::before {
+        left: -10px;
+        width: 3px;
     }
 }
