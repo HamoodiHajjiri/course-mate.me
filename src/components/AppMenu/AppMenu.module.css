@@ -1,36 +1,31 @@
 /* ===== Account menu =====
-   A dropdown anchored to the avatar from 768px, a bottom sheet below that. */
+   The top of a student record, then words. */
 
 .anchor {
     position: relative;
     display: inline-flex;
-    flex-shrink: 0;
 }
 
 .trigger {
     display: grid;
     place-items: center;
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
     padding: 0;
     border: 0;
     border-radius: 50%;
-    background: transparent;
-    cursor: pointer;
-    transition: background-color var(--dur-1) var(--ease-out);
+    background: none;
 }
 
-.trigger:hover {
-    background: var(--surface-hover);
+.trigger:hover > span {
+    box-shadow: 0 0 0 3px var(--wash-2);
 }
 
-.trigger > span {
-    box-shadow: 0 0 0 1px var(--line);
-    transition: box-shadow var(--dur-1) var(--ease-out);
-}
-
-.trigger[aria-expanded='true'] > span {
-    box-shadow: 0 0 0 2px var(--canvas), 0 0 0 4px var(--accent);
+.placeholder {
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--rule);
+    border-radius: 50%;
 }
 
 .scrim {
@@ -43,6 +38,7 @@
 
 .scrimClear {
     background: transparent;
+    animation: none;
 }
 
 .panel {
@@ -50,388 +46,214 @@
     z-index: calc(var(--z-overlay) + 1);
     display: flex;
     flex-direction: column;
-    background: var(--surface-raised);
-    color: var(--ink);
+    background: var(--sheet);
+    box-shadow: var(--float);
+}
+
+.panelDesktop {
+    width: 300px;
+    border-radius: var(--r-3);
+    animation: cm-pop-in var(--dur-2) var(--ease-out);
 }
 
 .panelSheet {
     left: 0;
     right: 0;
     bottom: 0;
-    max-height: 90dvh;
+    max-height: 88dvh;
+    padding-bottom: env(safe-area-inset-bottom);
+    border-radius: var(--r-3) var(--r-3) 0 0;
     overflow-y: auto;
-    padding: 0 12px calc(14px + env(safe-area-inset-bottom));
-    border-radius: 22px 22px 0 0;
-    box-shadow: var(--e3), var(--highlight);
     animation: cm-sheet-in var(--dur-3) var(--ease-out);
 }
 
 .handle {
     display: block;
     width: 36px;
-    height: 4px;
-    margin: 8px auto 10px;
-    border-radius: var(--r-full);
-    background: var(--line-strong);
-    flex-shrink: 0;
+    height: 3px;
+    margin: 8px auto 0;
+    background: var(--rule-control);
 }
 
-.panelDesktop {
-    width: 340px;
-    padding: 6px;
-    border: 1px solid var(--line);
-    border-radius: var(--r-xl);
-    box-shadow: var(--e2), var(--highlight);
-    transform-origin: top right;
-    animation: cm-pop-in var(--dur-2) var(--ease-out);
-}
-
-/* ===== Identity card ===== */
-.identity {
-    position: relative;
+/* ----- The record ----- */
+.record {
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    padding: 16px;
-    border-radius: 14px;
-    background:
-        radial-gradient(120% 140% at 100% 0%, rgba(46, 211, 156, 0.18), transparent 55%),
-        var(--forest);
-    color: var(--forest-ink);
-    overflow: hidden;
-    isolation: isolate;
-}
-
-/* Faint graph-paper ruling: the timetable grid, the one texture CourseMate
-   uses, and only on forest. */
-.identity::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    background-image:
-        linear-gradient(var(--forest-line) 1px, transparent 1px),
-        linear-gradient(90deg, var(--forest-line) 1px, transparent 1px);
-    background-size: 22px 22px;
-    background-position: -1px -1px;
-    mask-image: linear-gradient(to left, #000, transparent 70%);
-    -webkit-mask-image: linear-gradient(to left, #000, transparent 70%);
-    opacity: 0.5;
-}
-
-.identityTop {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-width: 0;
-}
-
-.identityText {
-    min-width: 0;
+    gap: 3px;
+    padding: 18px 18px 16px;
+    border-bottom: 1px solid var(--rule);
 }
 
 .name {
-    font-family: var(--font-display);
-    font-size: 1.125rem;
-    font-weight: 650;
-    letter-spacing: -0.025em;
-    line-height: 1.2;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.major {
-    margin-top: 2px;
-    font-size: var(--text-small);
-    color: var(--forest-ink-2);
-    line-height: 1.35;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
+    font-family: var(--font-serif);
+    font-size: 1.375rem;
+    font-weight: 500;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+    overflow-wrap: anywhere;
 }
 
 .facts {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-}
-
-.fact {
-    display: inline-flex;
-    align-items: center;
-    height: 24px;
-    padding: 0 9px;
-    border-radius: var(--r-full);
-    background: var(--forest-raised);
-    box-shadow: inset 0 0 0 1px var(--forest-line);
-    font-size: var(--text-caption);
-    font-weight: var(--weight-medium);
-    color: var(--forest-ink-2);
-}
-
-.factMono {
-    font-family: var(--font-mono);
-    font-size: 0.6875rem;
-    letter-spacing: 0.02em;
-    color: var(--forest-ink);
-}
-
-/* ===== Shortcuts ===== */
-.shortcuts {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px;
-    padding: 8px 0 6px;
-}
-
-.shortcut {
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-height: 48px;
-    padding: 0 10px;
-    border-radius: var(--r-md);
-    background: var(--surface-2);
-    color: var(--ink);
     font-size: var(--text-small);
-    font-weight: var(--weight-medium);
-    text-decoration: none;
-    transition: background-color var(--dur-1) var(--ease-out);
+    line-height: 1.4;
+    color: var(--ink-3);
 }
 
-.shortcut:hover,
-.shortcut:focus-visible {
-    background: var(--surface-active);
-    color: var(--ink);
-    outline: none;
+.id {
+    margin-top: 4px;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--ink-2);
 }
 
-.shortcut:focus-visible {
-    box-shadow: inset 0 0 0 2px var(--focus);
-}
-
-.shortcutIcon {
-    display: grid;
-    place-items: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
-    background: var(--surface);
-    color: var(--accent-ink);
-    box-shadow: inset 0 0 0 1px var(--line-subtle);
-    flex-shrink: 0;
-}
-
-.shortcutIcon svg {
-    width: 16px;
-    height: 16px;
-}
-
-.shortcutLabel {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.shortcutCount {
-    min-width: 18px;
-    height: 18px;
-    padding: 0 5px;
-    border-radius: var(--r-full);
-    background: var(--danger);
-    color: #fff;
-    font-size: 0.65625rem;
-    font-weight: var(--weight-bold);
-    line-height: 18px;
-    text-align: center;
-    font-variant-numeric: tabular-nums;
-}
-
-/* ===== Rows ===== */
+/* ----- Rows ----- */
 .group {
     display: flex;
     flex-direction: column;
-    gap: 2px;
     padding: 6px 0;
-    border-top: 1px solid var(--line-subtle);
+    border-bottom: 1px solid var(--rule);
 }
 
 .row {
     display: flex;
-    align-items: center;
+    align-items: baseline;
+    justify-content: space-between;
     gap: 12px;
     width: 100%;
-    min-height: 46px;
-    padding: 0 10px;
+    padding: 8px 18px;
     border: 0;
-    border-radius: var(--r-md);
     background: none;
-    color: var(--ink);
-    font-size: var(--text-body);
-    font-weight: var(--weight-medium);
     text-align: left;
-    text-decoration: none;
-    cursor: pointer;
-    transition: background-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out);
-}
-
-.panelDesktop .row {
-    min-height: 40px;
+    font-size: var(--text-body);
+    color: var(--ink);
 }
 
 .row:hover,
 .row:focus-visible {
-    background: var(--surface-hover);
-    color: var(--ink);
+    background: var(--wash);
     outline: none;
 }
 
-.row:focus-visible {
-    box-shadow: inset 0 0 0 2px var(--focus);
+.rowCurrent .rowLabel {
+    background-image: linear-gradient(var(--mark), var(--mark));
+    background-repeat: no-repeat;
+    background-size: 100% 78%;
+    background-position: 0 75%;
+    padding: 0 3px;
+    margin: 0 -3px;
 }
 
-.row svg {
-    width: 18px;
-    height: 18px;
-    color: var(--ink-3);
-}
-
-.rowLabel {
-    flex: 1;
-    min-width: 0;
-}
-
-.row .chevron {
-    width: 16px;
-    height: 16px;
-    color: var(--ink-4);
+.rowCount {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--danger-ink);
 }
 
 .rowKeys {
-    display: inline-flex;
-    gap: 2px;
-}
-
-.rowKeys kbd {
-    display: inline-grid;
-    place-items: center;
-    min-width: 20px;
-    height: 20px;
-    padding: 0 5px;
-    border-radius: 5px;
-    background: var(--surface-2);
-    box-shadow: inset 0 0 0 1px var(--line-subtle);
-    color: var(--ink-3);
-    font-family: var(--font-sans);
+    font-family: var(--font-mono);
     font-size: 0.6875rem;
-    font-weight: var(--weight-semibold);
+    color: var(--ink-4);
 }
 
-@media (hover: none) {
-    .rowKeys {
-        display: none;
-    }
-}
-
-.signOut,
-.signOut svg {
-    color: var(--danger-ink);
-}
-
-.signOut:hover,
-.signOut:focus-visible {
-    background: var(--danger-soft);
-    color: var(--danger-ink);
-}
-
-/* ===== Appearance ===== */
-.themeBlock {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 10px 10px 12px;
-    border-top: 1px solid var(--line-subtle);
-}
-
-.themeLabel {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-size: var(--text-body);
-    font-weight: var(--weight-medium);
-}
-
-.themeLabel svg {
-    width: 18px;
-    height: 18px;
-    color: var(--ink-3);
-}
-
-/* ===== Guest ===== */
-.guestPitch {
+/* ----- Guest ----- */
+.pitch {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    padding: 12px 4px 8px;
+    gap: 10px;
+    padding: 14px 18px 16px;
+    border-bottom: 1px solid var(--rule);
 }
 
-.pitchList {
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
-    padding: 2px 6px 6px;
-}
-
-.pitchList li {
-    display: flex;
-    align-items: center;
-    gap: 9px;
+.pitchLead {
     font-size: var(--text-small);
     color: var(--ink-2);
 }
 
-.pitchList svg {
-    width: 15px;
-    height: 15px;
-    color: var(--accent-ink);
+.pitchList {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.pitchList li {
+    position: relative;
+    padding-left: 14px;
+    font-size: var(--text-small);
+    line-height: 1.45;
+    color: var(--ink);
+}
+
+.pitchList li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.58em;
+    width: 5px;
+    height: 5px;
+    background: var(--go);
 }
 
 .pitchCta {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    height: 42px;
-    border-radius: var(--r-md);
-    background: var(--accent);
-    color: var(--on-accent);
+    height: 36px;
+    margin-top: 4px;
+    border-radius: var(--r-2);
+    background: var(--brand);
+    color: var(--on-brand);
     font-size: var(--text-body);
-    font-weight: var(--weight-semibold);
-    text-decoration: none;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
-    transition: background-color var(--dur-1) var(--ease-out);
+    font-weight: 500;
 }
 
-.pitchCta:hover,
-.pitchCta:focus-visible {
-    background: var(--accent-hover);
-    color: var(--on-accent);
+.pitchCta:hover {
+    background: var(--brand-hover);
+    color: var(--on-brand);
+}
+
+.pitchAlt {
+    align-self: center;
+    font-size: var(--text-small);
+    color: var(--ink-2);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-color: var(--rule-control);
+}
+
+/* ----- Theme and exit ----- */
+.theme {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--rule);
+}
+
+.themeLabel {
+    font-family: var(--font-cond);
+    font-size: var(--text-micro);
+    font-weight: 500;
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+    color: var(--ink-3);
+}
+
+.out {
+    padding: 12px 18px 14px;
+    border: 0;
+    background: none;
+    text-align: left;
+    font-size: var(--text-body);
+    color: var(--ink-2);
+}
+
+.out:hover,
+.out:focus-visible {
+    background: var(--wash);
+    color: var(--danger-ink);
     outline: none;
-}
-
-.pitchCta:focus-visible {
-    box-shadow: 0 0 0 3px var(--accent-soft-2);
-}
-
-.pitchCta svg {
-    width: 17px;
-    height: 17px;
 }
