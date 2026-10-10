@@ -8,20 +8,14 @@ import { seatStatus } from '@/lib/seats';
 import { useSemester } from '@/lib/SemesterContext';
 import { getGuest, setGuest, clearGuest, guestProfile, refuse } from '@/lib/guest';
 import PageShell from '@/components/PageShell';
-import PageHeader from '@/components/PageHeader';
-import SemesterPicker from '@/components/SemesterPicker';
 import InstructorFinder from '@/components/InstructorFinder';
 import CourseHistory, { HistorySheet } from '@/components/CourseHistory';
 import {
-    Badge, Button, Callout, Checkbox, CourseSwatch, Dialog, EmptyState, Field, Input, SearchInput,
-    SegmentedControl, Select, Skeleton, Spinner, Switch, Tabs, Ticket, Tooltip, useConfirm, useToast,
+    Button, Callout, Checkbox, CourseCode, CourseMark, CourseName, Dialog, EmptyState, Field, Input, Rubric, SearchInput,
+    Section, SegmentedControl, Select, Skeleton, Spinner, Status, Switch, Tabs, Tooltip, useConfirm, useToast,
 } from '@/components/ui';
-import {
-    AlertIcon, CalendarPlusIcon, CheckIcon, ChevronDownIcon, ChevronRightIcon, CloseIcon, CopyIcon, DownloadIcon,
-    EditIcon, HistoryIcon, LayersIcon, LockIcon, PlusIcon, RefreshIcon, ScheduleIcon, SlidersIcon, SparkleIcon,
-    StarIcon, UserCheckIcon,
-} from '@/components/Icons';
-import { formatDuration, formatRange } from '@/lib/classTime';
+import { CalendarPlusIcon, CheckIcon, CloseIcon, CopyIcon, DownloadIcon, HistoryIcon } from '@/components/Icons';
+import { formatDuration, formatClock24, formatSpan } from '@/lib/classTime';
 import { paletteFor } from '@/lib/courseColor';
 import { historyTerms, termLabel, fetchHistoryCounts } from '@/lib/courseHistory';
 import { decodeHtmlEntities } from '@/lib/text';
@@ -482,26 +476,6 @@ function generateSchedules(courseGroups, prefs, courseNames) {
 // ===== TIMETABLE RENDERING =====
 
 const ALL_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu'];
-const TIME_SLOTS = [];
-for (let h = 8; h <= 20; h++) {
-    TIME_SLOTS.push(h * 60); // Every hour from 8 AM to 8 PM
-}
-
-function formatTime(minutes) {
-    const h = Math.floor(minutes / 60);
-    const m = minutes % 60;
-    const period = h >= 12 ? 'PM' : 'AM';
-    const displayH = h > 12 ? h - 12 : h === 0 ? 12 : h;
-    return `${displayH}:${m.toString().padStart(2, '0')} ${period}`;
-}
-
-function formatTimeShort(minutes) {
-    const h = Math.floor(minutes / 60);
-    const period = h >= 12 ? 'PM' : 'AM';
-    const displayH = h > 12 ? h - 12 : h === 0 ? 12 : h;
-    return `${displayH} ${period}`;
-}
-
 // ===== MAIN COMPONENT =====
 
 export default function SchedulePage() {
@@ -548,7 +522,12 @@ export default function SchedulePage() {
     const [extraCourseNames, setExtraCourseNames] = useState({});
     const [extraCourseCredits, setExtraCourseCredits] = useState({});
     const [loadingCourseIds, setLoadingCourseIds] = useState(new Set());
-    const [showCount, setShowCount] = useState(3);
+    const [showCount, setShowCount] = useState(8);
+    // Which option is drawn on the sheet: 'r-<index>' for a generated one,
+    // 's-<id>' for a saved one. A new generation also replays the placing of
+    // the blocks; switching between options slides them instead.
+    const [picked, setPicked] = useState(null);
+    const [generationId, setGenerationId] = useState(0);
     const [error, setError] = useState('');
     const [savedScheduleIdx, setSavedScheduleIdx] = useState(null);
     const [dbSavedSchedules, setDbSavedSchedules] = useState([]);
@@ -1500,7 +1479,7 @@ export default function SchedulePage() {
 
         setGenerating(true);
         setResults(null);
-        setShowCount(3);
+        setShowCount(8);
 
         // Use setTimeout to avoid blocking the UI
         setTimeout(() => {
@@ -1583,7 +1562,7 @@ export default function SchedulePage() {
         setError('');
         setGenerating(true);
         setResults(null);
-        setShowCount(3);
+        setShowCount(8);
 
         setTimeout(() => {
             try {
@@ -1710,6 +1689,13 @@ export default function SchedulePage() {
     const [activeIdx, setActiveIdx] = useState(-1);
     useEffect(() => { setActiveIdx(-1); }, [courseSearch]);
 
+    useEffect(() => {
+        if (results && results.length > 0) {
+            setPicked('r-0');
+            setGenerationId(g => g + 1);
+        }
+    }, [results]);
+
     if (!profile) {
         return (
             <PageShell width="wide">
@@ -1752,18 +1738,56 @@ export default function SchedulePage() {
 
     const segment = (value, label) => ({ value, label });
 
+    // ===== The options on the contact sheet =====
+    const generated = hasResults ? results.slice(0, showCount).map((result, idx) => {
+        const sig = getScheduleSignature(result.schedule);
+        return {
+            key: `r-${idx}`,
+            label: String(idx + 1),
+            result,
+            selectedCourses,
+            isSaved: savedSignatures.has(sig),
+            dbId: savedSignatures.get(sig),
+        };
+    }) : [];
+    const saved = dbSavedSchedules.map((savedObj, i) => ({
+        key: `s-${savedObj.dbId}`,
+        label: savedObj.name || `Saved ${i + 1}`,
+        result: savedObj,
+        selectedCourses: savedObj.storedSelectedCourses,
+        isSaved: true,
+        dbId: savedObj.dbId,
+        savedName: savedObj.name || `Saved schedule ${i + 1}`,
+    }));
+    const options = [...saved, ...generated];
+    const current = options.find(o => o.key === picked) || generated[0] || saved[0] || null;
+
+    // One scale for every option, so switching keeps the sheet still and only
+    // the classes move.
+    const range = (() => {
+        let lo = Infinity;
+        let hi = -Infinity;
+        options.forEach(o => buildBlocks(o.result, o.selectedCourses, courseNameMap).forEach(b => {
+            lo = Math.min(lo, b.start);
+            hi = Math.max(hi, b.end);
+        }));
+        if (!Number.isFinite(lo)) return { startHour: 8, endHour: 16 };
+        const startHour = Math.floor(lo / 60);
+        return { startHour, endHour: Math.max(startHour + 4, Math.ceil(hi / 60)) };
+    })();
+
     return (
         <PageShell width="wide">
-            <PageHeader
-                title="Schedule"
-                subtitle={mode === 'build'
-                    ? 'Pick your courses and CourseMate finds every timetable that fits, ranked by your preferences.'
-                    : mode === 'instructor'
-                        ? 'Look up anyone teaching this term and see their whole week.'
-                        : 'See how a course ran in recent terms before you plan around it.'}
-            >
-                <SemesterPicker />
-            </PageHeader>
+            <header className={styles.head}>
+                <h1 className={styles.title}>Schedule</h1>
+                <p className={styles.sentence}>
+                    {mode === 'build'
+                        ? 'Choose your courses; CourseMate tries every combination of their sections and keeps the ones that fit.'
+                        : mode === 'instructor'
+                            ? 'Anyone teaching this term, and their whole week.'
+                            : 'How a course ran in recent terms, before you plan around it.'}
+                </p>
+            </header>
 
             {/* Building a timetable, looking up an instructor and checking a
                 course's past answer the same question — when does this
@@ -1773,9 +1797,9 @@ export default function SchedulePage() {
                 value={mode}
                 onChange={switchMode}
                 tabs={[
-                    { value: 'build', label: 'Build', icon: <ScheduleIcon /> },
-                    { value: 'instructor', label: 'Find instructor', icon: <UserCheckIcon /> },
-                    { value: 'history', label: 'Course history', icon: <HistoryIcon /> },
+                    { value: 'build', label: 'Build' },
+                    { value: 'instructor', label: 'Find an instructor' },
+                    { value: 'history', label: 'Course history' },
                 ]}
             />
 
@@ -1797,37 +1821,27 @@ export default function SchedulePage() {
             )}
 
             <div className={`${styles.workspace} ${hasResults ? styles.hasResults : ''}`} hidden={mode !== 'build'}>
-                {/* ===== Builder ===== */}
-                <aside className={styles.builder} aria-label="Your courses and preferences">
-                    {/* Phones, once there are results: the cart folds to a strip. */}
+                {/* ===== The bench: courses and preferences ===== */}
+                <aside className={styles.bench} aria-label="Your courses and preferences">
                     {hasResults && (
                         <div className={styles.compactBar}>
                             <div className={styles.compactCourses}>
                                 {selectedCourses.map(c => (
-                                    <span
-                                        key={c.course_id}
-                                        className={`${styles.compactChip} ${prereqMap[c.course_id] ? styles.compactChipPrereq : ''}`}
-                                        title={prereqNote(c.course_id) || c.name}
-                                    >
-                                        <span className={styles.compactDot} style={{ '--c': paletteFor(cartIndex(c.course_id)) }} />
-                                        {c.course_id.startsWith('BASKET_') ? c.name.replace(/University Elective \(Basket (\d)\)/, 'Univ. elective $1') : c.course_id}
+                                    <span key={c.course_id} className={styles.compactChip} title={prereqNote(c.course_id) || c.name}>
+                                        <CourseMark color={paletteFor(cartIndex(c.course_id))} size="sm" />
+                                        {c.course_id.startsWith('BASKET_') ? c.name.replace(/University Elective \(Basket (\d)\)/, 'Elective $1') : c.course_id}
                                     </span>
                                 ))}
                             </div>
-                            <Button size="sm" variant="secondary" icon={<EditIcon />} onClick={() => setResults(null)}>Edit</Button>
+                            <Button size="sm" variant="secondary" onClick={() => setResults(null)}>Edit</Button>
                         </div>
                     )}
 
-                    <div className={styles.builderStack}>
-                        {/* A guest has no profile campus, so they pick which sections to see. */}
+                    <div className={styles.benchStack}>
                         {profile.isGuest && (
-                            <section className={styles.panel}>
-                                <div className={styles.panelHead}>
-                                    <h2 className={styles.panelTitle}>Campus</h2>
-                                    <span className={styles.panelMeta}>Which sections you can take</span>
-                                </div>
+                            <section className={styles.block}>
+                                <Rubric title="Campus" description="Which sections you can take." />
                                 <SegmentedControl
-                                    full
                                     label="Campus"
                                     value={profile.gender}
                                     onChange={switchGuestCampus}
@@ -1839,15 +1853,12 @@ export default function SchedulePage() {
                             </section>
                         )}
 
-                        {/* ===== Courses ===== */}
-                        <section className={styles.panel} aria-labelledby="cart-title">
-                            <div className={styles.panelHead}>
-                                <h2 id="cart-title" className={styles.panelTitle}>Courses</h2>
-                                <span className={styles.panelMeta}>
-                                    <strong>{selectedCourses.length}</strong> of 8
-                                    {cartCredits > 0 && <> · <strong>{cartCredits}</strong>{hasBasketCredits ? '+' : ''} credits</>}
-                                </span>
-                            </div>
+                        <section className={styles.block} aria-labelledby="cart-title">
+                            <Rubric
+                                id="cart-title"
+                                title="Courses"
+                                meta={<>{selectedCourses.length}/8{cartCredits > 0 && <> · {cartCredits}{hasBasketCredits ? '+' : ''} cr</>}</>}
+                            />
 
                             <div className={styles.searchWrapper} onClick={e => e.stopPropagation()}>
                                 <SearchInput
@@ -1855,7 +1866,7 @@ export default function SchedulePage() {
                                     onChange={(e) => { setCourseSearch(e.target.value); setShowDropdown(true); }}
                                     onFocus={() => setShowDropdown(true)}
                                     onKeyDown={onCourseKeyDown}
-                                    placeholder={selectedCourses.length >= 8 ? 'Eight courses is the most' : 'Add a course by name or ID'}
+                                    placeholder={selectedCourses.length >= 8 ? 'Eight courses is the most' : 'Add a course: code or name'}
                                     disabled={selectedCourses.length >= 8}
                                     autoComplete="off"
                                     role="combobox"
@@ -1877,23 +1888,22 @@ export default function SchedulePage() {
                                                         className={`${styles.dropdownItem} ${i === activeIdx ? styles.dropdownItemActive : ''}`}
                                                         onClick={() => addCourse(course)}
                                                     >
-                                                        <CourseSwatch courseId={course.course_id} size="sm" />
-                                                        <span className={styles.dropdownText}>
-                                                            <span className={styles.dropdownName}>{course.name}</span>
-                                                            <span className={styles.dropdownId}>{course.course_id}{course.credit_hours ? ` · ${course.credit_hours} credits` : ''}</span>
+                                                        <span className={styles.dropdownTop}>
+                                                            <CourseCode id={course.course_id} size="sm" />
+                                                            {course.credit_hours ? <span className={styles.dropdownCr}>{course.credit_hours} cr</span> : null}
                                                         </span>
-                                                        <PlusIcon className={styles.dropdownAdd} />
+                                                        <CourseName size="sm">{course.name}</CourseName>
                                                     </button>
                                                 );
                                             }
                                             return (
                                                 <div key={course.course_id} className={styles.dropdownClosed}>
-                                                    <CourseSwatch courseId={course.course_id} size="sm" className={styles.dropdownClosedSwatch} />
-                                                    <span className={styles.dropdownText}>
-                                                        <span className={styles.dropdownName}>{course.name}</span>
-                                                        <span className={styles.dropdownClosedNote}>{closedNote}</span>
+                                                    <span className={styles.dropdownTop}>
+                                                        <CourseCode id={course.course_id} size="sm" />
+                                                        <button type="button" className={styles.textBtn} onClick={() => openHistory(course)}>history</button>
                                                     </span>
-                                                    <Button size="sm" variant="ghost" icon={<HistoryIcon />} onClick={() => openHistory(course)}>History</Button>
+                                                    <CourseName size="sm" className={styles.dropdownClosedName}>{course.name}</CourseName>
+                                                    <span className={styles.dropdownClosedNote}>{closedNote}</span>
                                                 </div>
                                             );
                                         })}
@@ -1902,193 +1912,131 @@ export default function SchedulePage() {
                             </div>
 
                             {selectedCourses.length > 0 ? (
-                                <ul className={styles.cart}>
+                                <ol className={styles.cart}>
                                     {selectedCourses.map((c, i) => {
                                         const isBasket = c.course_id.startsWith('BASKET_');
                                         const isXor = xorCourseIds.has(c.course_id);
                                         return (
                                             <li key={c.course_id} className={`${styles.cartItem} ${isXor ? styles.cartItemXor : ''}`}>
-                                                <div className={styles.cartRow}>
-                                                    <CourseSwatch
-                                                        courseId={c.course_id}
-                                                        color={paletteFor(i)}
-                                                        label={isBasket ? (c.course_id.startsWith('BASKET_DEPT') ? 'D' : c.course_id.startsWith('BASKET_SUPPORT') ? 'S' : `U${c.course_id.slice(-1)}`) : undefined}
-                                                    />
-                                                    <span className={styles.cartText}>
-                                                        <span className={styles.cartName}>{c.name}</span>
-                                                        <span className={styles.cartMeta}>
-                                                            {isBasket ? 'Any course in this slot' : c.course_id}
-                                                            {!isBasket && c.credit_hours ? ` · ${c.credit_hours} cr` : ''}
-                                                            {loadingCourseIds.has(c.course_id) && <span className={styles.cartLoading}><Spinner /> loading sections</span>}
-                                                        </span>
+                                                <span className={styles.cartMark} style={{ '--c': paletteFor(i) }} aria-hidden="true" />
+                                                <span className={styles.cartText}>
+                                                    <span className={styles.cartTop}>
+                                                        {isBasket ? <span className={styles.cartSlot}>Slot</span> : <CourseCode id={c.course_id} size="sm" />}
+                                                        {!isBasket && c.credit_hours ? <span className={styles.cartCr}>{c.credit_hours} cr</span> : null}
+                                                        {loadingCourseIds.has(c.course_id) && <span className={styles.cartLoading}><Spinner /> sections</span>}
                                                     </span>
-                                                    <span className={styles.cartActions}>
-                                                        <Tooltip label={isXor ? 'Either-or: on' : 'Either-or'}>
-                                                            <button
-                                                                type="button"
-                                                                className={`${styles.xorToggle} ${isXor ? styles.xorToggleActive : ''}`}
-                                                                onClick={() => toggleXor(c.course_id)}
-                                                                aria-pressed={isXor}
-                                                                aria-label={`Either-or for ${c.name}: only one either-or course appears per schedule`}
-                                                            >
-                                                                OR
+                                                    <CourseName size="sm" className={styles.cartName}>{c.name}</CourseName>
+                                                    {prereqMap[c.course_id] && <span className={styles.prereqNote}>{prereqNote(c.course_id)}</span>}
+                                                </span>
+                                                <span className={styles.cartActions}>
+                                                    <button
+                                                        type="button"
+                                                        className={`${styles.orToggle} ${isXor ? styles.orToggleOn : ''}`}
+                                                        onClick={() => toggleXor(c.course_id)}
+                                                        aria-pressed={isXor}
+                                                        aria-label={`Either-or for ${c.name}: only one either-or course appears per schedule`}
+                                                        title="Either-or: each schedule takes only one course marked OR"
+                                                    >
+                                                        or
+                                                    </button>
+                                                    {/^\d+$/.test(c.course_id) && (
+                                                        <Tooltip label="Past terms">
+                                                            <button type="button" className={styles.iconBtn} onClick={() => setSheetCourse(c)} aria-label={`Past terms for ${c.name}`}>
+                                                                <HistoryIcon />
                                                             </button>
                                                         </Tooltip>
-                                                        {/^\d+$/.test(c.course_id) && (
-                                                            <Tooltip label="Past terms">
-                                                                <button
-                                                                    type="button"
-                                                                    className={styles.iconBtn}
-                                                                    onClick={() => setSheetCourse(c)}
-                                                                    aria-label={`Past terms for ${c.name}`}
-                                                                >
-                                                                    <HistoryIcon />
-                                                                </button>
-                                                            </Tooltip>
-                                                        )}
-                                                        <Tooltip label="Remove">
-                                                            <button
-                                                                type="button"
-                                                                className={`${styles.iconBtn} ${styles.iconBtnDanger}`}
-                                                                onClick={() => removeCourse(c.course_id)}
-                                                                aria-label={`Remove ${c.name}`}
-                                                            >
-                                                                <CloseIcon />
-                                                            </button>
-                                                        </Tooltip>
-                                                    </span>
-                                                </div>
-                                                {prereqMap[c.course_id] && (
-                                                    <p className={styles.prereqNote}>
-                                                        <AlertIcon />
-                                                        <span>{prereqNote(c.course_id)}</span>
-                                                    </p>
-                                                )}
+                                                    )}
+                                                    <Tooltip label="Remove">
+                                                        <button type="button" className={`${styles.iconBtn} ${styles.iconBtnDanger}`} onClick={() => removeCourse(c.course_id)} aria-label={`Remove ${c.name}`}>
+                                                            <CloseIcon />
+                                                        </button>
+                                                    </Tooltip>
+                                                </span>
                                             </li>
                                         );
                                     })}
-                                </ul>
+                                </ol>
                             ) : (
-                                <div className={styles.cartEmpty}>
-                                    <span className={styles.cartEmptyIcon}><LayersIcon /></span>
-                                    <span>
-                                        <strong>Start with the courses you plan to take.</strong>
-                                        Search above, or hold a place for an elective below and let the builder pick it.
-                                    </span>
-                                </div>
-                            )}
-
-                            {xorCourseIds.size >= 1 && (
-                                <p className={styles.xorInfo}>
-                                    <strong>Either-or:</strong> each schedule includes only one of the courses marked OR.
+                                <p className={styles.cartEmpty}>
+                                    Start with the courses you plan to take, or keep a slot for an elective and let the builder choose it.
                                 </p>
                             )}
 
+                            {xorCourseIds.size >= 1 && (
+                                <p className={styles.xorInfo}>Courses marked <b>or</b> are alternatives: each schedule takes one of them.</p>
+                            )}
+
                             <div className={styles.slots}>
-                                <span className={styles.slotsLabel}>Elective slots</span>
-                                <div className={styles.slotGrid}>
-                                    <button type="button" className={styles.slotBtn} onClick={() => addCourse({ course_id: 'BASKET_1', name: 'University Elective (Basket 1)', is_basket: true, basket_name: 'Basket 1' })}>
-                                        <PlusIcon />University elective 1
-                                    </button>
-                                    <button type="button" className={styles.slotBtn} onClick={() => addCourse({ course_id: 'BASKET_2', name: 'University Elective (Basket 2)', is_basket: true, basket_name: 'Basket 2' })}>
-                                        <PlusIcon />University elective 2
-                                    </button>
-                                    {majorInfo?.dept_electives_count > 0 && majorInfo?.support_electives_count > 0 ? (
-                                        <>
-                                            <button type="button" className={styles.slotBtn} onClick={addDeptElective}>
-                                                <PlusIcon />Major elective
-                                            </button>
-                                            <button type="button" className={styles.slotBtn} onClick={addSupportElective}>
-                                                <PlusIcon />Support elective
-                                            </button>
-                                        </>
-                                    ) : majorInfo?.dept_electives_count > 0 ? (
-                                        <button type="button" className={`${styles.slotBtn} ${styles.slotBtnWide}`} onClick={addDeptElective}>
-                                            <PlusIcon />Department elective
-                                        </button>
-                                    ) : null}
-                                </div>
+                                <span className={styles.slotsLabel}>Keep a slot for</span>
+                                <button type="button" className={styles.slotBtn} onClick={() => addCourse({ course_id: 'BASKET_1', name: 'University Elective (Basket 1)', is_basket: true, basket_name: 'Basket 1' })}>University elective 1</button>
+                                <button type="button" className={styles.slotBtn} onClick={() => addCourse({ course_id: 'BASKET_2', name: 'University Elective (Basket 2)', is_basket: true, basket_name: 'Basket 2' })}>University elective 2</button>
+                                {majorInfo?.dept_electives_count > 0 && majorInfo?.support_electives_count > 0 ? (
+                                    <>
+                                        <button type="button" className={styles.slotBtn} onClick={addDeptElective}>Major elective</button>
+                                        <button type="button" className={styles.slotBtn} onClick={addSupportElective}>Support elective</button>
+                                    </>
+                                ) : majorInfo?.dept_electives_count > 0 ? (
+                                    <button type="button" className={styles.slotBtn} onClick={addDeptElective}>Department elective</button>
+                                ) : null}
                             </div>
                         </section>
 
-                        {/* ===== Preferences ===== */}
                         {selectedCourses.length > 0 && (
-                            <section className={`${styles.panel} ${styles.prefsPanel}`}>
+                            <section className={styles.block}>
                                 <button type="button" className={styles.prefsHeader} onClick={() => setPrefsOpen(!prefsOpen)} aria-expanded={prefsOpen}>
-                                    <span className={styles.prefsHeaderIcon}><SlidersIcon /></span>
-                                    <span className={styles.prefsHeaderText}>
-                                        <span className={styles.panelTitle}>Preferences</span>
-                                        <span className={styles.panelMeta}>{prefCount > 0 ? `${prefCount} set` : 'Times, days, gaps, instructors'}</span>
-                                    </span>
-                                    <ChevronDownIcon className={`${styles.prefsChevron} ${prefsOpen ? styles.prefsChevronOpen : ''}`} />
+                                    <span className={styles.prefsTitle}>Preferences</span>
+                                    <span className={styles.prefsMeta}>{prefCount > 0 ? `${prefCount} set` : 'none'}</span>
+                                    <span className={styles.prefsToggle}>{prefsOpen ? 'Hide' : 'Set'}</span>
                                 </button>
                                 {prefsOpen && (
-                                    <div className={styles.prefsBody}>
-                                        <div className={styles.prefGroup}>
+                                    <div className={styles.prefs}>
+                                        <div className={styles.pref}>
                                             <span className={styles.prefLabel}>Class times</span>
                                             <div className={styles.timeRow}>
                                                 <Field label="Not before" className={styles.timeField}>
                                                     <Select size="sm" value={prefs.noClassesBefore} onChange={e => setPrefs(p => ({ ...p, noClassesBefore: e.target.value }))}>
                                                         <option value="">Any time</option>
-                                                        <option value="09:30 AM">9:30 AM</option>
-                                                        <option value="11:00 AM">11:00 AM</option>
-                                                        <option value="12:30 PM">12:30 PM</option>
-                                                        <option value="02:00 PM">2:00 PM</option>
+                                                        <option value="09:30 AM">09:30</option>
+                                                        <option value="11:00 AM">11:00</option>
+                                                        <option value="12:30 PM">12:30</option>
+                                                        <option value="02:00 PM">14:00</option>
                                                     </Select>
                                                 </Field>
                                                 <Field label="Not after" className={styles.timeField}>
                                                     <Select size="sm" value={prefs.noClassesAfter} onChange={e => setPrefs(p => ({ ...p, noClassesAfter: e.target.value }))}>
                                                         <option value="">Any time</option>
-                                                        <option value="02:00 PM">2:00 PM</option>
-                                                        <option value="03:15 PM">3:30 PM</option>
-                                                        <option value="05:00 PM">5:00 PM</option>
-                                                        <option value="06:30 PM">6:30 PM</option>
+                                                        <option value="02:00 PM">14:00</option>
+                                                        <option value="03:15 PM">15:30</option>
+                                                        <option value="05:00 PM">17:00</option>
+                                                        <option value="06:30 PM">18:30</option>
                                                     </Select>
                                                 </Field>
                                             </div>
                                             <label className={styles.switchRow}>
                                                 <span>
-                                                    <span className={styles.switchLabel}>Strict times</span>
-                                                    <span className={styles.switchSub}>Don&rsquo;t suggest schedules that break them</span>
+                                                    <span className={styles.switchLabel}>Strict</span>
+                                                    <span className={styles.switchSub}>Never suggest a schedule that breaks them</span>
                                                 </span>
                                                 <Switch checked={prefs.strictTime} onChange={v => setPrefs(p => ({ ...p, strictTime: v }))} label="Strict time constraints" />
                                             </label>
                                         </div>
 
-                                        <div className={styles.prefGroup}>
-                                            <span className={styles.prefLabel}>Section language</span>
-                                            <SegmentedControl
-                                                full
-                                                size="sm"
-                                                label="Section language"
-                                                value={prefs.languagePref}
-                                                onChange={v => setPrefs(p => ({ ...p, languagePref: v }))}
-                                                options={[segment('any', 'Any'), segment('english', 'English'), segment('arabic', 'Arabic')]}
-                                            />
+                                        <div className={styles.pref}>
+                                            <span className={styles.prefLabel}>Language</span>
+                                            <SegmentedControl size="sm" label="Section language" value={prefs.languagePref} onChange={v => setPrefs(p => ({ ...p, languagePref: v }))}
+                                                options={[segment('any', 'Any'), segment('english', 'English'), segment('arabic', 'Arabic')]} />
                                         </div>
 
-                                        <div className={styles.prefGroup}>
-                                            <span className={styles.prefLabel}>Gaps between classes</span>
-                                            <SegmentedControl
-                                                full
-                                                size="sm"
-                                                label="Gaps between classes"
-                                                value={prefs.gapPref}
-                                                onChange={v => setPrefs(p => ({ ...p, gapPref: v }))}
-                                                options={[segment('none', 'Any'), segment('minimize', 'Fewer gaps'), segment('prefer', 'Some gaps')]}
-                                            />
+                                        <div className={styles.pref}>
+                                            <span className={styles.prefLabel}>Gaps</span>
+                                            <SegmentedControl size="sm" label="Gaps between classes" value={prefs.gapPref} onChange={v => setPrefs(p => ({ ...p, gapPref: v }))}
+                                                options={[segment('none', 'Any'), segment('minimize', 'Fewer'), segment('prefer', 'Some')]} />
                                         </div>
 
-                                        <div className={styles.prefGroup}>
+                                        <div className={styles.pref}>
                                             <span className={styles.prefLabel}>Days on campus</span>
-                                            <SegmentedControl
-                                                full
-                                                size="sm"
-                                                label="Days on campus"
-                                                value={prefs.compactPref}
-                                                onChange={v => setPrefs(p => ({ ...p, compactPref: v }))}
-                                                options={[segment('none', 'Any'), segment('fewer', 'Fewer days'), segment('spread', 'Spread out')]}
-                                            />
+                                            <SegmentedControl size="sm" label="Days on campus" value={prefs.compactPref} onChange={v => setPrefs(p => ({ ...p, compactPref: v }))}
+                                                options={[segment('none', 'Any'), segment('fewer', 'Fewer'), segment('spread', 'Spread out')]} />
                                         </div>
 
                                         <label className={styles.switchRow}>
@@ -2099,13 +2047,12 @@ export default function SchedulePage() {
                                             <Switch checked={prefs.hideMixedSections} onChange={v => setPrefs(p => ({ ...p, hideMixedSections: v }))} label="Hide mixed sections" />
                                         </label>
 
-                                        {/* Per-course preferences */}
                                         {selectedCourses.map((c, ci) => {
                                             const isBasket = c.course_id.startsWith('BASKET_');
                                             const isDeptBasket = c.course_id.startsWith('BASKET_DEPT_');
                                             const isSupportBasket = c.course_id.startsWith('BASKET_SUPPORT_');
 
-                                            // If it's a department basket, only show preferences for the FIRST one added
+                                            // Department/support baskets share one set of preferences.
                                             if (isDeptBasket) {
                                                 const firstDeptBasket = selectedCourses.find(sc => sc.course_id.startsWith('BASKET_DEPT_'));
                                                 if (c.course_id !== firstDeptBasket.course_id) return null;
@@ -2118,40 +2065,29 @@ export default function SchedulePage() {
                                             if (isBasket) {
                                                 const prefsKey = isDeptBasket ? 'BASKET_DEPT' : isSupportBasket ? 'BASKET_SUPPORT' : c.course_id;
                                                 const displayName = isDeptBasket ? (majorInfo?.support_electives_count > 0 ? 'Major electives' : 'Department electives') : isSupportBasket ? 'Support electives' : c.name;
-
                                                 const basketSections = allSections[c.course_id] || [];
                                                 const subCourseIds = [...new Set(basketSections.map(s => s.course_id))].sort();
                                                 if (subCourseIds.length === 0) return null;
-
                                                 const preferred = prefs.preferredElectives?.[prefsKey] || [];
                                                 const isHard = prefs.hardElectiveFilter?.[prefsKey] || false;
-
                                                 const toggleElective = (subId) => {
                                                     setPrefs(p => {
-                                                        const current = p.preferredElectives?.[prefsKey] || [];
-                                                        const next = current.includes(subId)
-                                                            ? current.filter(x => x !== subId)
-                                                            : [...current, subId];
+                                                        const cur = p.preferredElectives?.[prefsKey] || [];
+                                                        const next = cur.includes(subId) ? cur.filter(x => x !== subId) : [...cur, subId];
                                                         return { ...p, preferredElectives: { ...p.preferredElectives, [prefsKey]: next } };
                                                     });
                                                 };
-
                                                 return (
                                                     <div key={prefsKey} className={styles.prefCourse}>
                                                         <div className={styles.prefCourseHead}>
-                                                            <span className={styles.compactDot} style={{ '--c': paletteFor(ci) }} />
+                                                            <CourseMark color={paletteFor(ci)} size="sm" />
                                                             <span className={styles.prefCourseName}>{displayName}</span>
-                                                            <span className={styles.panelMeta}>{preferred.length ? `${preferred.length} preferred` : `${subCourseIds.length} options`}</span>
+                                                            <span className={styles.prefsMeta}>{preferred.length ? `${preferred.length} preferred` : `${subCourseIds.length} options`}</span>
                                                         </div>
                                                         <div className={styles.electiveList}>
                                                             {subCourseIds.map(subId => (
-                                                                <Checkbox
-                                                                    key={subId}
-                                                                    checked={preferred.includes(subId)}
-                                                                    onChange={() => toggleElective(subId)}
-                                                                    className={styles.electiveItem}
-                                                                >
-                                                                    <span className={styles.electiveId}>{subId}</span>
+                                                                <Checkbox key={subId} checked={preferred.includes(subId)} onChange={() => toggleElective(subId)} className={styles.electiveItem}>
+                                                                    <CourseCode id={subId} size="sm" />
                                                                     {extraCourseNames[subId] && <span className={styles.electiveName}> {extraCourseNames[subId]}</span>}
                                                                 </Checkbox>
                                                             ))}
@@ -2160,7 +2096,7 @@ export default function SchedulePage() {
                                                             <label className={styles.switchRow}>
                                                                 <span>
                                                                     <span className={styles.switchLabel}>Only these</span>
-                                                                    <span className={styles.switchSub}>Show only schedules with a preferred course</span>
+                                                                    <span className={styles.switchSub}>Only schedules with a preferred course</span>
                                                                 </span>
                                                                 <Switch checked={isHard} onChange={v => setPrefs(p => ({ ...p, hardElectiveFilter: { ...p.hardElectiveFilter, [prefsKey]: v } }))} label="Only show schedules with selected courses" />
                                                             </label>
@@ -2169,20 +2105,18 @@ export default function SchedulePage() {
                                                 );
                                             }
 
-                                            // Regular (non-basket) course
                                             const instructors = getInstructors(c.course_id);
                                             const baseSections = getBaseSections(c.course_id);
                                             const pinnedBaseId = prefs.pinnedSections[c.course_id] || '';
                                             const labSections = getLabSections(c.course_id, pinnedBaseId);
-
                                             if (instructors.length <= 1 && baseSections.length <= 1 && labSections.length <= 1) return null;
 
                                             return (
                                                 <div key={c.course_id} className={styles.prefCourse}>
                                                     <div className={styles.prefCourseHead}>
-                                                        <span className={styles.compactDot} style={{ '--c': paletteFor(ci) }} />
+                                                        <CourseMark color={paletteFor(ci)} size="sm" />
+                                                        <CourseCode id={c.course_id} size="sm" />
                                                         <span className={styles.prefCourseName}>{c.name}</span>
-                                                        <span className={styles.prefCourseId}>{c.course_id}</span>
                                                     </div>
                                                     {instructors.length > 1 && (
                                                         <Field label="Instructor">
@@ -2193,12 +2127,12 @@ export default function SchedulePage() {
                                                         </Field>
                                                     )}
                                                     {baseSections.length > 1 && (
-                                                        <Field label="Lecture section">
+                                                        <Field label="Lecture">
                                                             <Select size="sm" value={pinnedBaseId} onChange={e => {
                                                                 const newVal = e.target.value;
                                                                 setPrefs(p => {
                                                                     const next = { ...p, pinnedSections: { ...p.pinnedSections, [c.course_id]: newVal } };
-                                                                    // Clear pinned lab if it no longer belongs to the newly pinned lecture
+                                                                    // Clear a pinned lab that no longer belongs to the newly pinned lecture.
                                                                     if (newVal && p.pinnedLabs?.[c.course_id]) {
                                                                         const pl = p.pinnedLabs[c.course_id];
                                                                         if (getBaseSection(pl) !== newVal) {
@@ -2213,7 +2147,7 @@ export default function SchedulePage() {
                                                                     const baseNum = getBaseSection(s.section_num);
                                                                     return (
                                                                         <option key={baseNum} value={baseNum}>
-                                                                            Section {baseNum}{s.class_time ? ` · ${s.class_time}` : ''}{s.instructor ? ` · ${s.instructor}` : ''}{(() => { const q = seatStatus(s); return q ? ` · ${q.label}` : ''; })()}
+                                                                            §{baseNum}{s.class_time ? ` · ${s.class_time}` : ''}{s.instructor ? ` · ${s.instructor}` : ''}{(() => { const q = seatStatus(s); return q ? ` · ${q.label}` : ''; })()}
                                                                         </option>
                                                                     );
                                                                 })}
@@ -2221,12 +2155,12 @@ export default function SchedulePage() {
                                                         </Field>
                                                     )}
                                                     {labSections.length > 1 && (
-                                                        <Field label="Lab section">
+                                                        <Field label="Lab">
                                                             <Select size="sm" value={prefs.pinnedLabs?.[c.course_id] || ''} onChange={e => setPrefs(p => ({ ...p, pinnedLabs: { ...(p.pinnedLabs || {}), [c.course_id]: e.target.value } }))}>
                                                                 <option value="">Any lab</option>
                                                                 {labSections.map(s => (
                                                                     <option key={s.section_num} value={s.section_num}>
-                                                                        Lab {s.section_num}{s.class_time ? ` · ${s.class_time}` : ''}{s.instructor ? ` · ${s.instructor}` : ''}{(() => { const q = seatStatus(s); return q ? ` · ${q.label}` : ''; })()}
+                                                                        §{s.section_num}{s.class_time ? ` · ${s.class_time}` : ''}{s.instructor ? ` · ${s.instructor}` : ''}{(() => { const q = seatStatus(s); return q ? ` · ${q.label}` : ''; })()}
                                                                     </option>
                                                                 ))}
                                                             </Select>
@@ -2241,25 +2175,16 @@ export default function SchedulePage() {
                         )}
                     </div>
 
-                    {/* Generate */}
                     {selectedCourses.length > 0 && (
                         <div className={styles.generateBar}>
-                            <Button
-                                variant="primary"
-                                size="lg"
-                                block
-                                onClick={handleGenerate}
-                                loading={generating}
-                                disabled={loadingAny}
-                                icon={hasResults ? <RefreshIcon /> : <SparkleIcon />}
-                            >
-                                {loadingAny ? 'Loading course data…' : hasResults ? 'Regenerate schedules' : 'Generate schedules'}
+                            <Button variant="primary" size="lg" block onClick={handleGenerate} loading={generating} disabled={loadingAny}>
+                                {loadingAny ? 'Reading sections…' : hasResults ? 'Generate again' : `Fit ${selectedCourses.length} ${selectedCourses.length === 1 ? 'course' : 'courses'} together`}
                             </Button>
                         </div>
                     )}
                 </aside>
 
-                {/* ===== Canvas ===== */}
+                {/* ===== The sheet ===== */}
                 <section className={styles.canvas} aria-label="Schedules">
                     {error && (
                         <Callout tone="danger" title="Something needs a look" action={<Button size="sm" variant="ghost" onClick={() => setError('')}>Dismiss</Button>}>
@@ -2267,152 +2192,111 @@ export default function SchedulePage() {
                         </Callout>
                     )}
 
-                    {/* Saved schedules */}
-                    {dbSavedSchedules.length > 0 && (
-                        <div className={styles.group}>
-                            <div className={styles.groupHead}>
-                                <h2 className={styles.groupTitle}>
-                                    <StarIcon />
-                                    Saved
-                                </h2>
-                                <span className={styles.groupMeta}>{dbSavedSchedules.length} of 3</span>
+                    {options.length > 0 && !generating && (
+                        <div className={styles.contact}>
+                            <div className={styles.contactHead}>
+                                <span className={styles.contactTitle}>
+                                    {hasResults
+                                        ? <>{results.length === 100 ? '100+' : results.length} {results.length === 1 ? 'schedule fits' : 'schedules fit'}</>
+                                        : 'Saved schedules'}
+                                </span>
+                                {hasResults && <span className={styles.contactMeta}>best fit first</span>}
+                                {saved.length > 0 && <span className={styles.contactMeta}>{saved.length} of 3 saved</span>}
                             </div>
-                            {dbSavedSchedules.map((savedObj, i) => (
-                                <ScheduleCard
-                                    key={savedObj.dbId}
-                                    result={savedObj}
-                                    rank={savedObj.name || `Saved schedule ${i + 1}`}
-                                    courseNameMap={courseNameMap}
-                                    courseCreditsMap={courseCreditsMap}
-                                    selectedCourses={savedObj.storedSelectedCourses}
-                                    onSave={null}
-                                    onUnsave={() => handleDeleteSavedSchedule(savedObj.dbId)}
-                                    isSaved={true}
-                                    initiallyCollapsed={true}
-                                    isSavingSchedule={isSavingSchedule}
-                                />
-                            ))}
+                            <div className={styles.strip} role="listbox" aria-label="Schedule options">
+                                {saved.length > 0 && (
+                                    <div className={styles.stripGroup}>
+                                        {saved.map(o => (
+                                            <OptionThumb key={o.key} option={o} range={range} courseNameMap={courseNameMap} selected={current?.key === o.key} onSelect={() => setPicked(o.key)} />
+                                        ))}
+                                    </div>
+                                )}
+                                {generated.length > 0 && (
+                                    <div className={styles.stripGroup}>
+                                        {generated.map(o => (
+                                            <OptionThumb key={o.key} option={o} range={range} courseNameMap={courseNameMap} selected={current?.key === o.key} onSelect={() => setPicked(o.key)} />
+                                        ))}
+                                        {showCount < results.length && (
+                                            <button type="button" className={styles.more} onClick={() => setShowCount(n => n + 8)}>
+                                                <span className={styles.moreNum}>+{Math.min(8, results.length - showCount)}</span>
+                                                <span className={styles.moreLabel}>more</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
 
-                    {/* Results */}
-                    {generating && !results && (
+                    {generating ? (
                         <div className={styles.generating} aria-live="polite">
-                            <div className={styles.generatingGrid} aria-hidden="true">
-                                {Array.from({ length: 15 }).map((_, i) => <span key={i} style={{ animationDelay: `${(i % 5) * 80 + Math.floor(i / 5) * 60}ms` }} />)}
+                            <p className={styles.generatingText}>Fitting {selectedCourses.length} courses together…</p>
+                            <div className={styles.sweepWrap}>
+                                <WeekGrid days={ALL_DAYS} blocks={[]} startHour={8} endHour={16} pxPerMin={0.75} />
+                                <span className={styles.sweep} aria-hidden="true" />
                             </div>
-                            <p>Fitting {selectedCourses.length} courses together…</p>
                         </div>
-                    )}
-
-                    {hasResults && (
-                        <div className={styles.group}>
-                            <div className={styles.groupHead}>
-                                <h2 className={styles.groupTitle}>
-                                    <SparkleIcon />
-                                    {results.length === 100 ? '100+ schedules' : `${results.length} ${results.length === 1 ? 'schedule' : 'schedules'}`} fit
-                                </h2>
-                                <span className={styles.groupMeta}>Best fit first</span>
-                            </div>
-                            {results
-                                .slice(0, showCount)
-                                .map((result, idx) => {
-                                    const sig = getScheduleSignature(result.schedule);
-                                    const isSaved = savedSignatures.has(sig);
-                                    const dbId = savedSignatures.get(sig);
-                                    return (
-                                        <ScheduleCard
-                                            key={idx}
-                                            result={result}
-                                            rank={idx + 1}
-                                            courseNameMap={courseNameMap}
-                                            courseCreditsMap={courseCreditsMap}
-                                            selectedCourses={selectedCourses}
-                                            onSave={isSaved || profile.isGuest ? null : (name) => handleSaveSchedule(result, name)}
-                                            guest={profile.isGuest}
-                                            onUnsave={isSaved ? () => handleDeleteSavedSchedule(dbId) : null}
-                                            isSaved={isSaved}
-                                            initiallyCollapsed={idx > 0}
-                                            isSavingSchedule={isSavingSchedule}
-                                            savedCount={dbSavedSchedules.length}
-                                        />
-                                    );
-                                })}
-
-                            {(() => {
-                                const remaining = results.length;
-                                return showCount < remaining && (
-                                    <button type="button" className={styles.showMoreBtn} onClick={() => (showCount >= 9 ? setShowCount(remaining + 100) : setShowCount(prev => prev + 3))}>
-                                        {showCount >= 9 ? `Show all ${remaining - showCount} remaining` : `Show ${Math.min(3, remaining - showCount)} more`}
-                                        <ChevronDownIcon />
-                                    </button>
-                                );
-                            })()}
-                        </div>
-                    )}
-
-                    {results && results.length === 0 && (
+                    ) : current ? (
+                        <ScheduleSheet
+                            key={current.key.startsWith('s-') ? current.key : 'generated'}
+                            gridKey={`${generationId}`}
+                            option={current}
+                            range={range}
+                            courseNameMap={courseNameMap}
+                            courseCreditsMap={courseCreditsMap}
+                            onSave={current.isSaved || profile.isGuest ? null : (name) => handleSaveSchedule(current.result, name)}
+                            onUnsave={current.isSaved ? () => handleDeleteSavedSchedule(current.dbId) : null}
+                            guest={profile.isGuest}
+                            isSavingSchedule={isSavingSchedule}
+                            savedCount={dbSavedSchedules.length}
+                        />
+                    ) : results && results.length === 0 ? (
                         <div className={styles.noResults}>
                             <EmptyState
-                                tone="neutral"
-                                icon={<AlertIcon />}
-                                title={`These ${selectedCourses.length} courses don’t fit together`}
+                                title={`These ${selectedCourses.length} courses don’t fit together.`}
                                 actions={(
                                     <>
-                                        <Button variant="primary" onClick={handleGenerateBestEffort} loading={generating} icon={<SparkleIcon />}>Find the best fit</Button>
-                                        <Button variant="secondary" onClick={() => { setResults(null); setPrefsOpen(true); }}>Adjust preferences</Button>
+                                        <Button variant="primary" onClick={handleGenerateBestEffort} loading={generating}>Fit as many as possible</Button>
+                                        <Button variant="link" onClick={() => { setResults(null); setPrefsOpen(true); }}>Loosen the preferences</Button>
                                     </>
                                 )}
                             >
-                                Every combination of sections has a clash. Best fit builds schedules with as many of your courses as possible and tells you which it left out.
+                                Every combination of their sections has a clash. &ldquo;As many as possible&rdquo; builds schedules with the most courses that do fit, and says which it left out.
                             </EmptyState>
                             {conflictPairs.length > 0 && (
-                                <div className={styles.conflicts}>
-                                    <span className={styles.conflictsLabel}>Always clash</span>
-                                    <ul>
+                                <div className={styles.clashes}>
+                                    <Rubric title="Always clash" meta={conflictPairs.length} description="Every section of one meets at the same time as every section of the other. Drop one, or mark both or to try each in turn." />
+                                    <ul className={styles.clashList}>
                                         {conflictPairs.map(([a, b]) => (
-                                            <li key={`${a.course_id}-${b.course_id}`}>
-                                                <span className={styles.conflictCourse}><span className={styles.compactDot} style={{ '--c': paletteFor(cartIndex(a.course_id)) }} />{a.name}</span>
-                                                <span className={styles.conflictX} aria-label="clashes with"><CloseIcon /></span>
-                                                <span className={styles.conflictCourse}><span className={styles.compactDot} style={{ '--c': paletteFor(cartIndex(b.course_id)) }} />{b.name}</span>
+                                            <li key={`${a.course_id}-${b.course_id}`} className={styles.clash}>
+                                                <span className={styles.clashCourse}>
+                                                    <CourseMark color={paletteFor(cartIndex(a.course_id))} size="sm" />
+                                                    <CourseCode id={a.course_id} size="sm" />
+                                                    <CourseName size="sm">{a.name}</CourseName>
+                                                </span>
+                                                <span className={styles.clashMark} aria-label="clashes with" />
+                                                <span className={styles.clashCourse}>
+                                                    <CourseMark color={paletteFor(cartIndex(b.course_id))} size="sm" />
+                                                    <CourseCode id={b.course_id} size="sm" />
+                                                    <CourseName size="sm">{b.name}</CourseName>
+                                                </span>
                                             </li>
                                         ))}
                                     </ul>
-                                    <p>Every section of one meets at the same time as every section of the other. Drop one, or mark both OR to try each in turn.</p>
                                 </div>
                             )}
                         </div>
-                    )}
-
-                    {!results && !generating && (
+                    ) : (
                         <div className={styles.placeholder}>
-                            <div className={styles.ghostGrid} aria-hidden="true">
-                                <div className={styles.ghostHead}>
-                                    <span />
-                                    {ALL_DAYS.map(d => <span key={d}>{d}</span>)}
-                                </div>
-                                {[8, 9, 10, 11, 12, 13, 14, 15].map(h => (
-                                    <div key={h} className={styles.ghostRow}>
-                                        <span>{formatTimeShort(h * 60)}</span>
-                                        {ALL_DAYS.map(d => <span key={d} />)}
-                                    </div>
-                                ))}
-                                <span className={styles.ghostBlock} style={{ '--c': 'var(--course-1)', '--col': 2, '--row': 1, '--span': 2 }} />
-                                <span className={styles.ghostBlock} style={{ '--c': 'var(--course-2)', '--col': 4, '--row': 1, '--span': 2 }} />
-                                <span className={styles.ghostBlock} style={{ '--c': 'var(--course-3)', '--col': 3, '--row': 3, '--span': 2 }} />
-                                <span className={styles.ghostBlock} style={{ '--c': 'var(--course-4)', '--col': 1, '--row': 5, '--span': 2 }} />
-                                <span className={styles.ghostBlock} style={{ '--c': 'var(--course-5)', '--col': 5, '--row': 4, '--span': 2 }} />
-                            </div>
-                            <div className={styles.placeholderText}>
-                                <p className={styles.placeholderTitle}>
-                                    {selectedCourses.length === 0 ? 'Your timetable will appear here' : `${selectedCourses.length} ${selectedCourses.length === 1 ? 'course' : 'courses'} ready`}
-                                </p>
-                                <p className={styles.placeholderBody}>
-                                    {selectedCourses.length === 0
-                                        ? 'Add the courses you plan to take. CourseMate tries every combination of their sections and keeps the ones without a clash.'
-                                        : 'Set any preferences you care about, then generate. Schedules come back ranked by how well they fit.'}
-                                </p>
-                            </div>
+                            <p className={styles.placeholderTitle}>
+                                {selectedCourses.length === 0 ? 'Your week will be drawn here.' : `${selectedCourses.length} ${selectedCourses.length === 1 ? 'course' : 'courses'} on the bench.`}
+                            </p>
+                            <p className={styles.placeholderBody}>
+                                {selectedCourses.length === 0
+                                    ? 'Add the courses you plan to take. Every combination of their sections is tried, and only the ones without a clash are kept.'
+                                    : 'Set any preferences you care about, then fit them together. The options come back ranked by how well they suit you.'}
+                            </p>
+                            <WeekGrid days={ALL_DAYS} blocks={[]} startHour={8} endHour={16} pxPerMin={0.75} className={styles.emptyGrid} />
                         </div>
                     )}
                 </section>
@@ -2421,36 +2305,15 @@ export default function SchedulePage() {
     );
 }
 
-// ===== SCHEDULE CARD COMPONENT =====
+// ===== The options =====
 
-function ScheduleCard({ result, rank, courseNameMap, courseCreditsMap, selectedCourses, onSave, onUnsave, isSaved, initiallyCollapsed = false, isSavingSchedule = false, guest = false, savedCount = 0 }) {
-    const { schedule, score, warnings } = result;
-    const [detailsOpen, setDetailsOpen] = useState(false);
-    const [cardOpen, setCardOpen] = useState(!initiallyCollapsed);
-    const [exporting, setExporting] = useState(false);
-    const [copied, setCopied] = useState(false);
-    const [crnsCopied, setCrnsCopied] = useState(false);
-    const [naming, setNaming] = useState(false);
-    const [saveName, setSaveName] = useState('');
-    const { selectedTerm, semesters } = useSemester();
-    const confirm = useConfirm();
-    const toast = useToast();
-    // Carries the term's dates from Banner, which the calendar export needs.
-    const termInfo = semesters?.find(s => s.term_code === selectedTerm);
-
-    // Compute total credit hours for this schedule
-    const totalCredits = schedule.reduce((sum, group) => {
-        // Use group.courseId to get the actual course selected (bypassing the basket generic ID)
-        return sum + (courseCreditsMap[group.courseId] || 0);
-    }, 0);
-
-    // Collect all time blocks for the timetable
+/** Every class block of a schedule, coloured by its course's place in the cart. */
+function buildBlocks(result, selectedCourses, courseNameMap) {
     const blocks = [];
-    schedule.forEach((group) => {
-        const courseIdx = selectedCourses.findIndex(c => c.course_id === (group.originalCourseId || group.courseId));
+    (result?.schedule || []).forEach((group) => {
+        const courseIdx = (selectedCourses || []).findIndex(c => c.course_id === (group.originalCourseId || group.courseId));
         group.sections.forEach(sec => {
-            const slots = parseClassTime(sec.class_time);
-            slots.forEach(slot => {
+            parseClassTime(sec.class_time).forEach(slot => {
                 blocks.push({
                     ...slot,
                     courseId: group.courseId,
@@ -2459,38 +2322,78 @@ function ScheduleCard({ result, rank, courseNameMap, courseCreditsMap, selectedC
                     crn: sec.crn || null,
                     instructor: sec.instructor || null,
                     location: sec.location || null,
-                    colorIdx: courseIdx % 8,
+                    colorIdx: Math.max(0, courseIdx) % 8,
                 });
             });
         });
     });
+    return blocks;
+}
 
-    // Find which days are used
-    const usedDays = [...new Set(blocks.map(b => b.day))];
-    const days = ALL_DAYS.filter(d => usedDays.includes(d));
+/** The shape of a week: days used, first start, last finish, time between classes. */
+function weekShape(blocks) {
+    const days = ALL_DAYS.filter(d => blocks.some(b => b.day === d));
     if (days.length === 0) return null;
-
-    // Find time range
-    const minTime = Math.min(...blocks.map(b => b.start));
-    const maxTime = Math.max(...blocks.map(b => b.end));
-    const startHour = Math.floor(minTime / 60);
-    const endHour = Math.ceil(maxTime / 60);
-
-    const PX_PER_MIN = 1;
-
-    // The shape of the week, for comparing schedules at a glance.
-    const gapMinutes = days.reduce((sum, d) => {
+    const gap = days.reduce((sum, d) => {
         const list = blocks.filter(b => b.day === d).sort((a, b) => a.start - b.start);
         let g = 0;
         for (let i = 1; i < list.length; i++) g += Math.max(0, list[i].start - list[i - 1].end);
         return sum + g;
     }, 0);
-    const earliest = Math.min(...days.map(d => Math.min(...blocks.filter(b => b.day === d).map(b => b.start))));
-    const latest = Math.max(...days.map(d => Math.max(...blocks.filter(b => b.day === d).map(b => b.end))));
+    return {
+        days,
+        earliest: Math.min(...blocks.map(b => b.start)),
+        latest: Math.max(...blocks.map(b => b.end)),
+        gap,
+    };
+}
 
-    // Full sections do not stop a schedule being built -- it is a plan, and a
-    // seat may free up -- but burying that in a badge inside a collapsed
-    // details panel means nobody sees it until registration day.
+/** A thumbnail on the contact sheet: the week in miniature, its number, its fit. */
+function OptionThumb({ option, range, courseNameMap, selected, onSelect }) {
+    const blocks = buildBlocks(option.result, option.selectedCourses, courseNameMap);
+    const shape = weekShape(blocks);
+    const isSavedOption = option.key.startsWith('s-');
+    return (
+        <button
+            type="button"
+            role="option"
+            aria-selected={selected}
+            className={`${styles.thumb} ${selected ? styles.thumbOn : ''} ${isSavedOption ? styles.thumbSaved : ''}`}
+            onClick={onSelect}
+            title={isSavedOption ? option.savedName : `Option ${option.label}`}
+        >
+            <MiniWeek blocks={blocks} days={shape?.days || []} startHour={range.startHour} endHour={range.endHour} />
+            <span className={styles.thumbFoot}>
+                <span className={`${styles.thumbLabel} ${isSavedOption ? styles.thumbLabelName : ''}`}>{option.label}</span>
+                {!isSavedOption && <span className={styles.thumbFit}>{Math.round(option.result.score)}</span>}
+                {option.isSaved && !isSavedOption && <span className={styles.thumbStar} aria-label="saved">saved</span>}
+            </span>
+            {shape && <span className={styles.thumbMeta}>{shape.days.length}d · {formatClock24(shape.earliest)}–{formatClock24(shape.latest)}</span>}
+        </button>
+    );
+}
+
+// ===== The sheet =====
+
+function ScheduleSheet({ option, range, gridKey, courseNameMap, courseCreditsMap, onSave, onUnsave, guest = false, isSavingSchedule = false, savedCount = 0 }) {
+    const { result, selectedCourses, isSaved } = option;
+    const { schedule, score, warnings } = result;
+    const [exporting, setExporting] = useState(false);
+    const [copied, setCopied] = useState(false);
+    const [crnsCopied, setCrnsCopied] = useState(false);
+    const [naming, setNaming] = useState(false);
+    const [saveName, setSaveName] = useState('');
+    const { selectedTerm, semesters } = useSemester();
+    const confirm = useConfirm();
+    const toast = useToast();
+    const termInfo = semesters?.find(s => s.term_code === selectedTerm);
+
+    const totalCredits = schedule.reduce((sum, group) => sum + (courseCreditsMap[group.courseId] || 0), 0);
+    const blocks = buildBlocks(result, selectedCourses, courseNameMap);
+    const shape = weekShape(blocks);
+
+    // Full sections don't stop a schedule being built (a seat may free up),
+    // but they belong where they'll be seen, not in a folded panel.
     const fullSections = schedule
         .flatMap(group => group.sections)
         .filter(sec => {
@@ -2498,9 +2401,7 @@ function ScheduleCard({ result, rank, courseNameMap, courseCreditsMap, selectedC
             return seats && seats.tone === 'full';
         });
 
-    const scheduleTitle = Number.isInteger(rank) ? `Option ${rank}` : String(rank);
-    // Everything the downloadable sheet shows. Sections come along too, so one
-    // with no set time, which has no block on the grid, still gets a mention.
+    const scheduleTitle = option.key.startsWith('s-') ? option.savedName : `Option ${option.label}`;
     const exportData = {
         termCode: selectedTerm,
         termName: termInfo?.name,
@@ -2521,7 +2422,7 @@ function ScheduleCard({ result, rank, courseNameMap, courseCreditsMap, selectedC
             await downloadSchedulePng({ ...exportData, title: scheduleTitle, fileName: pngFileName });
         } catch (err) {
             console.error('PNG export failed:', err);
-            toast.error('Could not create the image. Please try again.');
+            toast.error('Couldn’t make the image. Try again.');
         } finally {
             setExporting(false);
         }
@@ -2538,15 +2439,14 @@ function ScheduleCard({ result, rank, courseNameMap, courseCreditsMap, selectedC
             },
             fileName: pngFileName.replace(/\.png$/, '.ics'),
         });
-        if (!ok) toast.error('This semester has no class dates yet, so a calendar file cannot be made.');
+        if (!ok) toast.error('This term has no class dates yet, so there’s no calendar to make.');
     };
 
     const handleCopyPng = async () => {
         setExporting(true);
         try {
             const res = await copySchedulePng(exportData);
-            // Firefox and plain HTTP have no image clipboard; the image is
-            // still worth having, so it downloads instead.
+            // Firefox and plain HTTP have no image clipboard: download instead.
             if (res === 'copied') {
                 setCopied(true);
                 setTimeout(() => setCopied(false), 2000);
@@ -2555,7 +2455,7 @@ function ScheduleCard({ result, rank, courseNameMap, courseCreditsMap, selectedC
             }
         } catch (err) {
             console.error('PNG copy failed:', err);
-            toast.error('Could not copy the image. Please try again.');
+            toast.error('Couldn’t copy the image. Try again.');
         } finally {
             setExporting(false);
         }
@@ -2568,246 +2468,166 @@ function ScheduleCard({ result, rank, courseNameMap, courseCreditsMap, selectedC
             setCrnsCopied(true);
             setTimeout(() => setCrnsCopied(false), 2000);
         } catch {
-            toast.error('Could not copy. Your browser blocked the clipboard.');
+            toast.error('Your browser blocked the clipboard.');
         }
     };
 
     const handleUnsave = async () => {
         const ok = await confirm({
             title: `Remove “${scheduleTitle}” from saved?`,
-            body: 'You can save it again any time you generate it.',
+            body: 'You can save it again whenever it’s generated.',
             confirmLabel: 'Remove',
             tone: 'danger',
         });
         if (ok) onUnsave();
     };
 
-    const fitTone = score >= 80 ? 'accent' : score >= 60 ? 'neutral' : 'warning';
+    const notes = [
+        ...(fullSections.length > 0 ? [{ tone: 'warning', text: `Full right now: ${fullSections.map(sec => `${sec.course_id} §${sec.section_num}`).join(', ')}` }] : []),
+        ...(result.xorSelected ? [{ tone: 'success', text: (() => {
+            let displayName = result.xorSelected.name;
+            let displayId = result.xorSelected.id;
+            if (result.xorSelected.id.startsWith('BASKET_')) {
+                const basketGroup = schedule.find(g => g.originalCourseId === result.xorSelected.id);
+                if (basketGroup) {
+                    displayId = basketGroup.courseId;
+                    displayName = courseNameMap[basketGroup.courseId] || displayId;
+                }
+            }
+            return `Takes ${displayName} (${displayId}) from the either-or courses`;
+        })() }] : []),
+        ...warnings.map(w => ({ tone: 'neutral', text: w.replace(/^⚠️\s*/, '') })),
+    ];
 
     return (
-        <article className={`${styles.scheduleCard} ${isSaved ? styles.scheduleCardSaved : ''}`}>
-            <header className={styles.cardHeader}>
-                <button
-                    type="button"
-                    className={styles.cardToggle}
-                    onClick={() => setCardOpen(!cardOpen)}
-                    aria-expanded={cardOpen}
-                >
-                    <ChevronRightIcon className={`${styles.cardChevron} ${cardOpen ? styles.cardChevronOpen : ''}`} />
-                    <span className={styles.cardTitleWrap}>
-                        <span className={styles.cardTitle}>{scheduleTitle}</span>
-                        <span className={styles.cardSub}>
-                            {isSaved && !Number.isInteger(rank) ? 'Saved' : `${schedule.length} ${schedule.length === 1 ? 'course' : 'courses'}`}
-                            {totalCredits > 0 && ` · ${totalCredits} credits`}
-                        </span>
-                    </span>
-                </button>
-                <Badge tone={fitTone} className={styles.fitBadge} title="How well this schedule fits your preferences, out of 100">
-                    Fit {Math.round(score)}
-                </Badge>
-                <div className={styles.cardActions}>
-                    {termInfo?.classes_start && termInfo?.classes_end && (
-                        <Tooltip label="Add to calendar">
-                            <button type="button" className={styles.iconBtn} onClick={handleExportIcs} aria-label="Download this schedule as a calendar file">
-                                <CalendarPlusIcon />
-                            </button>
-                        </Tooltip>
-                    )}
-                    <Tooltip label={copied ? 'Copied' : 'Copy image'}>
-                        <button
-                            type="button"
-                            className={`${styles.iconBtn} ${copied ? styles.iconBtnDone : ''}`}
-                            onClick={handleCopyPng}
-                            disabled={exporting}
-                            aria-label="Copy this schedule as an image"
-                        >
-                            {copied ? <CheckIcon strokeWidth={2.25} /> : <CopyIcon />}
-                        </button>
-                    </Tooltip>
-                    <Tooltip label="Download PNG">
-                        <button type="button" className={styles.iconBtn} onClick={handleExportPng} disabled={exporting} aria-label="Export this schedule as a PNG">
-                            <DownloadIcon />
-                        </button>
-                    </Tooltip>
+        <article className={styles.sheet}>
+            <header className={styles.sheetHead}>
+                <div className={styles.sheetTitleWrap}>
+                    <h2 className={styles.sheetTitle}>{scheduleTitle}</h2>
+                    {!option.key.startsWith('s-') && <span className={styles.sheetFit} title="How well this fits your preferences, out of 100">fit {Math.round(score)}</span>}
+                </div>
+                <div className={styles.sheetActions}>
                     {onSave && !isSaved && (
                         <Button
                             size="sm"
                             variant="primary"
-                            icon={<StarIcon />}
                             onClick={() => setNaming(true)}
                             disabled={isSavingSchedule || savedCount >= 3}
                             title={savedCount >= 3 ? 'You have 3 saved schedules. Remove one to save another.' : undefined}
-                            className={styles.saveBtn}
                         >
                             Save
                         </Button>
                     )}
                     {isSaved && onUnsave && (
-                        <Button size="sm" variant="soft" icon={<StarIcon className={styles.starFilled} />} onClick={handleUnsave} disabled={isSavingSchedule} className={styles.saveBtn} title="Saved. Click to remove.">
-                            Saved
+                        <Button size="sm" variant="secondary" onClick={handleUnsave} disabled={isSavingSchedule} title="Saved to your account. Remove it?">
+                            Saved · remove
                         </Button>
                     )}
                     {guest && (
-                        <Button size="sm" variant="secondary" icon={<LockIcon />} onClick={refuse} aria-disabled="true" className={styles.saveBtn} title="Create an account to save schedules">
-                            Save
+                        <Button size="sm" variant="secondary" onClick={refuse} aria-disabled="true" title="Make an account to save schedules">
+                            Save (needs an account)
                         </Button>
                     )}
+                    {allCrns.length > 0 && (
+                        <Button size="sm" variant="secondary" onClick={handleCopyCrns}>{crnsCopied ? 'CRNs copied' : `Copy ${allCrns.length} CRNs`}</Button>
+                    )}
+                    {termInfo?.classes_start && termInfo?.classes_end && (
+                        <Tooltip label="Add to calendar">
+                            <button type="button" className={styles.iconBtn} onClick={handleExportIcs} aria-label="Download as a calendar file"><CalendarPlusIcon /></button>
+                        </Tooltip>
+                    )}
+                    <Tooltip label={copied ? 'Copied' : 'Copy image'}>
+                        <button type="button" className={styles.iconBtn} onClick={handleCopyPng} disabled={exporting} aria-label="Copy as an image">
+                            {copied ? <CheckIcon /> : <CopyIcon />}
+                        </button>
+                    </Tooltip>
+                    <Tooltip label="Download image">
+                        <button type="button" className={styles.iconBtn} onClick={handleExportPng} disabled={exporting} aria-label="Download as a PNG"><DownloadIcon /></button>
+                    </Tooltip>
                 </div>
             </header>
 
-            {/* The week at a glance: always visible, even folded. */}
-            <div className={styles.stats}>
-                <span className={styles.stat}>
-                    <span className={styles.statValue}>{days.length}</span>
-                    <span className={styles.statLabel}>{days.length === 1 ? 'day' : 'days'} · {days.map(d => d[0] + d.slice(1, 2)).join(' ')}</span>
-                </span>
-                <span className={styles.stat}>
-                    <span className={styles.statValue}>{formatTimeShort(earliest).replace(' ', '')}</span>
-                    <span className={styles.statLabel}>earliest start</span>
-                </span>
-                <span className={styles.stat}>
-                    <span className={styles.statValue}>{formatTimeShort(latest).replace(' ', '')}</span>
-                    <span className={styles.statLabel}>latest finish</span>
-                </span>
-                <span className={styles.stat}>
-                    <span className={styles.statValue}>{gapMinutes === 0 ? '0' : formatDuration(gapMinutes)}</span>
-                    <span className={styles.statLabel}>between classes</span>
-                </span>
-                {!cardOpen && <MiniWeek blocks={blocks} days={days} startHour={startHour} endHour={endHour} />}
+            {shape && (
+                <dl className={styles.figures}>
+                    <div><dt>Days on campus</dt><dd>{shape.days.length}<span>{shape.days.join(' ')}</span></dd></div>
+                    <div><dt>First class</dt><dd>{formatClock24(shape.earliest)}</dd></div>
+                    <div><dt>Last finish</dt><dd>{formatClock24(shape.latest)}</dd></div>
+                    <div><dt>Between classes</dt><dd>{shape.gap === 0 ? '0' : formatDuration(shape.gap)}</dd></div>
+                    <div><dt>Credits</dt><dd>{totalCredits || '–'}</dd></div>
+                </dl>
+            )}
+
+            {notes.length > 0 && (
+                <div className={styles.notes}>
+                    {notes.map((n, i) => <Callout key={i} tone={n.tone}>{n.text}</Callout>)}
+                </div>
+            )}
+
+            <div className={styles.timetable}>
+                <WeekGrid
+                    key={gridKey}
+                    days={ALL_DAYS}
+                    startHour={range.startHour}
+                    endHour={range.endHour}
+                    blocks={blocks.map(block => ({
+                        key: `${block.courseId}-${block.day}-${block.sectionNum?.replace(/\d+/, '')}`,
+                        day: block.day,
+                        start: block.start,
+                        end: block.end,
+                        color: paletteFor(block.colorIdx),
+                        code: block.courseId,
+                        section: block.sectionNum,
+                        name: block.courseName,
+                        meta: block.location,
+                        title: `${block.courseId}${block.courseName ? ` ${block.courseName}` : ''} · §${block.sectionNum} · ${formatSpan(block.start, block.end)}${block.location ? ` · ${block.location}` : ''}${block.instructor ? ` · ${block.instructor}` : ''}`,
+                    }))}
+                />
             </div>
 
-            {cardOpen && (<>
-                {(fullSections.length > 0 || result.xorSelected || warnings.length > 0) && (
-                    <div className={styles.notes}>
-                        {fullSections.length > 0 && (
-                            <span className={`${styles.note} ${styles.noteWarn}`}>
-                                <AlertIcon />
-                                Full now: {fullSections.map(sec => `${courseNameMap[sec.course_id] || sec.course_id} ${sec.section_num}`).join(', ')}
-                            </span>
-                        )}
-                        {result.xorSelected && (() => {
-                            let displayName = result.xorSelected.name;
-                            let displayId = result.xorSelected.id;
-                            // For baskets, find the actual course from the schedule
-                            if (result.xorSelected.id.startsWith('BASKET_')) {
-                                const basketGroup = schedule.find(g => g.originalCourseId === result.xorSelected.id);
-                                if (basketGroup) {
-                                    displayId = basketGroup.courseId;
-                                    displayName = courseNameMap[basketGroup.courseId] || displayId;
-                                }
-                            }
+            <section className={styles.ledger} aria-label="Sections">
+                <Rubric title="Sections" meta={allCrns.length ? `${allCrns.length} CRNs` : null} quiet />
+                <ul className={styles.ledgerList}>
+                    {schedule.map((group) => {
+                        const courseIdx = (selectedCourses || []).findIndex(c => c.course_id === (group.originalCourseId || group.courseId));
+                        return group.sections.map((sec, secIdx) => {
+                            const seats = seatStatus(sec);
                             return (
-                                <span className={`${styles.note} ${styles.noteAccent}`}>
-                                    <CheckIcon />
-                                    Includes {displayName} ({displayId})
-                                </span>
+                                <li key={sec.crn || `${sec.course_id}-${sec.section_num}-${secIdx}`} className={styles.ledgerRow}>
+                                    <span className={styles.ledgerCourse}>
+                                        <CourseMark color={paletteFor(Math.max(0, courseIdx))} size="sm" />
+                                        <CourseCode id={sec.course_id} size="sm" />
+                                        <CourseName size="sm" className={styles.ledgerName}>{courseNameMap[sec.course_id] || sec.course_id}</CourseName>
+                                    </span>
+                                    <Section value={sec.section_num} size="sm" tone={sec.isMissing ? 'struck' : 'mine'} />
+                                    <span className={styles.ledgerTime}>{sec.isMissing ? 'no longer offered' : sec.class_time}</span>
+                                    <span className={styles.ledgerWho}>{sec.instructor}</span>
+                                    <span className={styles.ledgerRoom}>{sec.location && <RoomLink room={sec.location} />}</span>
+                                    <span className={styles.ledgerSeats}>
+                                        {seats && <Status tone={seats.tone === 'open' ? 'go' : seats.tone === 'low' ? 'warn' : 'danger'} title={seats.title}>{seats.label}</Status>}
+                                    </span>
+                                    <span className={styles.ledgerCrn}>{sec.crn}</span>
+                                    {isSaved && (
+                                        <a className={styles.requestLink} href={`/post?type=request&course=${sec.course_id}&section=${sec.section_num}`}>request</a>
+                                    )}
+                                </li>
                             );
-                        })()}
-                        {warnings.map((w, i) => (
-                            <span key={i} className={styles.note}>{w.replace(/^⚠️\s*/, '')}</span>
-                        ))}
-                    </div>
-                )}
+                        });
+                    })}
+                </ul>
+            </section>
 
-                <div className={styles.timetable}>
-                    <WeekGrid
-                        days={days}
-                        startHour={startHour}
-                        endHour={endHour}
-                        pxPerMin={PX_PER_MIN}
-                        blocks={blocks.map(block => ({
-                            day: block.day,
-                            start: block.start,
-                            end: block.end,
-                            color: paletteFor(block.colorIdx),
-                            code: block.courseId,
-                            section: block.sectionNum,
-                            name: block.courseName,
-                            meta: block.location,
-                            title: `${block.courseId}${block.courseName ? ` ${block.courseName}` : ''} · section ${block.sectionNum} · ${formatRange(block.start, block.end)}${block.location ? ` · ${block.location}` : ''}${block.instructor ? ` · ${block.instructor}` : ''}`,
-                        }))}
-                    />
-                </div>
-
-                {/* Section details */}
-                <div className={styles.detailsBar}>
-                    <button
-                        type="button"
-                        className={styles.detailsToggle}
-                        onClick={() => setDetailsOpen(prev => !prev)}
-                        aria-expanded={detailsOpen}
-                    >
-                        <ChevronDownIcon className={`${styles.detailsChevron} ${detailsOpen ? styles.detailsChevronOpen : ''}`} />
-                        {detailsOpen ? 'Hide sections' : 'Sections, CRNs and rooms'}
-                    </button>
-                    {allCrns.length > 0 && (
-                        <button type="button" className={`${styles.copyCrns} ${crnsCopied ? styles.copyCrnsDone : ''}`} onClick={handleCopyCrns}>
-                            {crnsCopied ? <CheckIcon strokeWidth={2.25} /> : <CopyIcon />}
-                            {crnsCopied ? 'CRNs copied' : `Copy ${allCrns.length} CRNs`}
-                        </button>
-                    )}
-                </div>
-                {detailsOpen && (
-                    <ul className={styles.details}>
-                        {schedule.map((group) => {
-                            const courseIdx = selectedCourses.findIndex(c => c.course_id === (group.originalCourseId || group.courseId));
-                            return group.sections.map((sec, secIdx) => {
-                                const seats = seatStatus(sec);
-                                return (
-                                    <li key={sec.crn || `${sec.course_id}-${sec.section_num}-${secIdx}`} className={styles.detailRow} style={{ '--c': paletteFor(courseIdx) }}>
-                                        <span className={styles.detailBar} aria-hidden="true" />
-                                        <div className={styles.detailMain}>
-                                            <span className={styles.detailCourse}>
-                                                <span className={styles.detailCourseName}>{courseNameMap[sec.course_id] || sec.course_id}</span>
-                                                <span className={styles.detailCourseId}>{sec.course_id}</span>
-                                            </span>
-                                            <span className={styles.detailMeta}>
-                                                <span className={styles.detailTime}>{sec.class_time}</span>
-                                                {sec.instructor && <span>{sec.instructor}</span>}
-                                                {sec.location && <RoomLink room={sec.location} className={styles.detailRoom} />}
-                                            </span>
-                                        </div>
-                                        <div className={styles.detailSide}>
-                                            <Ticket size="sm" label="Sec" section={sec.section_num} tone={sec.isMissing ? 'muted' : 'neutral'} />
-                                            {sec.crn && <span className={styles.detailCrn}>CRN {sec.crn}</span>}
-                                            {seats && (
-                                                <Badge size="sm" dot tone={seats.tone === 'open' ? 'success' : seats.tone === 'low' ? 'warning' : 'neutral'} title={seats.title}>
-                                                    {seats.detail}
-                                                </Badge>
-                                            )}
-                                            {isSaved && (
-                                                <a className={styles.requestLink} href={`/post?type=request&course=${sec.course_id}&section=${sec.section_num}`}>
-                                                    Request
-                                                </a>
-                                            )}
-                                        </div>
-                                    </li>
-                                );
-                            });
-                        })}
-                    </ul>
-                )}
-            </>)}
-
-            {/* Three saved schedules all called "Saved schedule 2" help nobody,
-                so saving asks what to call this one. */}
+            {/* Saving asks for a name: three schedules called "Saved 2" help nobody. */}
             <Dialog
                 open={naming}
                 onClose={() => !isSavingSchedule && setNaming(false)}
                 dismissible={!isSavingSchedule}
                 title="Name this schedule"
-                description="Saved schedules stay on your account for this term. You can keep up to three."
+                description="Saved schedules stay on your account for this term. You can keep three."
                 footer={(
                     <>
                         <Button variant="secondary" onClick={() => setNaming(false)} disabled={isSavingSchedule}>Cancel</Button>
-                        <Button
-                            variant="primary"
-                            type="submit"
-                            form="save-schedule-form"
-                            loading={isSavingSchedule}
-                            disabled={!saveName.trim()}
-                        >
-                            Save schedule
+                        <Button variant="primary" type="submit" form="save-schedule-form" loading={isSavingSchedule} disabled={!saveName.trim()}>
+                            Save
                         </Button>
                     </>
                 )}
@@ -2826,7 +2646,7 @@ function ScheduleCard({ result, rank, courseNameMap, courseCreditsMap, selectedC
                         <Input
                             value={saveName}
                             onChange={(e) => setSaveName(e.target.value)}
-                            placeholder={`e.g. ${scheduleTitle}, or “Mornings off”`}
+                            placeholder="Mornings free, Tuesdays off…"
                             maxLength={60}
                             data-autofocus
                             disabled={isSavingSchedule}
