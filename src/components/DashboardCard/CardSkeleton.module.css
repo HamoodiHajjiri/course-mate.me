@@ -1,36 +1,35 @@
 .skeleton {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-5);
+}
+
+.col {
     display: flex;
     flex-direction: column;
     gap: 10px;
 }
 
-.row {
-    height: 14px;
-    border-radius: var(--radius-sm);
-    background: linear-gradient(
-        90deg,
-        var(--bg-tertiary) 0%,
-        var(--bg-elevated) 50%,
-        var(--bg-tertiary) 100%
-    );
-    background-size: 200% 100%;
-    animation: shimmer 1.4s ease-in-out infinite;
+.bar {
+    display: block;
+    border-radius: var(--r-sm);
+    background: linear-gradient(90deg, var(--surface-2) 0%, var(--surface-3) 40%, var(--surface-2) 80%);
+    background-size: 220% 100%;
+    animation: cm-shimmer 1.4s var(--ease-in-out) infinite;
 }
 
-.row1 {
-    width: 70%;
-    height: 24px;
+.value {
+    width: 56px;
+    height: 30px;
 }
 
-.row2 {
+.label {
+    width: 90px;
+    height: 11px;
+}
+
+.meter {
     width: 100%;
-}
-
-.row3 {
-    width: 85%;
-}
-
-@keyframes shimmer {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
+    height: 6px;
+    border-radius: var(--r-full);
 }
