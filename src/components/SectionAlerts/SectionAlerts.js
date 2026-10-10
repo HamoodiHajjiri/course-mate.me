@@ -2,8 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Button, Select, Skeleton, useToast } from '@/components/ui';
-import { AlertIcon, BellIcon, ChevronDownIcon, CloseIcon, PlusIcon } from '@/components/Icons';
+import { Button, CourseCode, CourseMark, Section, Select, Skeleton, useToast } from '@/components/ui';
 import styles from './SectionAlerts.module.css';
 
 const PHONE_QUERY = '(max-width: 1023px)';
@@ -11,9 +10,9 @@ const PHONE_QUERY = '(max-width: 1023px)';
 /**
  * Watch a section: tell me when a swap or giveaway for it is posted.
  *
- * A small tool rather than a form: the course box suggests from the student's
- * own major, a section can be pinned or left as "any", and each alert is one
- * row that can be removed. Folds away on phones, where it sits above the feed.
+ * A ledger of what you're watching, then one line to add to it. The course
+ * box suggests from the student's own major; a section can be pinned or left
+ * as "any". Folded on phones, where it sits under the board.
  */
 export default function SectionAlerts({ term, courses, sections = [], majorCourses = null }) {
     const supabase = createClient();
@@ -166,7 +165,7 @@ export default function SectionAlerts({ term, courses, sections = [], majorCours
         setCourse('');
         setSection('');
         setShowSuggestions(false);
-        toast.success(`Watching ${code}${data.want_section ? `, section ${data.want_section}` : ''}`);
+        toast.success(`Watching ${code}${data.want_section ? ` §${data.want_section}` : ''}`);
     };
 
     const remove = async (id) => {
@@ -179,32 +178,52 @@ export default function SectionAlerts({ term, courses, sections = [], majorCours
     if (!term) return null;
 
     return (
-        <section className={`${styles.panel} ${open ? styles.panelOpen : ''}`} aria-labelledby={`${inputId}-title`}>
+        <section className={styles.panel} aria-labelledby={`${inputId}-title`}>
             <button
                 type="button"
                 className={styles.header}
                 onClick={() => setOpen(o => !o)}
                 aria-expanded={open}
             >
-                <span className={styles.headerIcon}><BellIcon /></span>
-                <span className={styles.headerText}>
-                    <span id={`${inputId}-title`} className={styles.title}>Section alerts</span>
-                    <span className={styles.subtitle}>
-                        {loading ? 'Loading…' : watches.length === 0 ? 'Get told when a spot opens' : `${watches.length} active`}
-                    </span>
-                </span>
-                <ChevronDownIcon className={styles.chevron} />
+                <span id={`${inputId}-title`} className={styles.title}>Alerts</span>
+                <span className={styles.count}>{loading ? '' : watches.length}</span>
+                <span className={styles.toggle}>{open ? 'Hide' : 'Show'}</span>
             </button>
 
             {open && (
                 <div className={styles.body}>
+                    <p className={styles.lead}>We&rsquo;ll tell you, here and by email, when someone posts a section you&rsquo;re watching.</p>
+
+                    {loading ? (
+                        <div className={styles.loading}><Skeleton height={12} width="70%" /><Skeleton height={12} width="55%" /></div>
+                    ) : watches.length > 0 && (
+                        <ul className={styles.watches}>
+                            {watches.map(w => (
+                                <li key={w.id} className={`${styles.watch} ${removing === w.id ? styles.watchLeaving : ''}`}>
+                                    <CourseMark courseId={w.course_code} size="sm" />
+                                    <CourseCode id={w.course_code} size="sm" />
+                                    {w.want_section ? <Section value={w.want_section} size="sm" /> : <span className={styles.any}>any section</span>}
+                                    <button
+                                        type="button"
+                                        className={styles.removeBtn}
+                                        onClick={() => remove(w.id)}
+                                        disabled={removing === w.id}
+                                        aria-label={`Stop watching ${w.course_code}${w.want_section ? ` section ${w.want_section}` : ''}`}
+                                    >
+                                        stop
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+
                     <form onSubmit={add} className={styles.form} noValidate>
                         <div className={styles.combo} ref={wrapperRef}>
-                            <label htmlFor={inputId} className="sr-only">Course ID</label>
+                            <label htmlFor={inputId} className={styles.formLabel}>Watch a course</label>
                             <input
                                 id={inputId}
                                 className={`${styles.input} ${error ? styles.inputInvalid : ''}`}
-                                placeholder="Course ID or name"
+                                placeholder="Code or name"
                                 value={course}
                                 autoComplete="off"
                                 role="combobox"
@@ -236,7 +255,7 @@ export default function SectionAlerts({ term, courses, sections = [], majorCours
                                             className={`${styles.option} ${i === activeIdx ? styles.optionActive : ''}`}
                                             onClick={() => selectCourse(code)}
                                         >
-                                            <span className={styles.optionCode}>{code}</span>
+                                            <CourseCode id={code} size="sm" />
                                             <span className={styles.optionName}>{name}</span>
                                         </button>
                                     ))}
@@ -250,56 +269,18 @@ export default function SectionAlerts({ term, courses, sections = [], majorCours
                                 <Select size="sm" value={section} onChange={(e) => setSection(e.target.value)} aria-label="Section">
                                     <option value="">Any section</option>
                                     {courseSections.map(s => (
-                                        <option key={s} value={s}>{`Section ${s}`}</option>
+                                        <option key={s} value={s}>{`§${s}`}</option>
                                     ))}
                                 </Select>
                             </div>
                         )}
 
-                        {error && (
-                            <p className={styles.error} role="alert">
-                                <AlertIcon />
-                                {error}
-                            </p>
-                        )}
+                        {error && <p className={styles.error} role="alert">{error}</p>}
 
-                        <Button type="submit" variant="secondary" size="sm" block icon={<PlusIcon />} loading={adding}>
-                            Add alert
+                        <Button type="submit" variant="secondary" size="sm" loading={adding} className={styles.submit}>
+                            Watch
                         </Button>
                     </form>
-
-                    <div className={styles.list}>
-                        {loading ? (
-                            <>
-                                <Skeleton height={36} radius={8} />
-                                <Skeleton height={36} radius={8} width="80%" />
-                            </>
-                        ) : watches.length === 0 ? (
-                            <p className={styles.empty}>
-                                No alerts yet. We&rsquo;ll notify you here and by email the moment a matching swap or giveaway is posted.
-                            </p>
-                        ) : (
-                            <ul className={styles.watches}>
-                                {watches.map(w => (
-                                    <li key={w.id} className={`${styles.watch} ${removing === w.id ? styles.watchLeaving : ''}`}>
-                                        <span className={styles.watchDot} aria-hidden="true" />
-                                        <span className={styles.watchCode}>{w.course_code}</span>
-                                        <span className={styles.watchSection}>{w.want_section ? `Sec ${w.want_section}` : 'Any section'}</span>
-                                        <button
-                                            type="button"
-                                            className={styles.removeBtn}
-                                            onClick={() => remove(w.id)}
-                                            disabled={removing === w.id}
-                                            aria-label={`Remove alert for ${w.course_code}${w.want_section ? ` section ${w.want_section}` : ''}`}
-                                            title="Remove alert"
-                                        >
-                                            <CloseIcon />
-                                        </button>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </div>
                 </div>
             )}
         </section>
