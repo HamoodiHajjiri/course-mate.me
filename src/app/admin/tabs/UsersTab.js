@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { SearchIcon } from '@/components/Icons';
+import { useConfirm, useToast } from '@/components/ui';
 import styles from '../admin.module.css';
 import UserSchedulesModal from './UserSchedulesModal';
 
@@ -18,6 +19,8 @@ function UsersProvider({ children }) {
     const [error, setError] = useState('');
     const [viewingUser, setViewingUser] = useState(null);
     const supabase = createClient();
+    const confirm = useConfirm();
+    const toast = useToast();
 
     const load = useCallback(async (overrides = {}) => {
         const q = overrides.search !== undefined ? overrides.search : search;
@@ -56,7 +59,13 @@ function UsersProvider({ children }) {
     const reset = () => { setSearch(''); setMajor(''); setGender(''); load({ search: '', major: '', gender: '' }); };
 
     const handleDelete = async (id, name) => {
-        if (!confirm(`Delete user ${name || id}? This removes their auth account and cascades to profile/posts/matches.`)) return;
+        const ok = await confirm({
+            title: `Delete ${name || 'this user'}?`,
+            body: 'Their account is removed, and with it their profile, posts and matches. This can’t be undone.',
+            confirmLabel: 'Delete user',
+            tone: 'danger',
+        });
+        if (!ok) return;
         try {
             const res = await fetch('/api/admin/users', {
                 method: 'DELETE',
@@ -68,8 +77,9 @@ function UsersProvider({ children }) {
                 throw new Error(body.error || 'Delete failed');
             }
             setUsers(prev => prev.filter(u => u.id !== id));
+            toast.success(`${name || 'User'} deleted`);
         } catch (e) {
-            alert(e.message);
+            toast.error(e.message);
         }
     };
 
@@ -92,12 +102,12 @@ function UsersSidebar() {
     return (
         <>
             <div className={styles.sidebarCard}>
-                <p className={styles.sectionTitle}>Filter by gender</p>
+                <p className={styles.sectionTitle}>Campus</p>
                 <div className={styles.navList}>
                     {[
                         { value: '', label: 'All' },
-                        { value: 'male', label: 'Male' },
-                        { value: 'female', label: 'Female' },
+                        { value: 'male', label: "Men's" },
+                        { value: 'female', label: "Women's" },
                     ].map(g => (
                         <button
                             key={g.value || 'all'}
@@ -111,7 +121,7 @@ function UsersSidebar() {
             </div>
 
             <div className={styles.sidebarCard}>
-                <p className={styles.sectionTitle}>Filter by major</p>
+                <p className={styles.sectionTitle}>Major</p>
                 <div className={`${styles.navList} ${styles.scrollList}`}>
                     <button
                         className={`${styles.navBtn} ${major === '' ? styles.navBtnActive : ''}`}
@@ -131,12 +141,9 @@ function UsersSidebar() {
                         </button>
                     ))}
                 </div>
-                <button className={`${styles.btn} ${styles.btnGhost} ${styles.btnFull}`} style={{ marginTop: 8 }} onClick={reset}>
-                    Reset all filters
+                <button type="button" className={`${styles.btn} ${styles.btnGhost} ${styles.btnFull}`} onClick={reset}>
+                    Clear the filters
                 </button>
-                <div style={{ marginTop: 8, textAlign: 'center', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                    {users.length} result{users.length === 1 ? '' : 's'}
-                </div>
             </div>
         </>
     );
@@ -149,51 +156,62 @@ function UsersMain() {
 
     return (
         <>
-            <form onSubmit={submitSearch} className={styles.card}>
-                <div className={styles.searchWrapper}>
-                    <span className={styles.searchIcon}><SearchIcon width={18} height={18} /></span>
+            <form onSubmit={submitSearch} className={styles.toolbar}>
+                <div className={`${styles.searchWrapper} ${styles.searchGrow}`}>
+                    <span className={styles.searchIcon}><SearchIcon /></span>
                     <input
-                        type="text"
+                        type="search"
                         className={styles.searchInput}
-                        placeholder="Search by name, email, or student ID..."
+                        placeholder="Name, email or university ID, then Enter"
+                        aria-label="Search users"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                     />
                 </div>
             </form>
 
-            <div className={styles.feedCard}>
-                {error && <div className={styles.error}>{error}</div>}
-                {loading ? (
-                    <div className={styles.loading}><div className={styles.spinner} />Loading users...</div>
-                ) : users.length === 0 ? (
-                    <div className={styles.empty}>
-                        <div className={styles.emptyTitle}>No users found</div>
-                        <span>Try adjusting your filters or search.</span>
-                    </div>
-                ) : (
-                    <div className={styles.feedList}>
-                        {users.map(u => (
-                            <div key={u.id} className={styles.row}>
-                                <div className={styles.rowMain}>
-                                    <div className={styles.rowTitle}>
-                                        {u.name || '(no name)'}
-                                        {u.major && <span className={styles.badge}>{u.major}</span>}
-                                        {u.gender && <span className={styles.badge}>{u.gender}</span>}
-                                    </div>
-                                    <div className={styles.rowMeta}>
-                                        {u.email || 'no email'} · {u.student_id || 'no ID'} · {u.phone || 'no phone'}
-                                    </div>
-                                </div>
-                                <div className={styles.rowActions}>
-                                    <button className={`${styles.btn} ${styles.btnGhost}`} onClick={() => setViewingUser(u)}>Schedules</button>
-                                    <button className={`${styles.btn} ${styles.btnDanger}`} onClick={() => handleDelete(u.id, u.name)}>Delete</button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
+            {error && <div className={styles.error}>{error}</div>}
+            {loading ? (
+                <div className={styles.loading}><div className={styles.spinner} />Reading users…</div>
+            ) : users.length === 0 ? (
+                <div className={styles.empty}>
+                    <div className={styles.emptyTitle}>Nobody matches.</div>
+                    <span>Loosen the filters or the search.</span>
+                </div>
+            ) : (
+                <div className={styles.tableWrap}>
+                    <table className={styles.table}>
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>University ID</th>
+                                <th>Major</th>
+                                <th>Campus</th>
+                                <th>Email</th>
+                                <th>Phone</th>
+                                <th className={styles.cellActions}><span className="sr-only">Actions</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {users.map(u => (
+                                <tr key={u.id}>
+                                    <td className={styles.cellStrong}>{u.name || <span className={styles.cellMuted}>no name</span>}</td>
+                                    <td className={styles.mono}>{u.student_id || '—'}</td>
+                                    <td className={styles.mono}>{u.major || '—'}</td>
+                                    <td>{u.gender === 'male' ? "Men's" : u.gender === 'female' ? "Women's" : '—'}</td>
+                                    <td>{u.email || '—'}</td>
+                                    <td className={styles.mono}>{u.phone || '—'}</td>
+                                    <td className={styles.cellActions}>
+                                        <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={() => setViewingUser(u)}>Schedules</button>
+                                        <button type="button" className={`${styles.btn} ${styles.btnDanger}`} onClick={() => handleDelete(u.id, u.name)}>Delete</button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    <p className={styles.tableFoot}>{users.length} {users.length === 1 ? 'student' : 'students'}</p>
+                </div>
+            )}
 
             {viewingUser && (
                 <UserSchedulesModal user={viewingUser} onClose={() => setViewingUser(null)} />
