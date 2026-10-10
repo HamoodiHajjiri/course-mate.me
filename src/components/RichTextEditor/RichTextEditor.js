@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
 import Link from '@tiptap/extension-link';
+import { useToast } from '@/components/ui';
 import styles from './RichTextEditor.module.css';
 
 function ToolbarButton({ onClick, active, disabled, title, children }) {
@@ -14,6 +15,7 @@ function ToolbarButton({ onClick, active, disabled, title, children }) {
             onClick={onClick}
             disabled={disabled}
             title={title}
+            aria-pressed={active || undefined}
             className={`${styles.toolBtn} ${active ? styles.toolBtnActive : ''}`}
         >
             {children}
@@ -21,8 +23,15 @@ function ToolbarButton({ onClick, active, disabled, title, children }) {
     );
 }
 
+/**
+ * The notice editor: a ruled sheet with a toolbar of words. Links are set
+ * in a line under the toolbar rather than a browser prompt.
+ */
 export default function RichTextEditor({ value, onChange, placeholder = 'Write something…' }) {
     const fileInputRef = useRef(null);
+    const toast = useToast();
+    const [linking, setLinking] = useState(false);
+    const [linkUrl, setLinkUrl] = useState('');
     const editor = useEditor({
         immediatelyRender: false,
         extensions: [
@@ -51,21 +60,19 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Write s
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [value, editor]);
 
-    if (!editor) return <div className={styles.wrapper}><div className={styles.editor}>Loading…</div></div>;
+    if (!editor) return <div className={styles.wrapper}><div className={styles.editor}>Loading the editor…</div></div>;
 
-    const handleAddLink = () => {
-        const prev = editor.getAttributes('link').href || '';
-        const url = window.prompt('URL', prev);
-        if (url === null) return;
-        if (url === '') {
-            editor.chain().focus().extendMarkRange('link').unsetLink().run();
-            return;
-        }
-        editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+    const openLink = () => {
+        setLinkUrl(editor.getAttributes('link').href || '');
+        setLinking(true);
     };
 
-    const handleImageClick = () => {
-        fileInputRef.current?.click();
+    const applyLink = (e) => {
+        e?.preventDefault();
+        const url = linkUrl.trim();
+        if (!url) editor.chain().focus().extendMarkRange('link').unsetLink().run();
+        else editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+        setLinking(false);
     };
 
     const handleImageSelected = async (e) => {
@@ -86,7 +93,7 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Write s
             const { url } = await res.json();
             editor.chain().focus().setImage({ src: url, alt: file.name }).run();
         } catch (err) {
-            alert(`Image upload failed: ${err.message}`);
+            toast.error(`The image didn’t upload: ${err.message}`);
         }
     };
 
@@ -97,28 +104,42 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Write s
                 <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} title="Italic"><i>I</i></ToolbarButton>
                 <ToolbarButton onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive('strike')} title="Strikethrough"><s>S</s></ToolbarButton>
                 <span className={styles.divider} />
-                <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive('heading', { level: 2 })} title="Heading 2">H2</ToolbarButton>
-                <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive('heading', { level: 3 })} title="Heading 3">H3</ToolbarButton>
-                <ToolbarButton onClick={() => editor.chain().focus().setParagraph().run()} active={editor.isActive('paragraph')} title="Paragraph">P</ToolbarButton>
+                <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive('heading', { level: 2 })} title="Heading">Heading</ToolbarButton>
+                <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive('heading', { level: 3 })} title="Subheading">Sub</ToolbarButton>
+                <ToolbarButton onClick={() => editor.chain().focus().setParagraph().run()} active={editor.isActive('paragraph')} title="Paragraph">Text</ToolbarButton>
                 <span className={styles.divider} />
-                <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} title="Bulleted list">• List</ToolbarButton>
-                <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} title="Numbered list">1. List</ToolbarButton>
-                <ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')} title="Blockquote">❝</ToolbarButton>
-                <ToolbarButton onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')} title="Code block">{'<>'}</ToolbarButton>
+                <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} title="Bulleted list">List</ToolbarButton>
+                <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} title="Numbered list">1, 2, 3</ToolbarButton>
+                <ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')} title="Quote">Quote</ToolbarButton>
                 <span className={styles.divider} />
-                <ToolbarButton onClick={handleAddLink} active={editor.isActive('link')} title="Link">🔗</ToolbarButton>
-                <ToolbarButton onClick={handleImageClick} title="Insert image">🖼️</ToolbarButton>
-                <ToolbarButton onClick={() => editor.chain().focus().setHorizontalRule().run()} title="Divider">―</ToolbarButton>
+                <ToolbarButton onClick={openLink} active={editor.isActive('link') || linking} title="Link">Link</ToolbarButton>
+                <ToolbarButton onClick={() => fileInputRef.current?.click()} title="Insert an image">Image</ToolbarButton>
+                <ToolbarButton onClick={() => editor.chain().focus().setHorizontalRule().run()} title="A rule across">Rule</ToolbarButton>
                 <span className={styles.divider} />
-                <ToolbarButton onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} title="Undo">↶</ToolbarButton>
-                <ToolbarButton onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} title="Redo">↷</ToolbarButton>
+                <ToolbarButton onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} title="Undo">Undo</ToolbarButton>
+                <ToolbarButton onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} title="Redo">Redo</ToolbarButton>
             </div>
+            {linking && (
+                <form className={styles.linkRow} onSubmit={applyLink}>
+                    <input
+                        type="url"
+                        className={styles.linkInput}
+                        value={linkUrl}
+                        onChange={(e) => setLinkUrl(e.target.value)}
+                        placeholder="https://… (empty removes the link)"
+                        aria-label="Link address"
+                        autoFocus
+                    />
+                    <button type="submit" className={styles.toolBtn}>Apply</button>
+                    <button type="button" className={styles.toolBtn} onClick={() => setLinking(false)}>Cancel</button>
+                </form>
+            )}
             <EditorContent editor={editor} />
             <input
                 ref={fileInputRef}
                 type="file"
                 accept="image/png,image/jpeg,image/webp,image/gif"
-                style={{ display: 'none' }}
+                hidden
                 onChange={handleImageSelected}
             />
         </div>
