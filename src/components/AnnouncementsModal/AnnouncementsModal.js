@@ -2,23 +2,19 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { Button, Dialog } from '@/components/ui';
 import styles from './AnnouncementsModal.module.css';
 
-function relativeTime(iso) {
+function dated(iso) {
     if (!iso) return '';
-    const then = new Date(iso).getTime();
-    const now = Date.now();
-    const diff = Math.max(0, now - then);
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'just now';
-    if (mins < 60) return `${mins}m ago`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h ago`;
-    const days = Math.floor(hrs / 24);
-    if (days < 7) return `${days}d ago`;
-    return new Date(iso).toLocaleDateString();
+    return new Date(iso).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+/**
+ * Notices from the team, set like a noticeboard memo: dated in the margin,
+ * a title, the text. Each can be put away on its own; closing puts them all
+ * away.
+ */
 export default function AnnouncementsModal({ ready }) {
     const [items, setItems] = useState(null);
     const [closing, setClosing] = useState(false);
@@ -64,62 +60,41 @@ export default function AnnouncementsModal({ ready }) {
         } catch (e) {
             console.error('Dismiss all failed:', e);
         }
-        setTimeout(() => setItems([]), 200);
+        setItems([]);
+        setClosing(false);
     };
 
-    if (!items || items.length === 0) return null;
+    const open = !!items && items.length > 0;
 
     return (
-        <div className={`${styles.backdrop} ${closing ? styles.closing : ''}`} role="dialog" aria-modal="true" aria-label="What's new">
-            <div className={styles.modal}>
-                <header className={styles.header}>
-                    <div>
-                        <p className={styles.eyebrow}>Updates</p>
-                        <h2 className={styles.title}>What&rsquo;s new</h2>
-                    </div>
-                    <button
-                        type="button"
-                        className={styles.closeBtn}
-                        onClick={dismissAll}
-                        aria-label="Close and dismiss all"
-                        title="Close and dismiss all"
-                    >×</button>
-                </header>
-
-                <div className={styles.list}>
-                    {items.map((a) => (
-                        <article key={a.id} className={styles.card}>
-                            <div className={styles.cardHeader}>
-                                <h3 className={styles.cardTitle}>{a.title}</h3>
-                                <span className={styles.timeStamp}>{relativeTime(a.created_at)}</span>
-                            </div>
+        <Dialog
+            open={open}
+            onClose={dismissAll}
+            size="md"
+            title={items?.length > 1 ? `${items.length} notices` : 'A notice'}
+            description="From the people who run CourseMate."
+            footer={(
+                <Button variant="primary" onClick={dismissAll} loading={closing}>
+                    {items?.length > 1 ? 'Put them all away' : 'Got it'}
+                </Button>
+            )}
+        >
+            <div className={styles.list}>
+                {(items || []).map((a) => (
+                    <article key={a.id} className={styles.notice}>
+                        <time className={styles.date} dateTime={a.created_at}>{dated(a.created_at)}</time>
+                        <div className={styles.main}>
+                            <h3 className={styles.title}>{a.title}</h3>
                             {a.body_html && (
-                                <div
-                                    className={styles.body}
-                                    dangerouslySetInnerHTML={{ __html: a.body_html }}
-                                />
+                                <div className={styles.body} dangerouslySetInnerHTML={{ __html: a.body_html }} />
                             )}
-                            <div className={styles.cardActions}>
-                                <button
-                                    type="button"
-                                    className={styles.dismissBtn}
-                                    onClick={() => dismissOne(a.id)}
-                                >
-                                    Got it
-                                </button>
-                            </div>
-                        </article>
-                    ))}
-                </div>
-
-                {items.length > 1 && (
-                    <footer className={styles.footer}>
-                        <button type="button" className={styles.dismissAllBtn} onClick={dismissAll}>
-                            Dismiss all
-                        </button>
-                    </footer>
-                )}
+                            {items.length > 1 && (
+                                <button type="button" className={styles.dismiss} onClick={() => dismissOne(a.id)}>Put away</button>
+                            )}
+                        </div>
+                    </article>
+                ))}
             </div>
-        </div>
+        </Dialog>
     );
 }
