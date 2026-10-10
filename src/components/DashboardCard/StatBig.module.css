@@ -1,53 +1,47 @@
 .stat {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
     flex: 1;
     min-width: 0;
+}
+
+.label {
+    font-size: var(--text-caption);
+    font-weight: var(--weight-medium);
+    color: var(--ink-3);
 }
 
 .valueRow {
     display: flex;
     align-items: baseline;
-    gap: 4px;
+    gap: 5px;
 }
 
 .value {
-    font-size: 2.25rem;
-    font-weight: 800;
-    color: var(--text-primary);
-    letter-spacing: -0.03em;
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 650;
+    letter-spacing: -0.04em;
     line-height: 1;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+    font-variation-settings: 'opsz' 48;
 }
 
-.valueAccent {
-    background: var(--gradient-accent-vivid);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    -webkit-text-fill-color: transparent;
-}
-
-.valueMuted {
-    color: var(--text-muted);
-}
+.tone_accent { color: var(--accent-ink); }
+.tone_muted { color: var(--ink-4); }
+.tone_warning { color: var(--warning-ink); }
 
 .max {
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    letter-spacing: -0.02em;
-}
-
-.label {
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
+    font-size: var(--text-body);
+    font-weight: var(--weight-semibold);
+    color: var(--ink-4);
+    font-variant-numeric: tabular-nums;
 }
 
 .sub {
-    font-size: 0.75rem;
-    color: var(--text-muted);
+    font-size: var(--text-caption);
+    color: var(--ink-3);
+    line-height: 1.4;
 }
