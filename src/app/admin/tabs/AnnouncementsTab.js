@@ -2,13 +2,14 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import RichTextEditor from '@/components/RichTextEditor';
+import { useConfirm, useToast } from '@/components/ui';
 import styles from '../admin.module.css';
 
 const Ctx = createContext(null);
 
 const GENDERS = [
-    { value: 'male', label: 'Male' },
-    { value: 'female', label: 'Female' },
+    { value: 'male', label: "Men's campus" },
+    { value: 'female', label: "Women's campus" },
 ];
 
 const EMPTY_FORM = {
@@ -45,6 +46,9 @@ function AnnouncementsProvider({ children }) {
     const [form, setForm] = useState(EMPTY_FORM);
     const [saving, setSaving] = useState(false);
     const [pickedUsers, setPickedUsers] = useState([]);
+    const [formError, setFormError] = useState('');
+    const confirm = useConfirm();
+    const toast = useToast();
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -70,7 +74,7 @@ function AnnouncementsProvider({ children }) {
 
     useEffect(() => { load(); }, [load]);
 
-    const startNew = () => { setForm(EMPTY_FORM); setPickedUsers([]); };
+    const startNew = () => { setForm(EMPTY_FORM); setPickedUsers([]); setFormError(''); };
 
     const startEdit = async (a) => {
         const next = {
@@ -84,6 +88,7 @@ function AnnouncementsProvider({ children }) {
             target_user_ids: a.target_user_ids || [],
         };
         setForm(next);
+        setFormError('');
 
         if (next.target_user_ids.length > 0) {
             try {
@@ -99,7 +104,8 @@ function AnnouncementsProvider({ children }) {
     };
 
     const save = async () => {
-        if (!form.title.trim()) { alert('Title is required'); return; }
+        if (!form.title.trim()) { setFormError('Give the notice a title.'); return; }
+        setFormError('');
         setSaving(true);
         try {
             const payload = {
@@ -119,10 +125,11 @@ function AnnouncementsProvider({ children }) {
                 body: JSON.stringify(body),
             });
             if (!res.ok) throw new Error(await res.text());
+            toast.success(form.id ? 'Notice saved' : 'Notice published');
             await load();
             startNew();
         } catch (e) {
-            alert(`Save failed: ${e.message}`);
+            toast.error(`Couldn’t save: ${e.message}`);
         } finally {
             setSaving(false);
         }
@@ -136,13 +143,20 @@ function AnnouncementsProvider({ children }) {
         });
         if (res.ok) {
             setAnnouncements(prev => prev.map(x => x.id === a.id ? { ...x, active: !x.active } : x));
+            toast.success(a.active ? 'Hidden from students' : 'Showing to students');
         } else {
-            alert('Failed');
+            toast.error('Couldn’t change that notice.');
         }
     };
 
     const remove = async (a) => {
-        if (!confirm(`Delete "${a.title}"? This cannot be undone.`)) return;
+        const ok = await confirm({
+            title: `Delete “${a.title}”?`,
+            body: 'Students who haven’t seen it won’t, and the record of who dismissed it goes too.',
+            confirmLabel: 'Delete notice',
+            tone: 'danger',
+        });
+        if (!ok) return;
         const res = await fetch('/api/admin/announcements', {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
@@ -151,8 +165,9 @@ function AnnouncementsProvider({ children }) {
         if (res.ok) {
             setAnnouncements(prev => prev.filter(x => x.id !== a.id));
             if (form.id === a.id) startNew();
+            toast.success('Notice deleted');
         } else {
-            alert('Failed');
+            toast.error('Couldn’t delete that notice.');
         }
     };
 
@@ -160,7 +175,7 @@ function AnnouncementsProvider({ children }) {
         <Ctx.Provider value={{
             announcements, majors, loading, error,
             form, setForm, saving, save, startNew, startEdit,
-            toggleActive, remove,
+            toggleActive, remove, formError,
             pickedUsers, setPickedUsers,
         }}>
             {children}
@@ -186,39 +201,30 @@ function DismissedList({ announcementId, count }) {
                 const data = await res.json();
                 setUsers(data.users || []);
             } catch (e) {
-                setError(e.message || 'Failed to load');
+                setError(e.message || 'Couldn’t load them.');
             } finally {
                 setLoading(false);
             }
         }
     };
 
+    if (count === 0) return <span className={styles.rowMeta}>Nobody has dismissed it yet.</span>;
+
     return (
         <div>
-            <button
-                type="button"
-                className={styles.previewMuted}
-                onClick={count > 0 ? toggle : undefined}
-                style={{
-                    textAlign: 'left', padding: 0, fontSize: '0.7rem',
-                    background: 'none', border: 'none',
-                    cursor: count > 0 ? 'pointer' : 'default',
-                    textDecoration: count > 0 ? 'underline' : 'none',
-                }}
-            >
-                {count} {count === 1 ? 'user' : 'users'} dismissed{count > 0 ? (open ? ' ▾' : ' ▸') : ''}
+            <button type="button" className={styles.textToggle} onClick={toggle} aria-expanded={open}>
+                {count} {count === 1 ? 'student' : 'students'} dismissed it {open ? '−' : '+'}
             </button>
             {open && (
-                <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {loading && <div className={styles.previewMuted} style={{ padding: 0, fontSize: '0.7rem' }}>Loading…</div>}
-                    {error && <div className={styles.error}>{error}</div>}
+                <ul className={styles.plainList}>
+                    {loading && <li className={styles.previewMuted}>Reading…</li>}
+                    {error && <li className={styles.error}>{error}</li>}
                     {users && users.map(u => (
-                        <div key={u.id} style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', lineHeight: 1.35 }}>
-                            <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{u.name || '(no name)'}</span>
-                            {' · '}{u.student_id || 'no ID'}{' · '}{u.email || 'no email'}
-                        </div>
+                        <li key={u.id} className={styles.rowMeta}>
+                            <strong className={styles.cellStrong}>{u.name || 'no name'}</strong> · <span className={styles.mono}>{u.student_id || 'no ID'}</span> · {u.email || 'no email'}
+                        </li>
                     ))}
-                </div>
+                </ul>
             )}
         </div>
     );
@@ -232,39 +238,39 @@ function AnnouncementsSidebar() {
     return (
         <>
             <div className={styles.sidebarCard}>
-                <button className={`${styles.btn} ${styles.btnPrimary} ${styles.btnFull}`} onClick={startNew}>
-                    + New announcement
+                <button type="button" className={`${styles.btn} ${styles.btnPrimary} ${styles.btnFull}`} onClick={startNew}>
+                    New notice
                 </button>
             </div>
 
             <div className={styles.sidebarCard}>
-                <p className={styles.sectionTitle}>All announcements</p>
+                <p className={styles.sectionTitle}>Every notice <span className={styles.navCount}>{announcements.length}</span></p>
                 {loading ? (
                     <div className={styles.loading}><div className={styles.spinner} /></div>
                 ) : announcements.length === 0 ? (
-                    <div className={styles.previewMuted}>No announcements yet.</div>
+                    <p className={styles.previewMuted}>None yet.</p>
                 ) : (
-                    <div className={styles.navList}>
+                    <div className={styles.noticeList}>
                         {announcements.map(a => {
                             const expired = a.expires_at && new Date(a.expires_at) < new Date();
                             const isSelected = form.id === a.id;
                             return (
-                                <div key={a.id} className={styles.row} style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
-                                        <span style={{ fontWeight: 700, fontSize: '0.8125rem', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.title}</span>
+                                <div key={a.id} className={`${styles.notice} ${isSelected ? styles.noticeOn : ''}`}>
+                                    <div className={styles.noticeHead}>
+                                        <span className={styles.noticeTitle}>{a.title}</span>
                                         <span className={`${styles.badge} ${a.active && !expired ? styles.badgeActive : styles.badgeExpired}`}>
-                                            {expired ? 'expired' : a.active ? 'active' : 'hidden'}
+                                            {expired ? 'expired' : a.active ? 'showing' : 'hidden'}
                                         </span>
                                     </div>
                                     <DismissedList announcementId={a.id} count={a.dismissed_count ?? 0} />
-                                    <div className={styles.rowActions} style={{ justifyContent: 'flex-end' }}>
-                                        <button className={`${styles.btn} ${styles.btnGhost}`} onClick={() => startEdit(a)}>
+                                    <div className={styles.rowActions}>
+                                        <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={() => startEdit(a)} disabled={isSelected}>
                                             {isSelected ? 'Editing' : 'Edit'}
                                         </button>
-                                        <button className={`${styles.btn} ${styles.btnGhost}`} onClick={() => toggleActive(a)}>
+                                        <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={() => toggleActive(a)}>
                                             {a.active ? 'Hide' : 'Show'}
                                         </button>
-                                        <button className={`${styles.btn} ${styles.btnDanger}`} onClick={() => remove(a)}>Delete</button>
+                                        <button type="button" className={`${styles.btn} ${styles.btnDanger}`} onClick={() => remove(a)}>Delete</button>
                                     </div>
                                 </div>
                             );
@@ -282,14 +288,15 @@ function MajorMultiSelect({ majors, value, onChange }) {
         else onChange([...value, code]);
     };
     return (
-        <div className={styles.formGrid}>
-            {majors.length === 0 && <div className={styles.previewMuted}>No majors loaded</div>}
+        <div className={styles.chips}>
+            {majors.length === 0 && <p className={styles.previewMuted}>No majors loaded.</p>}
             {majors.map(m => (
                 <button
                     type="button"
                     key={m.code}
                     onClick={() => toggle(m.code)}
-                    className={`${styles.btn} ${value.includes(m.code) ? styles.btnPrimary : ''}`}
+                    className={`${styles.toggleChip} ${value.includes(m.code) ? styles.toggleChipOn : ''}`}
+                    aria-pressed={value.includes(m.code)}
                     title={m.name}
                 >
                     {m.code}
@@ -337,51 +344,40 @@ function UserPicker({ value, onChange, picked, setPicked }) {
     };
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div className={styles.picker}>
             <input
-                type="text"
-                placeholder="Search users by name, email, student ID…"
+                type="search"
+                placeholder="Name, email or university ID"
+                aria-label="Find a student"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className={styles.input}
             />
-            {searching && <div className={styles.previewMuted}>Searching…</div>}
+            {searching && <p className={styles.previewMuted}>Searching…</p>}
             {results.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 200, overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: 6 }}>
+                <div className={styles.pickerList}>
                     {results.map(u => (
                         <button
                             key={u.id}
                             type="button"
-                            className={styles.btn}
+                            className={styles.pickerItem}
                             onClick={() => add(u)}
                             disabled={value.includes(u.id)}
-                            style={{ justifyContent: 'flex-start', textAlign: 'left' }}
                         >
-                            <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
-                                <span style={{ fontWeight: 700 }}>{u.name || '(no name)'}</span>
-                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                                    {u.student_id || 'no ID'} · {u.email || 'no email'}
-                                </span>
-                            </span>
+                            <span className={styles.mono}>{u.student_id || '—'}</span>
+                            <span className={styles.pickerName}>{u.name || 'no name'}</span>
+                            <span className={styles.pickerCr}>{u.email || ''}</span>
+                            <span className={styles.pickerAdd} aria-hidden="true">{value.includes(u.id) ? 'added' : 'add'}</span>
                         </button>
                     ))}
                 </div>
             )}
             {picked.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                <div className={styles.chips}>
                     {picked.map(u => (
-                        <span
-                            key={u.id}
-                            className={styles.badge}
-                            style={{ background: 'var(--color-accent-muted)', color: 'var(--color-accent)', borderColor: 'transparent', textTransform: 'none', display: 'inline-flex', gap: 6, alignItems: 'center' }}
-                        >
+                        <span key={u.id} className={styles.chip}>
                             {u.name || u.student_id || u.id.slice(0, 8)}
-                            <button
-                                type="button"
-                                onClick={() => removeId(u.id)}
-                                style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontWeight: 700, padding: 0, lineHeight: 1 }}
-                                title="Remove"
-                            >×</button>
+                            <button type="button" className={styles.chipRemove} onClick={() => removeId(u.id)} aria-label={`Remove ${u.name || 'this student'}`}>×</button>
                         </span>
                     ))}
                 </div>
@@ -393,16 +389,18 @@ function UserPicker({ value, onChange, picked, setPicked }) {
 function AnnouncementsMain() {
     const ctx = useContext(Ctx);
     if (!ctx) return null;
-    const { error, majors, form, setForm, saving, save, startNew, pickedUsers, setPickedUsers } = ctx;
+    const { error, majors, form, setForm, saving, save, startNew, pickedUsers, setPickedUsers, formError } = ctx;
 
     const update = (patch) => setForm(prev => ({ ...prev, ...patch }));
 
-    const targetingSummary = useMemo(() => {
+    // Who will see it, said in words: within a group any match counts, and
+    // the groups all have to match.
+    const audience = useMemo(() => {
         const parts = [];
-        if (form.target_majors.length) parts.push(`${form.target_majors.length} major(s)`);
-        if (form.target_genders.length) parts.push(`${form.target_genders.length} gender(s)`);
-        if (form.target_user_ids.length) parts.push(`${form.target_user_ids.length} user(s)`);
-        return parts.length ? parts.join(' AND ') : 'All users';
+        if (form.target_majors.length) parts.push(`${form.target_majors.join(', ')} ${form.target_majors.length === 1 ? 'students' : 'students'}`);
+        if (form.target_genders.length === 1) parts.push(`on the ${form.target_genders[0] === 'male' ? 'men’s' : 'women’s'} campus`);
+        if (form.target_user_ids.length) parts.push(`${form.target_user_ids.length} named ${form.target_user_ids.length === 1 ? 'student' : 'students'}`);
+        return parts.length ? `Shown to ${parts.join(', and only ')}.` : 'Shown to every student.';
     }, [form]);
 
     return (
@@ -410,107 +408,100 @@ function AnnouncementsMain() {
             {error && <div className={styles.error}>{error}</div>}
 
             <div className={styles.formCard}>
-                <div className={styles.fieldGroup}>
-                    <label className={styles.fieldLabel}>Title</label>
-                    <input
-                        type="text"
-                        className={styles.input}
-                        value={form.title}
-                        onChange={(e) => update({ title: e.target.value })}
-                        placeholder="What's new?"
-                    />
+                <div className={styles.labelRow}>
+                    <p className={styles.sectionTitle}>{form.id ? 'Editing a notice' : 'A new notice'}</p>
+                    <span className={styles.audience}>{audience}</span>
                 </div>
 
+                <label className={styles.fieldGroup}>
+                    <span className={styles.fieldLabel}>Title</span>
+                    <input
+                        type="text"
+                        className={`${styles.input} ${formError ? styles.inputInvalid : ''}`}
+                        value={form.title}
+                        onChange={(e) => update({ title: e.target.value })}
+                        placeholder="Add/drop closes on Thursday"
+                    />
+                    {formError && <span className={styles.fieldError}>{formError}</span>}
+                </label>
+
                 <div className={styles.fieldGroup}>
-                    <label className={styles.fieldLabel}>Body</label>
+                    <span className={styles.fieldLabel}>Text</span>
                     <RichTextEditor
                         value={form.body_html}
                         onChange={(html) => update({ body_html: html })}
-                        placeholder="Describe the update. Paste images, add links, format lists…"
+                        placeholder="What students need to know. Links, lists and images work."
                     />
                 </div>
 
                 <div className={styles.formGrid}>
-                    <div className={styles.fieldGroup}>
-                        <label className={styles.fieldLabel}>Auto-expire (optional)</label>
+                    <label className={styles.fieldGroup}>
+                        <span className={styles.fieldLabel}>Stop showing it on <span className={styles.cellMuted}>optional</span></span>
                         <input
                             type="datetime-local"
                             className={styles.input}
                             value={form.expires_at}
                             onChange={(e) => update({ expires_at: e.target.value })}
                         />
-                    </div>
+                    </label>
                     <div className={styles.fieldGroup}>
-                        <label className={styles.fieldLabel}>Visibility</label>
-                        <button
-                            type="button"
-                            className={`${styles.btn} ${form.active ? styles.btnPrimary : ''}`}
-                            onClick={() => update({ active: !form.active })}
-                        >
-                            {form.active ? 'Active (visible)' : 'Hidden'}
-                        </button>
+                        <span className={styles.fieldLabel}>Showing</span>
+                        <label className={styles.checkRow}>
+                            <input type="checkbox" checked={form.active} onChange={() => update({ active: !form.active })} />
+                            {form.active ? 'Students can see it' : 'Hidden for now'}
+                        </label>
                     </div>
                 </div>
 
-                <div className={styles.fieldGroup}>
-                    <label className={styles.fieldLabel}>Targeting (current: {targetingSummary})</label>
-                    <p className={styles.previewMuted} style={{ textAlign: 'left', padding: 0 }}>
-                        Leave a section empty to skip that filter. Filters within a section are OR; across sections, AND.
-                    </p>
-                </div>
+                <section className={styles.card}>
+                    <p className={styles.sectionTitle}>Who sees it</p>
+                    <p className={styles.previewMuted}>Leave a group empty to skip it. Inside a group any match counts; across groups, all of them must.</p>
 
-                <div className={styles.fieldGroup}>
-                    <label className={styles.fieldLabel}>Majors</label>
-                    <MajorMultiSelect
-                        majors={majors}
-                        value={form.target_majors}
-                        onChange={(v) => update({ target_majors: v })}
-                    />
-                </div>
-
-                <div className={styles.fieldGroup}>
-                    <label className={styles.fieldLabel}>Genders</label>
-                    <div className={styles.formGrid}>
-                        {GENDERS.map(g => (
-                            <button
-                                type="button"
-                                key={g.value}
-                                onClick={() => {
-                                    const has = form.target_genders.includes(g.value);
-                                    update({ target_genders: has ? form.target_genders.filter(x => x !== g.value) : [...form.target_genders, g.value] });
-                                }}
-                                className={`${styles.btn} ${form.target_genders.includes(g.value) ? styles.btnPrimary : ''}`}
-                            >
-                                {g.label}
-                            </button>
-                        ))}
+                    <div className={styles.fieldGroup}>
+                        <span className={styles.fieldLabel}>Majors</span>
+                        <MajorMultiSelect majors={majors} value={form.target_majors} onChange={(v) => update({ target_majors: v })} />
                     </div>
-                </div>
 
-                <div className={styles.fieldGroup}>
-                    <label className={styles.fieldLabel}>Specific users</label>
-                    <UserPicker
-                        value={form.target_user_ids}
-                        onChange={(v) => update({ target_user_ids: v })}
-                        picked={pickedUsers}
-                        setPicked={setPickedUsers}
-                    />
-                </div>
+                    <div className={styles.fieldGroup}>
+                        <span className={styles.fieldLabel}>Campus</span>
+                        <div className={styles.chips}>
+                            {GENDERS.map(g => {
+                                const on = form.target_genders.includes(g.value);
+                                return (
+                                    <button
+                                        type="button"
+                                        key={g.value}
+                                        aria-pressed={on}
+                                        onClick={() => update({ target_genders: on ? form.target_genders.filter(x => x !== g.value) : [...form.target_genders, g.value] })}
+                                        className={`${styles.toggleChip} ${on ? styles.toggleChipOn : ''}`}
+                                    >
+                                        {g.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
 
-                <div className={styles.formRow} style={{ justifyContent: 'flex-end' }}>
+                    <div className={styles.fieldGroup}>
+                        <span className={styles.fieldLabel}>Named students</span>
+                        <UserPicker
+                            value={form.target_user_ids}
+                            onChange={(v) => update({ target_user_ids: v })}
+                            picked={pickedUsers}
+                            setPicked={setPickedUsers}
+                        />
+                    </div>
+                </section>
+
+                <div className={styles.formRow}>
+                    <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={save} disabled={saving}>
+                        {saving ? 'Saving…' : form.id ? 'Save changes' : 'Publish the notice'}
+                    </button>
                     {form.id && (
-                        <button type="button" className={styles.btn} onClick={startNew} disabled={saving}>
+                        <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={startNew} disabled={saving}>
                             Cancel
                         </button>
                     )}
-                    <button
-                        type="button"
-                        className={`${styles.btn} ${styles.btnPrimary}`}
-                        onClick={save}
-                        disabled={saving}
-                    >
-                        {saving ? 'Saving…' : form.id ? 'Save changes' : 'Publish announcement'}
-                    </button>
                 </div>
             </div>
         </>
