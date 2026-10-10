@@ -3,11 +3,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useSemester } from '@/lib/SemesterContext';
-import { HistoryIcon, ChevronLeftIcon } from '@/components/Icons';
+import { courseColor } from '@/lib/courseColor';
+import { HistoryIcon, ChevronLeftIcon, ChevronRightIcon, AlertIcon } from '@/components/Icons';
 import {
     historyTerms, termLabel, fetchCourseHistory, startGrid, meetingText, formatClock, CAMPUS_LABELS,
 } from '@/lib/courseHistory';
 import RoomLink from '@/components/RoomLink';
+import { Badge, Button, CourseSwatch, EmptyState, Field, SearchInput, SegmentedControl, Skeleton, Ticket } from '@/components/ui';
 import styles from './CourseHistory.module.css';
 
 // PostgREST's or() splits on commas and parentheses, and ilike treats % and _
@@ -31,6 +33,7 @@ export default function CourseHistory({ request, onBackToBuild }) {
     const [query, setQuery] = useState('');
     const [suggestions, setSuggestions] = useState([]);
     const [showDropdown, setShowDropdown] = useState(false);
+    const [activeIdx, setActiveIdx] = useState(-1);
     const [course, setCourse] = useState(null);
     const [history, setHistory] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -100,6 +103,7 @@ export default function CourseHistory({ request, onBackToBuild }) {
     const handleSearchChange = (e) => {
         const value = e.target.value;
         setQuery(value);
+        setActiveIdx(-1);
         if (searchTimeout.current) clearTimeout(searchTimeout.current);
         const q = cleanQuery(value);
         if (q.length < 2) {
@@ -118,124 +122,172 @@ export default function CourseHistory({ request, onBackToBuild }) {
         }, 250);
     };
 
+    const onKeyDown = (e) => {
+        if (!showDropdown || suggestions.length === 0) return;
+        if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx(i => Math.min(suggestions.length - 1, i + 1)); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIdx(i => Math.max(0, i - 1)); }
+        else if (e.key === 'Enter' && activeIdx >= 0) { e.preventDefault(); selectCourse(suggestions[activeIdx]); }
+        else if (e.key === 'Escape') setShowDropdown(false);
+    };
+
     const pastLabels = terms.map(termLabel);
     const detail = history && openTerm ? history.terms.find(t => t.code === openTerm) : null;
 
     return (
         <div className={styles.main}>
             {onBackToBuild && (
-                <button type="button" className={styles.backToBuild} onClick={onBackToBuild}>
-                    <ChevronLeftIcon width={16} height={16} />
+                <Button variant="ghost" size="sm" icon={<ChevronLeftIcon />} onClick={onBackToBuild} className={styles.back}>
                     Back to your schedule
-                </button>
+                </Button>
             )}
 
             {!detail && (
-                <div className={styles.card} ref={searchRef}>
-                    <label htmlFor="history-search" className={styles.label}>Look up a course</label>
-                    <div className={styles.searchWrapper}>
-                        <input
-                            id="history-search"
-                            type="text"
-                            className={styles.input}
-                            placeholder="Search by course name or ID..."
-                            autoComplete="off"
-                            value={query}
-                            onChange={handleSearchChange}
-                            onFocus={() => { if (suggestions.length > 0) setShowDropdown(true); }}
-                        />
-                        {showDropdown && suggestions.length > 0 && (
-                            <div className={styles.dropdown}>
-                                {suggestions.map(c => (
-                                    <button key={c.course_id} type="button" className={styles.dropdownItem} onClick={() => selectCourse(c)}>
-                                        <span className={styles.dropdownId}>{c.course_id}</span>
-                                        <span>{c.name}</span>
-                                    </button>
-                                ))}
-                            </div>
-                        )}
+                <section className={styles.searchPanel} ref={searchRef}>
+                    <Field label="Look up any course" htmlFor="history-search">
+                        <div className={styles.combo}>
+                            <SearchInput
+                                id="history-search"
+                                size="lg"
+                                placeholder="Search by course name or ID"
+                                autoComplete="off"
+                                value={query}
+                                onChange={handleSearchChange}
+                                onClear={() => { setQuery(''); setSuggestions([]); setShowDropdown(false); }}
+                                onFocus={() => { if (suggestions.length > 0) setShowDropdown(true); }}
+                                onKeyDown={onKeyDown}
+                                role="combobox"
+                                aria-expanded={showDropdown && suggestions.length > 0}
+                                aria-controls="history-list"
+                            />
+                            {showDropdown && suggestions.length > 0 && (
+                                <div className={styles.dropdown} id="history-list" role="listbox">
+                                    {suggestions.map((c, i) => (
+                                        <button
+                                            key={c.course_id}
+                                            type="button"
+                                            role="option"
+                                            aria-selected={i === activeIdx}
+                                            className={`${styles.option} ${i === activeIdx ? styles.optionActive : ''}`}
+                                            onClick={() => selectCourse(c)}
+                                        >
+                                            <CourseSwatch courseId={c.course_id} size="sm" />
+                                            <span className={styles.optionName}>{c.name}</span>
+                                            <span className={styles.optionId}>{c.course_id}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </Field>
+                </section>
+            )}
+
+            {loading && (
+                <div className={styles.loadingCard} aria-busy="true">
+                    <div className={styles.headRow}>
+                        <Skeleton width={40} height={40} radius={11} />
+                        <span className={styles.loadingText}>
+                            <Skeleton width={260} height={18} />
+                            <Skeleton width={90} height={12} />
+                        </span>
                     </div>
+                    <div className={styles.loadingStats}>
+                        <Skeleton height={56} radius={10} />
+                        <Skeleton height={56} radius={10} />
+                        <Skeleton height={56} radius={10} />
+                    </div>
+                    {[0, 1, 2].map(i => <Skeleton key={i} height={62} radius={12} />)}
                 </div>
             )}
 
-            {loading && <div className={styles.spinner}></div>}
-            {failed && <div className={styles.empty}>Couldn&rsquo;t load this course&rsquo;s history. Try again in a moment.</div>}
+            {failed && (
+                <EmptyState tone="neutral" icon={<AlertIcon />} title="Couldn’t load this course’s history" actions={<Button variant="secondary" onClick={() => selectCourse(course)}>Try again</Button>}>
+                    Something went wrong fetching past terms. It&rsquo;s usually a blip; try again in a moment.
+                </EmptyState>
+            )}
 
             {!course && !loading && (
-                <div className={styles.empty}>
-                    <HistoryIcon width={32} height={32} />
-                    <span className={styles.emptyTitle}>See how a course ran before</span>
-                    <span>
-                        {terms.length
-                            ? `Times, instructors and sections from ${pastLabels.slice().reverse().join(', ')}.`
-                            : 'Pick a semester first.'}
-                    </span>
-                </div>
+                <EmptyState icon={<HistoryIcon />} title="See how a course ran before">
+                    {terms.length
+                        ? `Times, instructors and sections from ${pastLabels.slice().reverse().join(', ')}. Useful when a course isn’t open yet, or you want to know who usually teaches it.`
+                        : 'Pick a semester first.'}
+                </EmptyState>
             )}
 
             {course && history && !loading && !detail && (
-                <>
-                    <div className={styles.card}>
-                        <div className={styles.courseHead}>
-                            <div className={styles.courseTitle}>
-                                <span className={styles.courseId}>{course.course_id}</span>
-                                <span className={styles.courseName}>{course.name}</span>
-                            </div>
-                            {course.credit_hours > 0 && <span className={styles.credits}>{course.credit_hours} credits</span>}
-                        </div>
-                        <div className={styles.stats}>
-                            <div className={styles.stat}>
-                                <span className={styles.statValue}>{history.offeredCount} of {terms.length}</span>
-                                <span className={styles.statLabel}>terms offered</span>
-                            </div>
-                            <div className={styles.stat}>
-                                <span className={styles.statValue}>{history.sectionsPerTerm}</span>
-                                <span className={styles.statLabel}>sections a term</span>
-                            </div>
-                            <div className={styles.stat}>
-                                <span className={styles.statValue}>{history.instructors.length}</span>
-                                <span className={styles.statLabel}>{history.instructors.length === 1 ? 'instructor' : 'instructors'}</span>
-                            </div>
+                <article className={styles.card}>
+                    <header className={styles.headRow}>
+                        <CourseSwatch courseId={course.course_id} size="lg" />
+                        <div className={styles.courseTitle}>
+                            <h2 className={styles.courseName}>{course.name}</h2>
+                            <span className={styles.courseMeta}>
+                                <span className={styles.mono}>{course.course_id}</span>
+                                {course.credit_hours > 0 && <span>{course.credit_hours} credits</span>}
+                            </span>
                         </div>
                         {openNow != null && (
-                            <div className={openNow > 0 ? styles.nowOpen : styles.nowClosed}>
+                            <Badge tone={openNow > 0 ? 'success' : 'neutral'} dot className={styles.nowBadge}>
                                 {openNow > 0
-                                    ? `Open this term too: ${openNow} ${openNow === 1 ? 'section' : 'sections'} in ${termLabel(selectedTerm)}`
+                                    ? `${openNow} ${openNow === 1 ? 'section' : 'sections'} open in ${termLabel(selectedTerm)}`
                                     : `Not open in ${termLabel(selectedTerm)}`}
-                            </div>
+                            </Badge>
                         )}
+                    </header>
+
+                    <div className={styles.stats}>
+                        <div className={styles.stat}>
+                            <span className={styles.statValue}>{history.offeredCount}<small>/{terms.length}</small></span>
+                            <span className={styles.statLabel}>terms offered</span>
+                        </div>
+                        <div className={styles.stat}>
+                            <span className={styles.statValue}>{history.sectionsPerTerm}</span>
+                            <span className={styles.statLabel}>sections a term</span>
+                        </div>
+                        <div className={styles.stat}>
+                            <span className={styles.statValue}>{history.instructors.length}</span>
+                            <span className={styles.statLabel}>{history.instructors.length === 1 ? 'instructor' : 'instructors'}</span>
+                        </div>
                     </div>
 
-                    <div className={styles.termList}>
-                        <span className={styles.sectionTitle}>Past terms</span>
-                        {history.terms.map(t => t.offered ? (
-                            <button key={t.code} type="button" className={styles.termRow} onClick={() => setOpenTerm(t.code)}>
-                                <span className={styles.termRowHead}>
-                                    <span className={styles.termName}><span className={styles.dotOn}></span>{t.label}</span>
-                                    <span className={styles.termCount}>
-                                        {t.sections.length} {t.sections.length === 1 ? 'section' : 'sections'}
-                                        {t.fill != null && ` · ${t.fill}% full`}
+                    <div className={styles.timeline}>
+                        <span className={styles.timelineLabel}>Past terms, newest first</span>
+                        <ol className={styles.terms} style={{ '--c': courseColor(course.course_id) }}>
+                            {history.terms.map(t => t.offered ? (
+                                <li key={t.code} className={styles.termItem}>
+                                    <span className={styles.termDot} aria-hidden="true" />
+                                    <button type="button" className={styles.termRow} onClick={() => setOpenTerm(t.code)}>
+                                        <span className={styles.termRowHead}>
+                                            <span className={styles.termName}>{t.label}</span>
+                                            <span className={styles.termCount}>
+                                                {t.sections.length} {t.sections.length === 1 ? 'section' : 'sections'}
+                                                {t.fill != null && ` · ${t.fill}% full`}
+                                            </span>
+                                            <ChevronRightIcon className={styles.termChevron} />
+                                        </span>
+                                        <span className={styles.chips}>
+                                            {t.dayPatterns.slice(0, 3).map(d => <span key={d} className={styles.chip}>{d}</span>)}
+                                            {t.earliest != null && <span className={styles.chip}>{formatClock(t.earliest)}–{formatClock(t.latest)}</span>}
+                                            <span className={styles.chip}>
+                                                {t.instructors.length === 1 ? t.instructors[0] : `${t.instructors.length} instructors`}
+                                            </span>
+                                            {t.campuses.length === 1 && <span className={styles.chip}>{CAMPUS_LABELS[t.campuses[0]] || t.campuses[0]} campus only</span>}
+                                        </span>
+                                    </button>
+                                </li>
+                            ) : (
+                                <li key={t.code} className={`${styles.termItem} ${styles.termOff}`}>
+                                    <span className={styles.termDot} aria-hidden="true" />
+                                    <span className={styles.termRowOff}>
+                                        <span className={styles.termName}>{t.label}</span>
+                                        <span className={styles.termCount}>Not offered</span>
                                     </span>
-                                </span>
-                                <span className={styles.chips}>
-                                    {t.dayPatterns.slice(0, 3).map(d => <span key={d} className={styles.chip}>{d}</span>)}
-                                    {t.earliest != null && <span className={styles.chip}>{formatClock(t.earliest)} to {formatClock(t.latest)}</span>}
-                                    <span className={styles.chip}>
-                                        {t.instructors.length === 1 ? t.instructors[0] : `${t.instructors.length} instructors`}
-                                    </span>
-                                    {t.campuses.length === 1 && <span className={styles.chip}>{CAMPUS_LABELS[t.campuses[0]] || t.campuses[0]} campus only</span>}
-                                </span>
-                            </button>
-                        ) : (
-                            <div key={t.code} className={styles.termRowOff}>
-                                <span className={styles.termName}><span className={styles.dotOff}></span>{t.label}</span>
-                                <span>Not offered</span>
-                            </div>
-                        ))}
+                                </li>
+                            ))}
+                        </ol>
                     </div>
 
                     <p className={styles.footnote}>Past terms show what ran, not what will. Times and instructors change every term.</p>
-                </>
+                </article>
             )}
 
             {detail && (
@@ -254,105 +306,89 @@ export default function CourseHistory({ request, onBackToBuild }) {
 function TermDetail({ course, history, term, onPickTerm, onBack }) {
     const grid = startGrid(term.sections);
     const anySeats = term.sections.some(s => s.enrollment != null && s.max_enrollment);
+    const maxCell = Math.max(1, ...grid.cells.flat());
 
     return (
-        <>
-            <div className={styles.detailHead}>
-                <button type="button" className={styles.iconBtn} onClick={onBack} aria-label="Back to all terms">
-                    <ChevronLeftIcon width={18} height={18} />
-                </button>
+        <article className={styles.card} style={{ '--c': courseColor(course.course_id) }}>
+            <header className={styles.headRow}>
+                <Button variant="ghost" size="sm" icon={<ChevronLeftIcon />} onClick={onBack} aria-label="Back to all terms" />
+                <CourseSwatch courseId={course.course_id} />
                 <div className={styles.courseTitle}>
-                    <span className={styles.courseId}>{course.course_id} · {course.name}</span>
-                    <span className={styles.detailTerm}>{term.label}</span>
+                    <h2 className={styles.courseNameSm}>{course.name}</h2>
+                    <span className={styles.courseMeta}>
+                        <span className={styles.mono}>{course.course_id}</span>
+                        <span>{term.label}</span>
+                    </span>
                 </div>
-            </div>
+            </header>
 
-            <div className={styles.termTabs} role="tablist" aria-label="Term">
-                {history.terms.map(t => (
-                    <button
-                        key={t.code}
-                        type="button"
-                        role="tab"
-                        aria-selected={t.code === term.code}
-                        disabled={!t.offered}
-                        className={`${styles.termTab} ${t.code === term.code ? styles.termTabActive : ''}`}
-                        onClick={() => onPickTerm(t.code)}
-                        title={t.offered ? undefined : 'Not offered'}
-                    >
-                        {t.label}
-                    </button>
-                ))}
+            <div className={styles.termPicker}>
+                <SegmentedControl
+                    label="Term"
+                    size="sm"
+                    value={term.code}
+                    onChange={onPickTerm}
+                    options={history.terms.map(t => ({ value: t.code, label: t.label, disabled: !t.offered, title: t.offered ? undefined : 'Not offered' }))}
+                />
             </div>
 
             {grid.starts.length > 0 && (
-                <div className={styles.card}>
-                    <span className={styles.sectionTitle}>When it ran</span>
-                    <div className={styles.heat} style={{ gridTemplateColumns: `48px repeat(${grid.days.length}, minmax(0, 1fr))` }}>
-                        <span></span>
-                        {grid.days.map(d => <span key={d} className={styles.heatDay}>{d.toUpperCase()}</span>)}
+                <section className={styles.heatBlock}>
+                    <span className={styles.timelineLabel}>When sections started</span>
+                    <div className={styles.heat} style={{ gridTemplateColumns: `52px repeat(${grid.days.length}, minmax(0, 1fr))` }}>
+                        <span />
+                        {grid.days.map(d => <span key={d} className={styles.heatDay}>{d}</span>)}
                         {grid.starts.map((start, r) => (
-                            <StartRow key={start} label={formatClock(start)} row={grid.cells[r]} days={grid.days} />
+                            <StartRow key={start} label={formatClock(start)} row={grid.cells[r]} days={grid.days} max={maxCell} />
                         ))}
                     </div>
-                </div>
+                </section>
             )}
 
-            <div className={styles.listHead}>
-                <span className={styles.sectionTitle}>{term.sections.length} {term.sections.length === 1 ? 'section' : 'sections'}</span>
-                {anySeats && <span className={styles.listNote}>Enrolment when last checked</span>}
-            </div>
-
-            <div className={styles.sectionList}>
-                {term.sections.map(s => {
-                    const hasSeats = s.enrollment != null && s.max_enrollment > 0;
-                    const pct = hasSeats ? Math.min(100, Math.round((s.enrollment / s.max_enrollment) * 100)) : 0;
-                    return (
-                        <div key={s.crn} className={styles.sectionCard}>
-                            <div className={styles.sectionTop}>
-                                <span className={styles.sectionTime}>{meetingText(s.class_time)}</span>
-                                <span className={styles.sectionNum}>Sec {s.section_num}</span>
-                            </div>
-                            <div className={styles.sectionMid}>
-                                <span>{s.instructor || 'Instructor not listed'}</span>
-                                {s.campus && <span className={`${styles.campus} ${styles[`campus_${s.campus}`] || ''}`}>{CAMPUS_LABELS[s.campus] || s.campus}</span>}
-                            </div>
-                            {s.location && <div className={styles.sectionRoom}><RoomLink room={s.location} /></div>}
-                            {hasSeats && (
-                                <div className={styles.fillRow}>
-                                    <div className={styles.fillTrack}><div className={styles.fillBar} style={{ width: `${pct}%` }}></div></div>
-                                    <span className={styles.fillText}>{s.enrollment}/{s.max_enrollment}</span>
+            <section className={styles.sectionBlock}>
+                <div className={styles.listHead}>
+                    <span className={styles.timelineLabel}>{term.sections.length} {term.sections.length === 1 ? 'section' : 'sections'}</span>
+                    {anySeats && <span className={styles.listNote}>Enrolment when last checked</span>}
+                </div>
+                <div className={styles.sectionGrid}>
+                    {term.sections.map(s => {
+                        const hasSeats = s.enrollment != null && s.max_enrollment > 0;
+                        const pct = hasSeats ? Math.min(100, Math.round((s.enrollment / s.max_enrollment) * 100)) : 0;
+                        return (
+                            <div key={s.crn} className={styles.sectionCard}>
+                                <div className={styles.sectionTop}>
+                                    <Ticket size="sm" label="Sec" section={s.section_num} />
+                                    {s.campus && <Badge size="sm">{CAMPUS_LABELS[s.campus] || s.campus}</Badge>}
                                 </div>
-                            )}
-                        </div>
-                    );
-                })}
-            </div>
-        </>
+                                <span className={styles.sectionTime}>{meetingText(s.class_time)}</span>
+                                <span className={styles.sectionWho}>{s.instructor || 'Instructor not listed'}</span>
+                                {s.location && <span className={styles.sectionRoom}><RoomLink room={s.location} /></span>}
+                                {hasSeats && (
+                                    <div className={styles.fillRow}>
+                                        <div className={styles.fillTrack}><div className={styles.fillBar} style={{ width: `${pct}%` }} /></div>
+                                        <span className={styles.fillText}>{s.enrollment}/{s.max_enrollment}</span>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            </section>
+        </article>
     );
 }
 
-// Fixed steps by section count, on the app's green: 1 is a light turquoise
-// green, and 4 or more is the darkest.
-const SHADES = [
-    { background: '#A7EBD6', color: '#0A2540' },
-    { background: '#5CD6B0', color: '#0A2540' },
-    { background: '#00A775', color: '#FFFFFF' },
-    { background: '#006E4E', color: '#FFFFFF' },
-];
-
-function shade(n) {
-    return SHADES[Math.min(n, SHADES.length) - 1];
-}
-
-function StartRow({ label, row, days }) {
+// How many sections started in each slot, as the course's own colour at
+// growing strength.
+function StartRow({ label, row, days, max }) {
     return (
         <>
             <span className={styles.heatHour}>{label}</span>
             {row.map((n, i) => (
                 <span
                     key={days[i]}
-                    className={styles.heatCell}
-                    style={n ? shade(n) : undefined}
+                    className={`${styles.heatCell} ${n ? styles.heatOn : ''}`}
+                    style={n ? { '--level': `${18 + Math.round((n / max) * 62)}%` } : undefined}
                     title={n ? `${n} ${n === 1 ? 'section' : 'sections'} starting ${days[i]} ${label}` : undefined}
                 >
                     {n > 0 ? n : ''}
