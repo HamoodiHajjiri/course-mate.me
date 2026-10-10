@@ -1,108 +1,134 @@
 /* ===== App bar =====
-   One bar on every screen size. On phones it carries the brand, search, the
-   bell and the account menu; from 1024px the destinations join it and the
-   tab bar at the bottom steps aside. */
+   A ruled band: the canvas colour, a hairline under it, nothing floating.
+   The current destination is an ink rule laid on that hairline. */
 
 .bar {
     position: sticky;
     top: 0;
     z-index: var(--z-nav);
-    width: 100%;
-    padding-top: env(safe-area-inset-top);
-    background: color-mix(in srgb, var(--canvas) 86%, transparent);
-    backdrop-filter: saturate(1.5) blur(14px);
-    -webkit-backdrop-filter: saturate(1.5) blur(14px);
-    border-bottom: 1px solid var(--line-subtle);
+    background: var(--canvas);
+    border-bottom: 1px solid var(--rule);
 }
 
 .inner {
     display: flex;
     align-items: center;
-    gap: var(--space-3);
-    height: 56px;
+    gap: 28px;
+    height: var(--topbar-h);
     max-width: calc(var(--page-max) + 2 * var(--page-gutter));
     margin: 0 auto;
-    padding: 0 var(--space-4);
+    padding: 0 var(--page-gutter);
 }
 
 .brand {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 9px;
     flex-shrink: 0;
-    color: var(--ink);
-    text-decoration: none;
-    border-radius: var(--r-md);
-}
-
-.brand:hover {
     color: var(--ink);
 }
 
 .logo {
-    display: grid;
-    place-items: center;
-    width: 30px;
-    height: 30px;
-    border-radius: 9px;
-    overflow: hidden;
-    background: #FDFDFB;
-    box-shadow: inset 0 0 0 1px rgba(28, 40, 33, 0.1), var(--e1);
-    flex-shrink: 0;
-}
-
-.logoImage {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transform: scale(1.55);
+    width: 26px;
+    height: 26px;
+    object-fit: contain;
 }
 
 .wordmark {
-    font-family: var(--font-display);
-    font-size: 1.0625rem;
-    font-weight: 650;
-    letter-spacing: -0.035em;
-    font-variation-settings: 'opsz' 20;
+    font-family: var(--font-serif);
+    font-size: 1.25rem;
+    font-weight: 500;
+    letter-spacing: -0.015em;
+    line-height: 1;
 }
 
-/* Destinations: desktop only. */
+/* ----- Destinations ----- */
 .nav {
+    position: relative;
     display: none;
+    align-items: stretch;
+    gap: 22px;
+    height: 100%;
 }
 
+.navItem {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-size: var(--text-body);
+    font-weight: 500;
+    color: var(--ink-3);
+    white-space: nowrap;
+    transition: color var(--dur-1) var(--ease-out);
+}
+
+.navItem:hover,
+.navItem[aria-current='page'] {
+    color: var(--ink);
+}
+
+.navItem:focus-visible {
+    outline-offset: -4px;
+}
+
+.locked {
+    color: var(--ink-4);
+    cursor: not-allowed;
+}
+
+.locked:hover {
+    color: var(--ink-4);
+}
+
+.rule {
+    position: absolute;
+    left: 0;
+    bottom: -1px;
+    height: 2px;
+    background: var(--ink);
+    transition: transform var(--dur-3) var(--ease-out), width var(--dur-3) var(--ease-out);
+    pointer-events: none;
+}
+
+/* ----- Right side ----- */
 .actions {
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 6px;
     margin-left: auto;
-    flex-shrink: 0;
 }
 
-/* Search: an icon on phones, a field-like button with its shortcut on
-   desktop. */
+.term {
+    display: none;
+    margin-right: 6px;
+}
+
 .search {
-    display: grid;
-    place-items: center;
-    width: 40px;
-    height: 40px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--r-md);
-    background: transparent;
-    color: var(--ink-2);
-    cursor: pointer;
-    transition: background-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out), border-color var(--dur-1) var(--ease-out);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    padding: 0 8px;
+    border: 1px solid var(--rule-control);
+    border-radius: var(--r-2);
+    background: var(--sheet);
+    color: var(--ink-3);
+    font-size: var(--text-small);
+    transition: border-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out);
 }
 
 .search:hover {
-    background: var(--surface-hover);
+    border-color: var(--ink);
     color: var(--ink);
 }
 
 .search svg {
-    width: 20px;
-    height: 20px;
+    width: 16px;
+    height: 16px;
 }
 
 .searchLabel,
@@ -110,199 +136,88 @@
     display: none;
 }
 
-.newPost {
-    display: none;
+.searchKeys {
+    margin-left: 18px;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--ink-4);
 }
 
+.newPost {
+    display: none;
+    align-items: center;
+    gap: 5px;
+    height: 32px;
+    padding: 0 11px 0 9px;
+    border: 1px solid var(--rule-control);
+    border-radius: var(--r-2);
+    font-size: var(--text-small);
+    font-weight: 500;
+    color: var(--ink);
+    transition: border-color var(--dur-1) var(--ease-out), background-color var(--dur-1) var(--ease-out);
+}
+
+.newPost svg {
+    width: 15px;
+    height: 15px;
+}
+
+.newPost:hover {
+    border-color: var(--ink);
+    background: var(--wash);
+}
+
+.newPost[aria-current='page'] {
+    border-color: var(--ink);
+    background: var(--ink);
+    color: var(--on-ink);
+}
+
+/* ----- Desktop ----- */
 @media (min-width: 1024px) {
-    .inner {
-        height: var(--topbar-h);
-        padding: 0 var(--page-gutter);
-        gap: var(--space-5);
-    }
-
-    .brand {
-        min-width: 160px;
-    }
-
-    .nav {
-        position: relative;
-        display: flex;
-        align-items: stretch;
-        align-self: stretch;
-        gap: 2px;
-        margin: 0 auto;
-    }
-
-    .actions {
-        margin-left: 0;
-        gap: 6px;
-    }
-
-    .navItem {
-        position: relative;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 0 12px;
-        margin: 11px 0;
-        border: 0;
-        border-radius: var(--r-md);
-        background: none;
-        color: var(--ink-3);
-        font-size: var(--text-body);
-        font-weight: var(--weight-semibold);
-        text-decoration: none;
-        white-space: nowrap;
-        transition: color var(--dur-1) var(--ease-out), background-color var(--dur-1) var(--ease-out);
-    }
-
-    .navItem svg {
-        width: 18px;
-        height: 18px;
-    }
-
-    .navItem:hover {
-        color: var(--ink);
-        background: var(--surface-hover);
-    }
-
-    .active,
-    .active:hover {
-        color: var(--ink);
-        background: transparent;
-    }
-
-    .active svg {
-        color: var(--accent-ink);
-    }
-
-    /* The mint rule on the bar's bottom edge, sliding between destinations. */
-    .rule {
-        position: absolute;
-        left: 0;
-        bottom: -1px;
-        height: 2px;
-        border-radius: 2px 2px 0 0;
-        background: var(--accent);
-        transition: transform var(--dur-3) var(--ease-out), width var(--dur-3) var(--ease-out);
-        pointer-events: none;
-    }
+    .nav { display: flex; }
+    .newPost { display: inline-flex; }
+    .term { display: block; }
 
     .search {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        width: auto;
-        height: 36px;
-        padding: 0 7px 0 10px;
-        border: 1px solid var(--line);
-        background: var(--surface);
-        color: var(--ink-3);
-        box-shadow: var(--e1);
+        width: 248px;
     }
 
-    .search:hover {
-        border-color: var(--line-strong);
-        background: var(--surface);
-        color: var(--ink-2);
-    }
-
-    .search svg {
-        width: 16px;
-        height: 16px;
+    .searchLabel,
+    .searchKeys {
+        display: inline;
     }
 
     .searchKeys {
-        display: inline-flex;
-        gap: 2px;
-    }
-
-    .searchKeys kbd {
-        display: inline-grid;
-        place-items: center;
-        min-width: 20px;
-        height: 20px;
-        padding: 0 5px;
-        border-radius: 5px;
-        background: var(--surface-2);
-        box-shadow: inset 0 0 0 1px var(--line-subtle);
-        color: var(--ink-3);
-        font-family: var(--font-sans);
-        font-size: 0.6875rem;
-        font-weight: var(--weight-semibold);
-    }
-
-    .newPost {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        height: 36px;
-        padding: 0 14px 0 11px;
-        margin: 0 4px;
-        border: 0;
-        border-radius: var(--r-md);
-        background: var(--accent);
-        color: var(--on-accent);
-        font-size: var(--text-small);
-        font-weight: var(--weight-semibold);
-        white-space: nowrap;
-        text-decoration: none;
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 1px 2px rgba(0, 70, 48, 0.18);
-        transition: background-color var(--dur-1) var(--ease-out), transform var(--dur-1) var(--ease-out);
-    }
-
-    .newPost:hover {
-        background: var(--accent-hover);
-        color: var(--on-accent);
-    }
-
-    .newPost:active {
-        transform: scale(0.97);
-    }
-
-    .newPost svg {
-        width: 16px;
-        height: 16px;
-    }
-
-    .newPostCurrent {
-        box-shadow: 0 0 0 3px var(--accent-soft-2);
+        margin-left: auto;
     }
 }
 
-@media (min-width: 1200px) {
+@media (min-width: 1024px) and (max-width: 1180px) {
+    .search { width: auto; }
+    .searchLabel { display: none; }
+    .searchKeys { margin-left: 6px; }
+}
+
+/* ----- Phone ----- */
+@media (max-width: 1023px) {
+    .inner {
+        height: 52px;
+        padding: 0 16px;
+        gap: 12px;
+    }
+
     .search {
-        width: 210px;
+        width: 32px;
+        justify-content: center;
+        padding: 0;
+        border-color: transparent;
+        background: transparent;
+        color: var(--ink-2);
     }
 
-    .searchLabel {
-        display: inline;
-        flex: 1;
-        text-align: left;
-        font-size: var(--text-small);
+    .search:hover {
+        border-color: transparent;
+        background: var(--wash);
     }
-}
-
-/* ===== Guest mode: destinations that need an account ===== */
-.locked {
-    color: var(--ink-4) !important;
-    cursor: not-allowed !important;
-}
-
-.locked:hover {
-    background: transparent !important;
-}
-
-.navItem .lock {
-    width: 13px;
-    height: 13px;
-    margin-left: -2px;
-}
-
-.newPostLocked {
-    background: var(--surface-2) !important;
-    color: var(--ink-3) !important;
-    box-shadow: inset 0 0 0 1px var(--line) !important;
-    cursor: not-allowed;
 }
