@@ -2,7 +2,6 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CheckIcon, CloseIcon, InfoIcon } from '@/components/Icons';
 import Dialog from './Dialog';
 import Button from './Button';
 import styles from './ui.module.css';
@@ -93,9 +92,6 @@ export function FeedbackProvider({ children }) {
                 <div className={styles.toastRegion} role="status" aria-live="polite">
                     {toasts.map(t => (
                         <div key={t.id} className={`${styles.toast} ${styles[`toast_${t.tone}`] || ''} ${t.leaving ? styles.toastLeaving : ''}`}>
-                            <span className={styles.toastIcon} aria-hidden="true">
-                                {t.tone === 'success' ? <CheckIcon strokeWidth={2.5} /> : t.tone === 'error' ? <CloseIcon strokeWidth={2.5} /> : <InfoIcon strokeWidth={2.25} />}
-                            </span>
                             <span>{t.message}</span>
                         </div>
                     ))}
