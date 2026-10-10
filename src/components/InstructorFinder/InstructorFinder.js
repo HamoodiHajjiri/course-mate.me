@@ -4,14 +4,15 @@ import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useSemester } from '@/lib/SemesterContext';
 import { decodeHtmlEntities } from '@/lib/text';
-import { parseClassTime, formatTime } from '@/lib/classTime';
+import { parseClassTime } from '@/lib/classTime';
 import { courseColor } from '@/lib/courseColor';
 import { seatStatus } from '@/lib/seats';
 import { OFFICE_HOUR_DAYS, formatClock, fetchOfficeHours, layoutOfficeHours } from '@/lib/officeHours';
 import RoomLink from '@/components/RoomLink';
 import WeekGrid from '@/components/WeekGrid/WeekGrid';
-import { Avatar, Badge, Callout, CourseSwatch, EmptyState, Field, SearchInput, Skeleton, Ticket } from '@/components/ui';
-import { ClockIcon, ExternalIcon, InfoIcon, UserCheckIcon } from '@/components/Icons';
+import {
+    Callout, CourseCode, CourseMark, CourseName, EmptyState, Field, Rubric, SearchInput, Section, Skeleton, Status,
+} from '@/components/ui';
 import styles from './InstructorFinder.module.css';
 
 function encodeForSearch(text) {
@@ -210,7 +211,7 @@ export default function InstructorFinder() {
                         <SearchInput
                             id="instructor-search"
                             size="lg"
-                            placeholder="Type a name, like Mheidat or Ahmed"
+                            placeholder="A name, like Mheidat or Ahmed"
                             value={searchQuery}
                             onChange={handleSearchChange}
                             onClear={() => { setSearchQuery(''); setSuggestions([]); setShowDropdown(false); }}
@@ -234,7 +235,6 @@ export default function InstructorFinder() {
                                         className={`${styles.option} ${i === activeIdx ? styles.optionActive : ''}`}
                                         onClick={() => handleSelectInstructor(name)}
                                     >
-                                        <Avatar name={decodeHtmlEntities(name).replace(',', '')} size={28} tone="neutral" />
                                         {decodeHtmlEntities(name)}
                                     </button>
                                 ))}
@@ -245,101 +245,79 @@ export default function InstructorFinder() {
             </section>
 
             {loading && (
-                <div className={styles.loadingCard} aria-busy="true">
-                    <div className={styles.loadingHead}>
-                        <Skeleton width={56} height={56} radius={28} />
-                        <span className={styles.loadingText}>
-                            <Skeleton width={220} height={18} />
-                            <Skeleton width={140} height={12} />
-                        </span>
-                    </div>
-                    <Skeleton height={360} radius={12} />
+                <div className={styles.loading} aria-busy="true">
+                    <Skeleton width={280} height={30} />
+                    <Skeleton width={200} height={12} />
+                    <Skeleton height={320} />
                 </div>
             )}
 
             {!loading && !selectedInstructor && (
-                <EmptyState icon={<UserCheckIcon />} title="See anyone’s teaching week">
-                    Search for an instructor to see every class they teach in {currentSemesterName || 'this term'}, with their office and office hours where they&rsquo;re posted. Handy before you swap into their section.
+                <EmptyState title="Look anyone up before you swap into their section.">
+                    Every class they teach in {currentSemesterName || 'this term'}, drawn as a week, with their office and office hours where they&rsquo;re posted.
                 </EmptyState>
             )}
 
             {!loading && selectedInstructor && instructorSections.length === 0 && (
-                <EmptyState tone="neutral" icon={<UserCheckIcon />} title={`${displayName} isn’t teaching in ${currentSemesterName}`}>
-                    No active sections list them this term. Try another spelling, or check Course history for past terms.
+                <EmptyState title={`${displayName} isn’t teaching in ${currentSemesterName}.`}>
+                    No active sections list them this term. Try another spelling, or look in Course history for past terms.
                 </EmptyState>
             )}
 
             {!loading && selectedInstructor && instructorSections.length > 0 && (
                 <article className={styles.result}>
                     <header className={styles.profile}>
-                        <Avatar name={displayName.replace(',', '')} size={56} tone="solid" />
-                        <div className={styles.profileText}>
-                            <h2 className={styles.name}>{displayName}</h2>
-                            <div className={styles.facts}>
-                                <Badge>{instructorSections.length} {instructorSections.length === 1 ? 'section' : 'sections'}</Badge>
-                                <Badge>{courseCount} {courseCount === 1 ? 'course' : 'courses'}</Badge>
-                                <Badge tone={hasOfficeHours ? 'accent' : 'neutral'} icon={<ClockIcon />}>
-                                    {hasOfficeHours ? 'Office hours posted' : 'No office hours posted'}
-                                </Badge>
-                                {officeLocation && (
-                                    <span className={styles.office}>Office <RoomLink room={officeLocation} /></span>
-                                )}
-                            </div>
-                        </div>
+                        <h2 className={styles.name}>{displayName}</h2>
+                        <dl className={styles.facts}>
+                            <div><dt>Sections</dt><dd>{instructorSections.length}</dd></div>
+                            <div><dt>Courses</dt><dd>{courseCount}</dd></div>
+                            <div><dt>Office</dt><dd className={styles.factText}>{officeLocation ? <RoomLink room={officeLocation} /> : <span className={styles.none}>not posted</span>}</dd></div>
+                            <div><dt>Office hours</dt><dd className={styles.factText}>{hasOfficeHours ? 'on the week below' : <span className={styles.none}>not posted</span>}</dd></div>
+                        </dl>
                     </header>
 
-                    <div className={styles.gridWrap}>
-                        <WeekGrid
-                            days={days}
-                            startHour={startHour}
-                            endHour={endHour}
-                            blocks={[...officeSegments, ...classBlocks]}
-                        />
-                    </div>
+                    <WeekGrid
+                        days={days}
+                        startHour={startHour}
+                        endHour={endHour}
+                        blocks={[...officeSegments, ...classBlocks]}
+                    />
 
-                    <div className={styles.notes}>
-                        <Callout tone="neutral" icon={<InfoIcon />}>
-                            {hasOfficeHours
-                                ? <>The week shows classes and office hours only. Meetings and other commitments aren&rsquo;t listed.</>
-                                : <>The week shows class times only. No office hours are posted for them, and meetings aren&rsquo;t listed.</>}
-                            {officeHours && (
-                                <> Office details come from{' '}
-                                    <a href={FIND_MY_PROF_URL} target="_blank" rel="noopener noreferrer" className={styles.credit}>
-                                        Find My Prof <ExternalIcon />
-                                    </a>.
-                                </>
-                            )}
-                        </Callout>
-                    </div>
+                    <Callout>
+                        {hasOfficeHours
+                            ? <>Classes and office hours only; meetings and other commitments aren&rsquo;t listed.</>
+                            : <>Class times only. No office hours are posted for them, and meetings aren&rsquo;t listed.</>}
+                        {officeHours && (
+                            <> Office details are from{' '}
+                                <a href={FIND_MY_PROF_URL} target="_blank" rel="noopener noreferrer" className={styles.credit}>Find My Prof ↗</a>.
+                            </>
+                        )}
+                    </Callout>
 
-                    <ul className={styles.sections}>
-                        {sortedSections.map(sec => {
-                            const seats = seatStatus(sec);
-                            const meetings = parseClassTime(sec.class_time);
-                            return (
-                                <li key={sec.crn} className={styles.sectionRow}>
-                                    <CourseSwatch courseId={sec.course_id} />
-                                    <span className={styles.sectionMain}>
-                                        <span className={styles.sectionName}>{courseData[sec.course_id] || sec.course_id}</span>
-                                        <span className={styles.sectionMeta}>
-                                            <span className={styles.mono}>{sec.course_id}</span>
-                                            <span>{meetings.length ? `${[...new Set(meetings.map(m => m.day))].join('/')} ${formatTime(meetings[0].start)}` : 'No set time'}</span>
-                                            {sec.location && <RoomLink room={sec.location} className={styles.room} />}
+                    <section aria-label="Sections">
+                        <Rubric title="Sections" meta={sortedSections.length} quiet />
+                        <ul className={styles.sections}>
+                            {sortedSections.map(sec => {
+                                const seats = seatStatus(sec);
+                                return (
+                                    <li key={sec.crn} className={styles.sectionRow}>
+                                        <span className={styles.sectionCourse}>
+                                            <CourseMark courseId={sec.course_id} size="sm" />
+                                            <CourseCode id={sec.course_id} size="sm" />
+                                            <CourseName size="sm" className={styles.sectionName}>{courseData[sec.course_id] || sec.course_id}</CourseName>
                                         </span>
-                                    </span>
-                                    <span className={styles.sectionSide}>
-                                        <Ticket size="sm" label="Sec" section={sec.section_num} />
-                                        <span className={styles.crn}>CRN {sec.crn}</span>
-                                        {seats && (
-                                            <Badge size="sm" dot tone={seats.tone === 'open' ? 'success' : seats.tone === 'low' ? 'warning' : 'neutral'} title={seats.title}>
-                                                {seats.label}
-                                            </Badge>
-                                        )}
-                                    </span>
-                                </li>
-                            );
-                        })}
-                    </ul>
+                                        <Section value={sec.section_num} size="sm" />
+                                        <span className={styles.sectionTime}>{sec.class_time || 'no set time'}</span>
+                                        <span className={styles.sectionRoom}>{sec.location && <RoomLink room={sec.location} />}</span>
+                                        <span className={styles.sectionSeats}>
+                                            {seats && <Status tone={seats.tone === 'open' ? 'go' : seats.tone === 'low' ? 'warn' : 'danger'} title={seats.title}>{seats.label}</Status>}
+                                        </span>
+                                        <span className={styles.crn}>{sec.crn}</span>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    </section>
                 </article>
             )}
         </div>
