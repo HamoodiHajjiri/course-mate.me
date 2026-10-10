@@ -1,221 +1,240 @@
 /* ==========================================================================
-   CourseMate identity primitives — the details that repeat across the
-   product and make a screenshot recognisable without the logo.
+   The academic vocabulary: course codes, course names, sections, transfers,
+   course marks, page tabs.
    ========================================================================== */
 
-/* ===== Course swatch ===== */
-.swatch {
-    --c: var(--course-1);
-    display: inline-grid;
-    place-items: center;
-    flex-shrink: 0;
-    width: 32px;
-    height: 32px;
-    border-radius: 9px;
-    background: color-mix(in srgb, var(--c) var(--course-tint), var(--surface));
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 28%, transparent);
-    color: color-mix(in srgb, var(--c) var(--course-ink), var(--course-ink-base));
+/* ===== Course code: 0401 211 ===== */
+.code {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.28em;
     font-family: var(--font-mono);
-    font-size: 0.6875rem;
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    line-height: 1;
-    user-select: none;
-}
-
-.swatch_sm {
-    width: 24px;
-    height: 24px;
-    border-radius: 7px;
-    font-size: 0.5625rem;
-}
-
-.swatch_lg {
-    width: 40px;
-    height: 40px;
-    border-radius: 11px;
     font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: 0;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
 }
 
-.dot {
+.codeDept {
+    color: var(--ink-4);
+    font-weight: 400;
+}
+
+.codeNum {
+    color: inherit;
+}
+
+.code_sm { font-size: 0.75rem; }
+.code_lg { font-size: 0.9375rem; }
+.code_xl { font-size: 1.125rem; }
+
+/* ===== Course name: the catalogue serif ===== */
+.name {
+    font-family: var(--font-serif);
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    color: var(--ink);
+    font-optical-sizing: auto;
+}
+
+.name_sm { font-size: 0.9375rem; line-height: 1.3; }
+.name_md { font-size: 1.0625rem; line-height: 1.3; }
+.name_lg { font-size: 1.375rem; line-height: 1.2; letter-spacing: -0.01em; }
+.name_xl { font-size: 2rem; line-height: 1.1; letter-spacing: -0.015em; }
+
+/* ===== Section: §01 ===== */
+.sec {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.06em;
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+}
+
+.secSign {
+    font-family: var(--font-serif);
+    font-size: 1.12em;
+    font-weight: 400;
+    color: var(--ink-3);
+    transform: translateY(0.02em);
+}
+
+.sec_sm { font-size: 0.8125rem; }
+.sec_lg { font-size: 1.0625rem; }
+.sec_xl { font-size: 1.5rem; }
+
+.sec_muted { color: var(--ink-3); }
+
+.sec_struck .secNum {
+    color: var(--ink-3);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+}
+
+/* Yours: the highlighter. */
+.sec_mine {
+    background-image: linear-gradient(var(--mark), var(--mark));
+    background-repeat: no-repeat;
+    background-size: 100% 78%;
+    background-position: 0 75%;
+    padding: 0 0.22em;
+    margin: 0 -0.08em;
+    color: var(--mark-ink);
+    animation: cm-mark-draw var(--dur-3) var(--ease-out) both;
+}
+
+.sec_mine .secSign {
+    color: inherit;
+    opacity: 0.6;
+}
+
+/* ===== Transfer line: §01 ───→ §03 ===== */
+.transfer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.transferLine {
+    position: relative;
+    flex: 1;
+    min-width: 28px;
+    height: 1px;
+    background: currentColor;
+    color: var(--ink-3);
+}
+
+/* The arrowhead: two short strokes, drawn rather than typed. */
+.transferLine::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 50%;
+    width: 6px;
+    height: 6px;
+    border-top: 1px solid currentColor;
+    border-right: 1px solid currentColor;
+    transform: translate(0, -50%) rotate(45deg);
+    transform-origin: center;
+}
+
+.transferLabel {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    padding: 0 6px;
+    background: var(--transfer-ground, var(--canvas));
+    font-family: var(--font-cond);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+    color: var(--ink-3);
+    white-space: nowrap;
+}
+
+/* A giveaway runs out to anyone; a request runs in from anyone. */
+.transfer_giveaway .transferLine { color: var(--giveaway); }
+.transfer_request { flex-direction: row-reverse; }
+.transfer_request .transferLine { color: var(--request); }
+.transfer_request .transferLine::after {
+    right: auto;
+    left: 0;
+    transform: translate(0, -50%) rotate(-135deg);
+}
+
+.transfer_swap .transferLine { color: var(--ink-2); }
+
+.transferOpen {
+    font-family: var(--font-cond);
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+    color: var(--ink-3);
+    white-space: nowrap;
+}
+
+/* ===== Course mark: a square in the course's colour ===== */
+.mark {
     --c: var(--course-1);
     display: inline-block;
     flex-shrink: 0;
-    width: 8px;
-    height: 8px;
-    border-radius: 3px;
+    width: 10px;
+    height: 10px;
     background: var(--c);
 }
 
-/* ===== Ticket =====
-   Two notches cut from the sides with a mask, so the cut-outs show whatever
-   the ticket sits on. A dashed perforation separates the stub. */
+.mark_sm { width: 8px; height: 8px; }
+.mark_lg { width: 12px; height: 12px; }
+.mark_bar { width: 3px; height: 1.1em; }
+
+/* ===== Section with a label ===== */
 .ticket {
-    --t-bg: var(--surface-2);
-    --t-line: var(--line);
-    --t-ink: var(--ink);
-    --t-stub: var(--ink-3);
-    --notch: 5px;
-    position: relative;
     display: inline-flex;
-    align-items: stretch;
-    min-width: 0;
-    max-width: 100%;
-    border-radius: 9px;
-    background: var(--t-bg);
-    box-shadow: inset 0 0 0 1px var(--t-line);
-    -webkit-mask:
-        radial-gradient(circle var(--notch) at 0 50%, transparent 96%, #000 100%) left / 51% 100% no-repeat,
-        radial-gradient(circle var(--notch) at 100% 50%, transparent 96%, #000 100%) right / 51% 100% no-repeat;
-    mask:
-        radial-gradient(circle var(--notch) at 0 50%, transparent 96%, #000 100%) left / 51% 100% no-repeat,
-        radial-gradient(circle var(--notch) at 100% 50%, transparent 96%, #000 100%) right / 51% 100% no-repeat;
-}
-
-.ticketStub {
-    display: flex;
-    align-items: center;
-    padding: 0 9px 0 12px;
-    border-right: 1.5px dashed var(--t-line);
-    font-size: 0.625rem;
-    font-weight: var(--weight-semibold);
-    letter-spacing: var(--tracking-overline);
-    text-transform: uppercase;
-    color: var(--t-stub);
-    white-space: nowrap;
-}
-
-.ticketBody {
-    display: flex;
     align-items: baseline;
-    gap: 8px;
-    min-width: 0;
-    padding: 6px 13px 6px 10px;
+    gap: 6px;
+    white-space: nowrap;
 }
 
-.ticketSection {
-    font-family: var(--font-mono);
-    font-size: 0.9375rem;
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    color: var(--t-ink);
-    white-space: nowrap;
+.ticketLabel {
+    font-family: var(--font-cond);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+    color: var(--ink-3);
 }
 
 .ticketMeta {
-    min-width: 0;
     font-size: var(--text-caption);
     color: var(--ink-3);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
-.ticket_sm {
-    --notch: 4px;
-    border-radius: 7px;
-}
-
-.ticket_sm .ticketStub {
-    padding: 0 7px 0 9px;
-    font-size: 0.5625rem;
-}
-
-.ticket_sm .ticketBody {
-    padding: 3px 10px 3px 8px;
-}
-
-.ticket_sm .ticketSection {
-    font-size: 0.78125rem;
-}
-
-.ticket_lg {
-    --notch: 7px;
-    border-radius: 12px;
-}
-
-.ticket_lg .ticketStub {
-    padding: 0 12px 0 16px;
-    font-size: 0.6875rem;
-}
-
-.ticket_lg .ticketBody {
-    padding: 10px 18px 10px 14px;
-}
-
-.ticket_lg .ticketSection {
-    font-size: 1.375rem;
-}
-
-.ticket_accent,
-.ticket_swap {
-    --t-bg: var(--accent-soft);
-    --t-line: color-mix(in srgb, var(--accent) 30%, transparent);
-    --t-stub: var(--accent-ink);
-}
-
-.ticket_giveaway {
-    --t-bg: var(--giveaway-soft);
-    --t-line: color-mix(in srgb, var(--giveaway) 32%, transparent);
-    --t-stub: var(--giveaway-ink);
-}
-
-.ticket_request {
-    --t-bg: var(--request-soft);
-    --t-line: color-mix(in srgb, var(--request) 30%, transparent);
-    --t-stub: var(--request-ink);
-}
-
-.ticket_muted {
-    --t-bg: transparent;
-    --t-ink: var(--ink-3);
-}
-
-/* ===== CountUp ===== */
 .count {
     font-variant-numeric: tabular-nums;
 }
 
-/* ===== Tabs ===== */
+/* ===== Page tabs ===== */
 .tabsWrap {
     position: relative;
-    min-width: 0;
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid var(--rule);
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.tabsWrap::-webkit-scrollbar {
+    display: none;
 }
 
 .tabs {
     position: relative;
     display: flex;
-    gap: 22px;
-    overflow-x: auto;
-    scrollbar-width: none;
-}
-
-.tabs::-webkit-scrollbar {
-    display: none;
+    gap: 28px;
 }
 
 .tab {
-    position: relative;
     display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    flex-shrink: 0;
+    align-items: baseline;
+    gap: 6px;
     height: 42px;
-    padding: 0 2px;
+    padding: 12px 0 0;
     border: 0;
     background: none;
+    font-size: 0.9375rem;
+    font-weight: 500;
     color: var(--ink-3);
-    font-size: var(--text-body);
-    font-weight: var(--weight-semibold);
     white-space: nowrap;
-    cursor: pointer;
     transition: color var(--dur-1) var(--ease-out);
-}
-
-.tab svg {
-    width: 17px;
-    height: 17px;
 }
 
 .tab:hover {
@@ -226,13 +245,34 @@
     color: var(--ink);
 }
 
-.tab[aria-selected='true'] svg {
-    color: var(--accent-ink);
-}
-
 .tab:focus-visible {
     outline-offset: -2px;
-    border-radius: 6px;
+}
+
+.tabCount {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--ink-4);
+}
+
+.tab[aria-selected='true'] .tabCount {
+    color: var(--ink-3);
+}
+
+/* Something here needs you: the count turns to signal and gets a square. */
+.tabCountAlert,
+.tab[aria-selected='true'] .tabCountAlert {
+    color: var(--danger-ink);
+}
+
+.tabCountAlert::before {
+    content: '';
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    margin: 0 4px 2px 0;
+    background: var(--danger);
 }
 
 .tabBar {
@@ -240,46 +280,12 @@
     left: 0;
     bottom: -1px;
     height: 2px;
-    border-radius: 2px 2px 0 0;
-    background: var(--accent);
+    background: var(--ink);
     transition: transform var(--dur-2) var(--ease-out), width var(--dur-2) var(--ease-out);
-    pointer-events: none;
 }
 
-.tabCount {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 20px;
-    height: 20px;
-    padding: 0 6px;
-    border-radius: var(--r-full);
-    background: var(--surface-3);
-    color: var(--ink-2);
-    font-size: 0.6875rem;
-    font-weight: var(--weight-semibold);
-    font-variant-numeric: tabular-nums;
-}
-
-.tab[aria-selected='true'] .tabCount {
-    background: var(--accent-soft-2);
-    color: var(--accent-ink);
-}
-
-.tabCountAlert,
-.tab[aria-selected='true'] .tabCountAlert {
-    background: var(--danger);
-    color: #fff;
-}
-
-.tabsSm .tab {
-    height: 36px;
-    font-size: var(--text-small);
-}
-
-.tabsSm .tabs {
-    gap: 18px;
-}
+.tabsSm .tabs { gap: 20px; }
+.tabsSm .tab { height: 36px; padding-top: 8px; font-size: var(--text-body); }
 
 /* ===== Tooltip ===== */
 .tooltipWrap {
@@ -289,50 +295,31 @@
 
 .tooltip {
     position: absolute;
-    z-index: var(--z-dropdown);
     left: 50%;
-    bottom: calc(100% + 8px);
-    padding: 5px 8px;
-    border-radius: 7px;
+    z-index: var(--z-dropdown);
+    padding: 4px 7px;
+    border-radius: var(--r-1);
     background: var(--ink);
-    color: var(--canvas);
+    color: var(--on-ink);
     font-size: var(--text-caption);
-    font-weight: var(--weight-medium);
+    font-weight: 500;
     line-height: 1.3;
     white-space: nowrap;
     pointer-events: none;
     opacity: 0;
-    transform: translate(-50%, 3px);
-    transition: opacity var(--dur-1) var(--ease-out), transform var(--dur-1) var(--ease-out);
-    box-shadow: var(--e2);
+    transform: translateX(-50%);
+    transition: opacity var(--dur-1) var(--ease-out);
 }
 
-[data-theme="dark"] .tooltip,
-[data-theme="black"] .tooltip {
-    background: var(--surface-3);
-    color: var(--ink);
-    box-shadow: var(--e2), inset 0 0 0 1px var(--line);
-}
-
-.tooltip_bottom {
-    top: calc(100% + 8px);
-    bottom: auto;
-    transform: translate(-50%, -3px);
-}
+.tooltip_top { bottom: calc(100% + 6px); }
+.tooltip_bottom { top: calc(100% + 6px); }
 
 .tooltipWrap:hover .tooltip,
 .tooltipWrap:focus-within .tooltip {
     opacity: 1;
-    transform: translate(-50%, 0);
-    transition-delay: 350ms;
-}
-
-.tooltipWrap:focus-within .tooltip {
-    transition-delay: 0ms;
+    transition-delay: 300ms;
 }
 
 @media (hover: none) {
-    .tooltip {
-        display: none;
-    }
+    .tooltip { display: none; }
 }
