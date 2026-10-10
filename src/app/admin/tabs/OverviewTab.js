@@ -42,55 +42,42 @@ function OverviewSidebar() {
     return (
         <div className={styles.sidebarCard}>
             <p className={styles.sectionTitle}>Snapshot</p>
-            <p className={styles.previewMuted} style={{ textAlign: 'left', padding: 0, fontSize: '0.75rem' }}>
-                A live snapshot of platform activity.
-            </p>
-            <button className={`${styles.btn} ${styles.btnPrimary} ${styles.btnFull}`} style={{ marginTop: 10 }} onClick={reload} disabled={loading}>
+            <p className={styles.previewMuted}>Counts are read live from the database when you open this or refresh.</p>
+            <button type="button" className={`${styles.btn} ${styles.btnFull}`} onClick={reload} disabled={loading}>
                 {loading ? 'Refreshing…' : 'Refresh'}
             </button>
-            {updatedAt && (
-                <div style={{ marginTop: 8, textAlign: 'center', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                    Updated {updatedAt.toLocaleTimeString()}
-                </div>
-            )}
+            {updatedAt && <span className={styles.updated}>as of {updatedAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })}</span>}
         </div>
     );
 }
 
-function StatTile({ label, value, sub }) {
+function Figure({ label, value, sub }) {
     return (
-        <div style={{
-            background: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
-            borderRadius: 'var(--radius-md)', padding: '14px 16px', flex: '1 1 150px', minWidth: 140,
-        }}>
-            <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.1 }}>{value}</div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600, marginTop: 2 }}>{label}</div>
-            {sub && <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 4 }}>{sub}</div>}
+        <div className={styles.figure}>
+            <span className={styles.figureValue}>{value}</span>
+            <span className={styles.figureLabel}>{label}</span>
+            {sub && <span className={styles.figureSub}>{sub}</span>}
         </div>
     );
 }
 
 const LABELS = {
-    male: 'Male', female: 'Female', unknown: 'Not set',
+    male: "Men's campus", female: "Women's campus", unknown: 'Not set',
     swap: 'Swap', giveaway: 'Giveaway', request: 'Request',
-    active: 'Active', pending: 'Pending', completed: 'Completed', expired: 'Expired', declined: 'Declined',
+    active: 'Active', pending: 'Pending', completed: 'Completed', expired: 'Expired', declined: 'Declined', accepted: 'Accepted',
 };
 const labelOf = (k) => LABELS[k] || k;
 
-function BarList({ items, empty = 'No data' }) {
-    if (!items || items.length === 0) return <div className={styles.previewMuted} style={{ padding: 0, fontSize: '0.75rem' }}>{empty}</div>;
+function BarList({ items, empty = 'Nothing yet.' }) {
+    if (!items || items.length === 0) return <p className={styles.previewMuted}>{empty}</p>;
     const max = Math.max(...items.map(i => i.count), 1);
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {items.map(i => (
-                <div key={i.key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ flex: '0 0 120px', fontSize: '0.8125rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={i.label || labelOf(i.key)}>
-                        {i.label || labelOf(i.key)}
-                    </div>
-                    <div style={{ flex: '1 1 auto', height: 8, background: 'var(--bg-tertiary)', borderRadius: 4, overflow: 'hidden' }}>
-                        <div style={{ width: `${(i.count / max) * 100}%`, height: '100%', background: 'var(--color-accent)', borderRadius: 4 }} />
-                    </div>
-                    <div style={{ flex: '0 0 40px', textAlign: 'right', fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-primary)' }}>{i.count}</div>
+        <div className={styles.bars}>
+            {items.map((i, n) => (
+                <div key={`${i.key}-${n}`} className={styles.bar}>
+                    <span className={styles.barLabel} title={i.label || labelOf(i.key)}>{i.label || labelOf(i.key)}</span>
+                    <span className={styles.barTrack}><span className={styles.barFill} style={{ width: `${(i.count / max) * 100}%`, display: 'block' }} /></span>
+                    <span className={styles.barCount}>{i.count}</span>
                 </div>
             ))}
         </div>
@@ -99,10 +86,10 @@ function BarList({ items, empty = 'No data' }) {
 
 function Panel({ title, children }) {
     return (
-        <div className={styles.card} style={{ flex: '1 1 320px', minWidth: 280 }}>
+        <section className={styles.card}>
             <p className={styles.sectionTitle}>{title}</p>
             {children}
-        </div>
+        </section>
     );
 }
 
@@ -112,26 +99,24 @@ function OverviewMain() {
     const { stats, loading, error } = ctx;
 
     if (error) return <div className={styles.error}>{error}</div>;
-    if (loading && !stats) return <div className={styles.loading}><div className={styles.spinner} />Loading analytics…</div>;
+    if (loading && !stats) return <div className={styles.loading}><div className={styles.spinner} />Reading the numbers…</div>;
     if (!stats) return null;
 
     const { users, posts, matches, savedSchedules, interests, activeAnnouncements, topCourses } = stats;
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {/* Headline tiles */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-                <StatTile label="Users" value={users.total} sub={`+${users.newLast7} this week`} />
-                <StatTile label="Live posts" value={posts.live} sub={`${posts.total} all-time`} />
-                <StatTile label="Pending matches" value={matches.pending} sub={`${matches.total} all-time`} />
-                <StatTile label="Saved schedules" value={savedSchedules} />
-                <StatTile label="Interests sent" value={interests} />
-                <StatTile label="Active announcements" value={activeAnnouncements} />
+        <>
+            <div className={styles.figures}>
+                <Figure label="Students" value={users.total} sub={`+${users.newLast7} this week`} />
+                <Figure label="Live posts" value={posts.live} sub={`${posts.total} ever`} />
+                <Figure label="Pending matches" value={matches.pending} sub={`${matches.total} ever`} />
+                <Figure label="Saved schedules" value={savedSchedules} />
+                <Figure label="Interests sent" value={interests} />
+                <Figure label="Live notices" value={activeAnnouncements} />
             </div>
 
-            {/* Activity */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
-                <Panel title="New users">
+            <div className={styles.panels}>
+                <Panel title="New students">
                     <BarList items={[
                         { key: '7d', label: 'Last 7 days', count: users.newLast7 },
                         { key: '30d', label: 'Last 30 days', count: users.newLast30 },
@@ -145,27 +130,22 @@ function OverviewMain() {
                         { key: 'all', label: 'All time', count: posts.total },
                     ]} />
                 </Panel>
-            </div>
-
-            {/* Breakdowns */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
-                <Panel title="Posts by type"><BarList items={posts.byType} /></Panel>
+                <Panel title="Posts by kind"><BarList items={posts.byType} /></Panel>
                 <Panel title="Posts by status"><BarList items={posts.byStatus} /></Panel>
-                <Panel title="Matches by status"><BarList items={matches.byStatus} empty="No matches yet" /></Panel>
+                <Panel title="Matches by status"><BarList items={matches.byStatus} empty="No matches yet." /></Panel>
+                <Panel title="Students by campus"><BarList items={users.byGender} /></Panel>
             </div>
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
-                <Panel title="Users by major"><BarList items={users.byMajor} /></Panel>
-                <Panel title="Users by gender"><BarList items={users.byGender} /></Panel>
+            <div className={styles.panels}>
+                <Panel title="Students by major"><BarList items={users.byMajor} /></Panel>
+                <Panel title="Courses with the most posts">
+                    <BarList
+                        items={topCourses.map(c => ({ key: c.course_id, label: `${c.course_id}${c.name ? ' · ' + c.name : ''}`, count: c.count }))}
+                        empty="No posts yet."
+                    />
+                </Panel>
             </div>
-
-            <Panel title="Top courses by posts">
-                <BarList
-                    items={topCourses.map(c => ({ key: c.course_id, label: `${c.course_id}${c.name ? ' · ' + c.name : ''}`, count: c.count }))}
-                    empty="No posts yet"
-                />
-            </Panel>
-        </div>
+        </>
     );
 }
 
