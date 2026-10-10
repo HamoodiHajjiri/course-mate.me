@@ -48,7 +48,7 @@ function useSurround() {
     const read = () => {
         const root = document.documentElement;
         return {
-            color: getComputedStyle(root).getPropertyValue('--bg-tertiary').trim() || '#f5f2eb',
+            color: getComputedStyle(root).getPropertyValue('--map-ground').trim() || '#ece9e0',
             dark: root.getAttribute('data-theme') !== 'light',
         };
     };
