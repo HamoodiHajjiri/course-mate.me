@@ -31,6 +31,15 @@ export function paletteFor(index) {
     return `var(--course-${(((index || 0) % PALETTE_SIZE) + PALETTE_SIZE) % PALETTE_SIZE + 1})`;
 }
 
+/**
+ * A UOS course ID is a 4-digit department and a 3-digit course number:
+ * 0401211 → { dept: '0401', num: '211' }. Null for anything else.
+ */
+export function splitCourseCode(courseId) {
+    const s = String(courseId || '');
+    return /^\d{7}$/.test(s) ? { dept: s.slice(0, 4), num: s.slice(4) } : null;
+}
+
 /** The part of a UOS course ID students say aloud: 0401211 → "211". */
 export function courseNumber(courseId) {
     const s = String(courseId || '');
