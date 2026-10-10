@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
 import { EyeIcon, EyeOffIcon } from '@/components/Icons';
+import { Button, Callout, Field, Input, Spinner } from '@/components/ui';
 import styles from '../auth.module.css';
 
 export default function ResetPasswordPage() {
@@ -53,12 +54,12 @@ export default function ResetPasswordPage() {
         setError('');
 
         if (password.length < 6) {
-            setError('Password must be at least 6 characters');
+            setError('The password needs at least 6 characters.');
             return;
         }
 
         if (password !== confirmPassword) {
-            setError('Passwords do not match');
+            setError('The two passwords don’t match.');
             return;
         }
 
@@ -83,113 +84,85 @@ export default function ResetPasswordPage() {
         }
     };
 
+    const passwordField = (label, value, set, shown, setShown, autoFocus) => (
+        <Field label={label}>
+            {({ id }) => (
+                <span className={styles.passwordWrap}>
+                    <Input
+                        id={id}
+                        size="lg"
+                        type={shown ? 'text' : 'password'}
+                        value={value}
+                        onChange={(e) => set(e.target.value)}
+                        autoComplete="new-password"
+                        required
+                        disabled={loading}
+                        data-autofocus={autoFocus || undefined}
+                    />
+                    <button type="button" onClick={() => setShown(!shown)} className={styles.reveal} aria-label={shown ? 'Hide password' : 'Show password'}>
+                        {shown ? <EyeIcon /> : <EyeOffIcon />}
+                    </button>
+                </span>
+            )}
+        </Field>
+    );
+
+    let body;
     if (!ready) {
-        return (
-            <div className={styles.container}>
-                <div className={styles.card}>
-                    <div className={styles.logoWrapper}>
-                        <div className={styles.logoFrame}>
-                            <Image src="/logo.png" alt="CourseMate" width={256} height={256} className={styles.logo} />
-                        </div>
-                        <h1 className={styles.title}>CourseMate</h1>
-                        <p className={styles.subtitle}>Verifying reset link...</p>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'center', padding: '20px' }}>
-                        <span className={styles.spinner} />
-                    </div>
-                </div>
+        body = (
+            <div className={styles.form}>
+                <header className={styles.formHead}>
+                    <h2 className={styles.formTitle}>Checking your link…</h2>
+                </header>
+                <Spinner />
             </div>
+        );
+    } else if (success) {
+        body = (
+            <div className={styles.form}>
+                <header className={styles.formHead}>
+                    <h2 className={styles.formTitle}>Password changed</h2>
+                    <p className={styles.formLead}>Taking you to CourseMate…</p>
+                </header>
+            </div>
+        );
+    } else if (error && !password) {
+        body = (
+            <div className={styles.form}>
+                <header className={styles.formHead}>
+                    <h2 className={styles.formTitle}>This link doesn&rsquo;t work</h2>
+                    <p className={styles.formLead}>{error}</p>
+                </header>
+                <Button variant="secondary" size="lg" block onClick={() => router.push('/auth')}>Back to signing in</Button>
+            </div>
+        );
+    } else {
+        body = (
+            <form onSubmit={handleReset} className={styles.form} noValidate>
+                <header className={styles.formHead}>
+                    <h2 className={styles.formTitle}>Choose a new password</h2>
+                    <p className={styles.formLead}>At least 6 characters.</p>
+                </header>
+                {passwordField('New password', password, setPassword, showPassword, setShowPassword, true)}
+                {passwordField('New password again', confirmPassword, setConfirmPassword, showConfirmPassword, setShowConfirmPassword)}
+                {error && <Callout tone="danger">{error}</Callout>}
+                <Button type="submit" variant="primary" size="lg" block loading={loading}>Save the new password</Button>
+            </form>
         );
     }
 
     return (
-        <div className={styles.container}>
-            <div className={styles.card}>
-                <div className={styles.logoWrapper}>
-                    <div className={styles.logoFrame}>
-                        <Image src="/logo.png" alt="CourseMate" width={256} height={256} className={styles.logo} />
-                    </div>
-                    <h1 className={styles.title}>CourseMate</h1>
-                    <p className={styles.subtitle}>Reset your password</p>
-                </div>
-
-                {success ? (
-                    <div className={styles.resetSentMessage}>
-                        <div className={styles.resetSentTitle}>Password updated</div>
-                        <div className={styles.resetSentText}>
-                            Your password has been reset successfully. Redirecting...
-                        </div>
-                    </div>
-                ) : error && !password ? (
-                    <div className={styles.resetSentMessage}>
-                        <div className={styles.error}>{error}</div>
-                        <button
-                            type="button"
-                            className={styles.submitBtn}
-                            onClick={() => router.push('/auth')}
-                            style={{ marginTop: '16px' }}
-                        >
-                            Back to Sign In
-                        </button>
-                    </div>
-                ) : (
-                    <form onSubmit={handleReset} className={styles.form}>
-                        <div className={styles.formGroup}>
-                            <label className={styles.label}>New Password</label>
-                            <div className={styles.passwordWrapper}>
-                                <input
-                                    type={showPassword ? 'text' : 'password'}
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className={`${styles.input} ${styles.inputPassword}`}
-                                    placeholder="Enter new password"
-                                    required
-                                    disabled={loading}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className={styles.passwordToggle}
-                                    aria-label={showPassword ? "Hide password" : "Show password"}
-                                    tabIndex={-1}
-                                >
-                                    {showPassword ? <EyeIcon width={20} height={20} /> : <EyeOffIcon width={20} height={20} />}
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className={styles.formGroup}>
-                            <label className={styles.label}>Confirm Password</label>
-                            <div className={styles.passwordWrapper}>
-                                <input
-                                    type={showConfirmPassword ? 'text' : 'password'}
-                                    value={confirmPassword}
-                                    onChange={(e) => setConfirmPassword(e.target.value)}
-                                    className={`${styles.input} ${styles.inputPassword}`}
-                                    placeholder="Confirm new password"
-                                    required
-                                    disabled={loading}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                    className={styles.passwordToggle}
-                                    aria-label={showConfirmPassword ? "Hide password" : "Show password"}
-                                    tabIndex={-1}
-                                >
-                                    {showConfirmPassword ? <EyeIcon width={20} height={20} /> : <EyeOffIcon width={20} height={20} />}
-                                </button>
-                            </div>
-                        </div>
-
-                        {error && <div className={styles.error}>{error}</div>}
-
-                        <button type="submit" className={styles.submitBtn} disabled={loading}>
-                            {loading ? <span className={styles.spinner} /> : 'Reset Password'}
-                        </button>
-                    </form>
-                )}
-            </div>
+        <div className={`${styles.page} ${styles.pageNarrow}`}>
+            <section className={styles.brand} aria-label="CourseMate">
+                <span className={styles.wordmark}>
+                    <Image src="/logo.png" alt="" width={56} height={56} priority />
+                    CourseMate
+                </span>
+                <h1 className={styles.statement}>A new<br />password.</h1>
+            </section>
+            <section className={styles.panel}>
+                <div className={styles.panelInner}>{body}</div>
+            </section>
         </div>
     );
 }
