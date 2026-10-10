@@ -6,11 +6,9 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { BUILDINGS, buildingInfo, fromOldCode } from '@/app/map/buildings';
 import { setThemePreference } from '@/components/ThemeToggle/ThemeToggle';
-import { CourseSwatch } from '@/components/ui';
-import {
-    ActivityIcon, ArrowLeftIcon, BellIcon, BuildingIcon, CalendarPlusIcon, HistoryIcon, HomeIcon, MapIcon,
-    MoonIcon, PaletteIcon, PlusIcon, ProfileIcon, ScheduleIcon, SearchIcon, SunIcon, UserCheckIcon,
-} from '@/components/Icons';
+import { CourseCode, CourseMark } from '@/components/ui';
+import { decodeHtmlEntities } from '@/lib/text';
+import { ArrowLeftIcon, SearchIcon } from '@/components/Icons';
 import styles from './CommandPalette.module.css';
 
 // PostgREST's or() splits on commas and parentheses, and ilike treats % and _
@@ -18,23 +16,23 @@ import styles from './CommandPalette.module.css';
 const cleanQuery = (q) => q.replace(/[,()%_*\\]/g, ' ').trim();
 
 const PAGES = [
-    { id: 'home', label: 'Home', hint: 'Your day at a glance', icon: HomeIcon, href: '/', keywords: 'dashboard today' },
-    { id: 'browse', label: 'Browse posts', hint: 'Swaps, giveaways and requests', icon: SearchIcon, href: '/browse', account: true, keywords: 'marketplace feed' },
-    { id: 'post', label: 'New post', hint: 'Swap, give away or request a section', icon: PlusIcon, href: '/post', account: true, keywords: 'create swap giveaway request' },
-    { id: 'schedule', label: 'Build a schedule', hint: 'Generate timetables without clashes', icon: ScheduleIcon, href: '/schedule', keywords: 'timetable builder' },
-    { id: 'instructor', label: 'Find an instructor', hint: 'See anyone’s teaching week', icon: UserCheckIcon, href: '/schedule?mode=instructor', keywords: 'professor doctor faculty' },
-    { id: 'history', label: 'Course history', hint: 'How a course ran in past terms', icon: HistoryIcon, href: '/schedule?mode=history', keywords: 'past terms' },
-    { id: 'activity', label: 'Activity', hint: 'Matches, your posts and history', icon: ActivityIcon, href: '/matches', account: true, keywords: 'matches swaps' },
-    { id: 'notifications', label: 'Notifications', hint: 'Everything that happened', icon: BellIcon, href: '/notifications', account: true, keywords: 'alerts inbox' },
-    { id: 'map', label: 'Campus map', hint: 'Buildings, rooms and places', icon: MapIcon, href: '/map', keywords: 'building room location' },
-    { id: 'profile', label: 'Profile & settings', hint: 'Account, theme and alerts', icon: ProfileIcon, href: '/profile', account: true, keywords: 'account settings preferences' },
+    { id: 'home', label: 'Home', hint: 'Your day at a glance', href: '/', keywords: 'dashboard today' },
+    { id: 'browse', label: 'Browse posts', hint: 'Swaps, giveaways and requests', href: '/browse', account: true, keywords: 'marketplace feed' },
+    { id: 'post', label: 'New post', hint: 'Swap, give away or request a section', href: '/post', account: true, keywords: 'create swap giveaway request' },
+    { id: 'schedule', label: 'Build a schedule', hint: 'Generate timetables without clashes', href: '/schedule', keywords: 'timetable builder' },
+    { id: 'instructor', label: 'Find an instructor', hint: 'See anyone’s teaching week', href: '/schedule?mode=instructor', keywords: 'professor doctor faculty' },
+    { id: 'history', label: 'Course history', hint: 'How a course ran in past terms', href: '/schedule?mode=history', keywords: 'past terms' },
+    { id: 'activity', label: 'Activity', hint: 'Matches, your posts and history', href: '/matches', account: true, keywords: 'matches swaps' },
+    { id: 'notifications', label: 'Notifications', hint: 'Everything that happened', href: '/notifications', account: true, keywords: 'alerts inbox' },
+    { id: 'map', label: 'Campus map', hint: 'Buildings, rooms and places', href: '/map', keywords: 'building room location' },
+    { id: 'profile', label: 'Profile & settings', hint: 'Account, theme and alerts', href: '/profile', account: true, keywords: 'account settings preferences' },
 ];
 
 const THEMES = [
-    { id: 'theme-system', value: 'system', label: 'Theme: Auto', hint: 'Follow your device', icon: PaletteIcon },
-    { id: 'theme-light', value: 'light', label: 'Theme: Light', hint: 'Bright paper', icon: SunIcon },
-    { id: 'theme-dark', value: 'dark', label: 'Theme: Navy', hint: 'Deep and calm', icon: MoonIcon },
-    { id: 'theme-black', value: 'black', label: 'Theme: Black', hint: 'Pure black for OLED', icon: MoonIcon },
+    { id: 'theme-system', value: 'system', label: 'Theme: Auto', hint: 'Paper by day, Blueprint by night' },
+    { id: 'theme-light', value: 'light', label: 'Theme: Paper', hint: 'Warm paper, ink type' },
+    { id: 'theme-dark', value: 'dark', label: 'Theme: Blueprint', hint: 'Navy, drawn in light' },
+    { id: 'theme-black', value: 'black', label: 'Theme: Night', hint: 'True black, for OLED' },
 ];
 
 const BUILDING_LIST = Object.keys(BUILDINGS).map(id => buildingInfo(id));
@@ -102,12 +100,12 @@ export default function CommandPalette({ open, onClose, isGuest = false }) {
         if (course) {
             const id = course.course_id;
             return [{
-                label: `${id} · ${course.course_name || ''}`,
+                label: decodeHtmlEntities(course.course_name || id),
                 items: [
-                    { id: 'c-history', label: 'See how it ran in past terms', hint: 'Course history', icon: HistoryIcon, run: () => go(`/schedule?mode=history&course=${encodeURIComponent(id)}`) },
-                    { id: 'c-add', label: 'Add it to my schedule', hint: 'Schedule builder', icon: CalendarPlusIcon, run: () => go(`/schedule?course=${encodeURIComponent(id)}`) },
-                    ...(!isGuest ? [{ id: 'c-posts', label: 'Find posts for it', hint: 'Browse', icon: SearchIcon, run: () => go(`/browse?q=${encodeURIComponent(id)}`) }] : []),
-                    { id: 'c-back', label: 'Back to search', hint: 'Esc', icon: ArrowLeftIcon, run: () => { setCourse(null); setActive(0); requestAnimationFrame(() => inputRef.current?.focus()); } },
+                    { id: 'c-history', label: 'See how it ran in past terms', hint: 'Course history', run: () => go(`/schedule?mode=history&course=${encodeURIComponent(id)}`) },
+                    { id: 'c-add', label: 'Add it to my schedule', hint: 'Schedule builder', run: () => go(`/schedule?course=${encodeURIComponent(id)}`) },
+                    ...(!isGuest ? [{ id: 'c-posts', label: 'Find posts for it', hint: 'Browse', run: () => go(`/browse?q=${encodeURIComponent(id)}`) }] : []),
+                    { id: 'c-back', label: 'Back to search', hint: 'Esc', run: () => { setCourse(null); setActive(0); requestAnimationFrame(() => inputRef.current?.focus()); } },
                 ],
             }];
         }
@@ -118,7 +116,7 @@ export default function CommandPalette({ open, onClose, isGuest = false }) {
             .filter(p => !q || matches(q, p.label, p.hint, p.keywords))
             .map(p => ({ ...p, run: () => go(p.href) }));
         const themes = THEMES
-            .filter(t => q ? matches(q, t.label, t.hint, 'theme dark light appearance mode') : false)
+            .filter(t => q ? matches(q, t.label, t.hint, 'theme dark light black navy paper blueprint night appearance mode') : false)
             .map(t => ({ ...t, run: () => { setThemePreference(t.value); onClose(); } }));
 
         let buildings = [];
@@ -130,17 +128,16 @@ export default function CommandPalette({ open, onClose, isGuest = false }) {
                 .map(b => ({
                     id: `b-${b.id}`,
                     label: b.name || `Building ${b.code}`,
-                    hint: [b.code, b.zoneName].filter(Boolean).join(' · '),
-                    icon: BuildingIcon,
+                    hint: b.zoneName || '',
+                    building: b.code,
                     run: () => go(`/map?b=${encodeURIComponent(b.id)}`),
                 }));
         }
 
         const courseItems = courses.map(c => ({
             id: `course-${c.course_id}`,
-            label: c.course_name || c.course_id,
-            hint: c.course_id,
-            swatch: c.course_id,
+            label: decodeHtmlEntities(c.course_name || c.course_id),
+            course: c.course_id,
             more: true,
             run: () => { setCourse(c); setActive(0); },
         }));
@@ -183,7 +180,7 @@ export default function CommandPalette({ open, onClose, isGuest = false }) {
                     {course ? (
                         <button type="button" className={styles.crumb} onClick={() => setCourse(null)} aria-label="Back to search">
                             <ArrowLeftIcon />
-                            <CourseSwatch courseId={course.course_id} size="sm" />
+                            <CourseCode id={course.course_id} />
                         </button>
                     ) : (
                         <SearchIcon className={styles.inputIcon} />
@@ -193,7 +190,7 @@ export default function CommandPalette({ open, onClose, isGuest = false }) {
                         className={styles.input}
                         value={course ? '' : query}
                         onChange={(e) => setQuery(e.target.value)}
-                        placeholder={course ? `What do you want to do with ${course.course_id}?` : 'Search pages, courses, buildings…'}
+                        placeholder={course ? 'Choose what to do with this course' : 'Find a course, a building or a page'}
                         readOnly={!!course}
                         role="combobox"
                         aria-expanded="true"
@@ -208,8 +205,8 @@ export default function CommandPalette({ open, onClose, isGuest = false }) {
                 <div className={styles.list} id="cm-palette-list" role="listbox" ref={listRef}>
                     {groups.length === 0 && (
                         <div className={styles.empty}>
-                            <strong>No results for &ldquo;{query}&rdquo;</strong>
-                            <span>Try a course ID like 0401211, a building like A3, or a page name.</span>
+                            <strong>Nothing called &ldquo;{query}&rdquo;.</strong>
+                            <span>Try a course code like 0401211, a building like M10, or a page name.</span>
                         </div>
                     )}
                     {groups.map(group => (
@@ -219,7 +216,6 @@ export default function CommandPalette({ open, onClose, isGuest = false }) {
                             {group.items.map(item => {
                                 index += 1;
                                 const i = index;
-                                const Icon = item.icon;
                                 const isActive = i === active;
                                 return (
                                     <button
@@ -233,14 +229,18 @@ export default function CommandPalette({ open, onClose, isGuest = false }) {
                                         onMouseMove={() => { if (active !== i) setActive(i); }}
                                         onClick={item.run}
                                     >
-                                        {item.swatch
-                                            ? <CourseSwatch courseId={item.swatch} size="md" />
-                                            : <span className={styles.itemIcon}><Icon /></span>}
+                                        {item.course && (
+                                            <span className={styles.itemKey}>
+                                                <CourseMark courseId={item.course} size="sm" />
+                                                <CourseCode id={item.course} />
+                                            </span>
+                                        )}
+                                        {item.building && <span className={`${styles.itemKey} ${styles.itemBuilding}`}>{item.building}</span>}
                                         <span className={styles.itemText}>
-                                            <span className={styles.itemLabel}>{item.label}</span>
+                                            <span className={`${styles.itemLabel} ${item.course ? styles.itemCourse : ''}`}>{item.label}</span>
                                             {item.hint && <span className={styles.itemHint}>{item.hint}</span>}
                                         </span>
-                                        <span className={styles.itemEnter} aria-hidden="true">{item.more ? 'Open ›' : '↵'}</span>
+                                        <span className={styles.itemEnter} aria-hidden="true">{item.more ? 'more →' : '↵'}</span>
                                     </button>
                                 );
                             })}
