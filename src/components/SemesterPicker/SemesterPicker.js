@@ -2,44 +2,35 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useSemester } from '@/lib/SemesterContext';
+import { CheckIcon, ChevronDownIcon, ScheduleIcon } from '@/components/Icons';
 import styles from './SemesterPicker.module.css';
 
-const Chevron = () => (
-    <svg className={styles.chevron} viewBox="0 0 24 24" fill="none" stroke="currentColor"
-        strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="6 9 12 15 18 9" />
-    </svg>
-);
-
-const Check = () => (
-    <svg className={styles.check} viewBox="0 0 24 24" fill="none" stroke="currentColor"
-        strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="20 6 9 17 4 12" />
-    </svg>
-);
-
 /**
- * Term switcher.
+ * Term switcher: a chip that opens a short list.
  *
- * Works for any number of active semesters. The pill it replaces only rendered
- * when there were exactly two, so three active terms left users with no way to
- * switch at all. Renders nothing when there is nothing to choose between.
+ * Works for any number of active semesters and renders nothing when there is
+ * nothing to choose between.
  */
-export default function SemesterPicker() {
+export default function SemesterPicker({ align = 'right' }) {
     const { semesters, selectedTerm, setSelectedTerm } = useSemester();
     const [open, setOpen] = useState(false);
     const triggerRef = useRef(null);
     const wrapRef = useRef(null);
+    const listRef = useRef(null);
 
-    // Close on Escape or an outside click. A fixed-position scrim would not
-    // work here: the hero's backdrop-filter makes it the containing block for
-    // fixed descendants, so a "full screen" scrim would only cover the hero.
     useEffect(() => {
-        if (!open) return;
+        if (!open) return undefined;
         const onKey = (e) => {
             if (e.key === 'Escape') {
                 setOpen(false);
                 triggerRef.current?.focus();
+            }
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                const items = [...(listRef.current?.querySelectorAll('button') || [])];
+                const idx = items.indexOf(document.activeElement);
+                const next = items[(idx + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length];
+                next?.focus();
             }
         };
         const onPointerDown = (e) => {
@@ -48,6 +39,7 @@ export default function SemesterPicker() {
         document.addEventListener('keydown', onKey);
         document.addEventListener('mousedown', onPointerDown);
         document.addEventListener('touchstart', onPointerDown);
+        requestAnimationFrame(() => listRef.current?.querySelector('[aria-selected="true"]')?.focus());
         return () => {
             document.removeEventListener('keydown', onKey);
             document.removeEventListener('mousedown', onPointerDown);
@@ -70,32 +62,35 @@ export default function SemesterPicker() {
                 aria-haspopup="listbox"
                 aria-label={`Semester: ${current?.name || 'select'}`}
             >
-                {current?.name || 'Select semester'}
-                <Chevron />
+                <ScheduleIcon className={styles.calendar} />
+                <span className={styles.chipLabel}>{current?.name || 'Select semester'}</span>
+                <ChevronDownIcon className={styles.chevron} />
             </button>
 
             {open && (
-                    <ul className={styles.menu} role="listbox" aria-label="Semester">
-                        {semesters.map(sem => {
-                            const isSelected = sem.term_code === selectedTerm;
-                            return (
-                                <li key={sem.term_code} role="none">
-                                    <button
-                                        type="button"
-                                        role="option"
-                                        aria-selected={isSelected}
-                                        className={`${styles.option} ${isSelected ? styles.selected : ''}`}
-                                        onClick={() => {
-                                            setSelectedTerm(sem.term_code);
-                                            setOpen(false);
-                                        }}
-                                    >
-                                        {sem.name}
-                                        {isSelected && <Check />}
-                                    </button>
-                                </li>
-                            );
-                        })}
+                <ul ref={listRef} className={`${styles.menu} ${align === 'left' ? styles.menuLeft : ''}`} role="listbox" aria-label="Semester">
+                    <li className={styles.menuLabel} role="presentation">Semester</li>
+                    {semesters.map(sem => {
+                        const isSelected = sem.term_code === selectedTerm;
+                        return (
+                            <li key={sem.term_code} role="none">
+                                <button
+                                    type="button"
+                                    role="option"
+                                    aria-selected={isSelected}
+                                    className={`${styles.option} ${isSelected ? styles.selected : ''}`}
+                                    onClick={() => {
+                                        setSelectedTerm(sem.term_code);
+                                        setOpen(false);
+                                        triggerRef.current?.focus();
+                                    }}
+                                >
+                                    {sem.name}
+                                    {isSelected && <CheckIcon className={styles.check} strokeWidth={2.25} />}
+                                </button>
+                            </li>
+                        );
+                    })}
                 </ul>
             )}
         </div>
