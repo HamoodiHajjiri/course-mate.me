@@ -1,8 +1,4 @@
-/* ===== Semester picker =====
-   Replaces the old two-button sliding pill, which was gated on
-   `semesters.length === 2` and so vanished entirely with three or more active
-   terms. A chip + dropdown scales to any number and stays narrow enough to sit
-   beside the greeting on a phone. */
+/* ===== Semester picker ===== */
 
 .wrap {
     position: relative;
@@ -13,65 +9,79 @@
 .chip {
     display: inline-flex;
     align-items: center;
-    gap: 7px;
-    padding: 8px 12px;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color-subtle);
-    border-radius: var(--radius-full);
-    color: var(--text-primary);
-    font-family: inherit;
-    font-size: 0.8125rem;
-    font-weight: 700;
-    cursor: pointer;
+    gap: 8px;
+    height: 36px;
+    padding: 0 10px 0 12px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-md);
+    background: var(--surface);
+    color: var(--ink);
+    font-size: var(--text-small);
+    font-weight: var(--weight-semibold);
     white-space: nowrap;
-    transition: all var(--transition-fast) var(--ease-out-expo);
-    -webkit-tap-highlight-color: transparent;
+    cursor: pointer;
+    box-shadow: var(--e1), var(--highlight);
+    transition: border-color var(--dur-1) var(--ease-out), background-color var(--dur-1) var(--ease-out);
 }
 
 .chip:hover {
-    border-color: var(--color-accent);
-    color: var(--color-accent);
+    background: color-mix(in srgb, var(--ink) 4%, var(--surface));
 }
 
 .chip[aria-expanded='true'] {
-    background: var(--color-accent-muted);
-    border-color: var(--color-accent);
-    color: var(--color-accent);
+    border-color: var(--focus);
+    box-shadow: 0 0 0 3px var(--accent-soft-2);
+}
+
+.calendar {
+    width: 16px;
+    height: 16px;
+    color: var(--accent-ink);
 }
 
 .chevron {
-    width: 14px;
-    height: 14px;
-    flex-shrink: 0;
-    transition: transform var(--transition-fast) var(--ease-out-expo);
+    width: 16px;
+    height: 16px;
+    color: var(--ink-3);
+    transition: transform var(--dur-2) var(--ease-out);
 }
 
 .chip[aria-expanded='true'] .chevron {
     transform: rotate(180deg);
 }
 
-
 .menu {
     position: absolute;
-    top: calc(100% + 8px);
+    top: calc(100% + 6px);
     right: 0;
-    z-index: 201;
-    min-width: 190px;
+    z-index: var(--z-dropdown);
+    min-width: 200px;
     max-height: 320px;
     overflow-y: auto;
     margin: 0;
-    padding: 6px;
+    padding: 4px;
     list-style: none;
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-xl);
-    animation: menuIn 0.16s var(--ease-out-expo);
+    background: var(--surface-raised);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    box-shadow: var(--e2), var(--highlight);
+    transform-origin: top right;
+    animation: cm-pop-in var(--dur-2) var(--ease-out);
 }
 
-@keyframes menuIn {
-    from { opacity: 0; transform: translateY(-6px); }
-    to { opacity: 1; transform: translateY(0); }
+.menuLeft {
+    right: auto;
+    left: 0;
+    transform-origin: top left;
+}
+
+.menuLabel {
+    padding: 8px 10px 4px;
+    font-size: var(--text-micro);
+    font-weight: var(--weight-semibold);
+    letter-spacing: var(--tracking-overline);
+    text-transform: uppercase;
+    color: var(--ink-3);
 }
 
 .option {
@@ -80,51 +90,39 @@
     justify-content: space-between;
     gap: 12px;
     width: 100%;
-    padding: 10px 12px;
+    height: 38px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 8px;
     background: none;
-    border: none;
-    border-radius: var(--radius-md);
-    font-family: inherit;
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    cursor: pointer;
+    color: var(--ink);
+    font-size: var(--text-body);
+    font-weight: var(--weight-medium);
     text-align: left;
     white-space: nowrap;
-    transition: background var(--transition-fast);
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease-out);
 }
 
-.option:hover {
-    background: var(--bg-tertiary);
+.option:hover,
+.option:focus-visible {
+    background: var(--surface-hover);
+    outline: none;
 }
 
 .selected {
-    color: var(--color-accent);
-    background: var(--color-accent-muted);
-}
-
-.selected:hover {
-    background: var(--color-accent-muted);
+    color: var(--accent-ink);
+    font-weight: var(--weight-semibold);
 }
 
 .check {
-    width: 15px;
-    height: 15px;
-    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
 }
 
-@media (max-width: 767px) {
+@media (max-width: 480px) {
     .chip {
-        padding: 7px 11px;
-        font-size: 0.75rem;
-    }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .menu {
-        animation: none;
-    }
-    .chevron {
-        transition: none;
+        height: 34px;
+        padding: 0 8px 0 10px;
     }
 }
