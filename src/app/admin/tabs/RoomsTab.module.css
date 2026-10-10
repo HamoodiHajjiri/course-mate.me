@@ -1,124 +1,133 @@
 /* ===== Admin Rooms tab =====
-   Builds on admin.module.css and MapTab.module.css; this is the free-rooms
+   Builds on admin.module.css and MapTab.module.css; these are the free-rooms
    view's own pieces. */
 
-/* "Find a room" or "Free rooms". */
+/* "Find a room" or "Free rooms": two words, the chosen one highlighted. */
 .modeSwitch {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 2px;
-    padding: 3px;
-    margin-bottom: 14px;
-    border-radius: var(--radius-md);
-    background: var(--bg-tertiary);
+    display: flex;
+    gap: 16px;
+    margin-bottom: 6px;
 }
 
 .modeBtn {
-    padding: 7px 8px;
-    border: none;
-    border-radius: calc(var(--radius-md) - 2px);
-    background: transparent;
-    color: var(--text-secondary);
-    font: inherit;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    cursor: pointer;
+    padding: 2px 0;
+    border: 0;
+    background: none;
+    font-size: var(--text-small);
+    font-weight: 500;
+    color: var(--ink-3);
 }
 
-.modeOn {
-    background: var(--bg-card);
-    color: var(--text-primary);
-    box-shadow: var(--shadow-sm);
+.modeBtn:hover {
+    color: var(--ink);
 }
 
-/* Side by side when there's room for "12:30 PM" in both, else stacked: the
-   desktop sidebar is too narrow for two. */
+.modeOn,
+.modeOn:hover {
+    background-image: linear-gradient(var(--mark), var(--mark));
+    background-repeat: no-repeat;
+    background-size: 100% 80%;
+    background-position: 0 72%;
+    padding: 2px 3px;
+    margin: 0 -3px;
+    color: var(--mark-ink);
+}
+
 .timeRow {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
     gap: 8px;
-    margin-top: 8px;
 }
 
 .field {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 3px;
     min-width: 0;
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: var(--text-secondary);
+    font-size: var(--text-caption);
+    color: var(--ink-3);
+}
+
+.where {
+    margin-top: 8px;
+}
+
+.note {
+    margin-top: 4px;
 }
 
 /* ----- Results, one group per building ----- */
+.group {
+    padding-top: 10px;
+    border-top: 1px solid var(--rule);
+}
 
 .group + .group {
-    margin-top: 14px;
+    margin-top: 16px;
 }
 
 .groupHead {
     display: flex;
-    align-items: center;
-    gap: 4px;
+    align-items: baseline;
+    gap: 8px;
     margin: 0 0 8px;
-    font-size: 0.8125rem;
-    font-weight: 700;
-    color: var(--text-primary);
+    font-size: var(--text-small);
+    font-weight: 600;
+    color: var(--ink);
 }
 
 .groupHead span {
-    font-weight: 500;
-    color: var(--text-secondary);
+    font-weight: 400;
+    color: var(--ink-3);
 }
 
 .groupHead .groupCount {
-    margin-left: 4px;
-    min-width: 20px;
-    padding: 0 6px;
-    border-radius: var(--radius-full);
-    background: var(--color-accent-muted);
-    color: var(--color-accent);
+    margin-left: auto;
+    font-family: var(--font-mono);
     font-size: 0.6875rem;
-    font-weight: 800;
-    text-align: center;
+    color: var(--ink-3);
 }
 
 .chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 4px;
 }
 
+/* A free room, as its door sign. */
 .chip {
     display: inline-flex;
-    align-items: baseline;
-    gap: 6px;
-    padding: 6px 12px;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-full);
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    font: inherit;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+    padding: 5px 9px 6px;
+    border: 1px solid var(--rule-control);
+    background: var(--sheet);
+    font-family: var(--font-mono);
     font-size: 0.8125rem;
-    font-weight: 600;
+    font-weight: 500;
+    color: var(--ink);
     white-space: nowrap;
     cursor: pointer;
-    transition: border-color var(--transition-fast), background var(--transition-fast);
 }
 
 .chip:hover {
-    border-color: var(--color-accent);
-    background: var(--color-accent-muted);
+    border-color: var(--ink);
 }
 
 .chipNote {
-    font-size: 0.72rem;
-    font-weight: 500;
-    color: var(--text-secondary);
+    font-family: var(--font-sans);
+    font-size: 0.6875rem;
+    font-weight: 400;
+    color: var(--go-ink);
 }
 
 .footnote {
-    margin: 12px 0 0;
-    font-size: 0.72rem;
-    color: var(--text-muted);
+    margin: 14px 0 0;
+    font-size: var(--text-caption);
+    color: var(--ink-3);
+}
+
+.sections {
+    margin-top: 14px;
 }
