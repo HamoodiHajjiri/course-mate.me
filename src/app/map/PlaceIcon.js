@@ -1,6 +1,7 @@
 import { PLACE_KINDS } from './places';
 
-// One line icon per kind of place, drawn on a 24 unit grid.
+// One pictogram per kind of place, drawn on a 24 unit grid and set on a
+// square plate like a campus sign: places are things, and things are square.
 const PATHS = {
     department: (
         <>
@@ -104,7 +105,7 @@ export default function PlaceIcon({ kind, size = 32, solid = false }) {
                 flex: 'none',
                 width: size,
                 height: size,
-                borderRadius: '50%',
+                borderRadius: 2,
                 background: solid ? color : `${color}1f`,
                 color: solid ? '#fff' : color,
             }}
@@ -115,9 +116,9 @@ export default function PlaceIcon({ kind, size = 32, solid = false }) {
                 height={size * 0.56}
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+                strokeWidth="1.75"
+                strokeLinecap="square"
+                strokeLinejoin="miter"
             >
                 {PATHS[kind] || PATHS.other}
             </svg>
