@@ -162,18 +162,19 @@ function RoomsSidebar() {
                             />
                         </label>
                     </div>
-                    <p className={styles.sectionTitle} style={{ marginTop: 14 }}>Where</p>
+                    <p className={`${styles.sectionTitle} ${rs.where}`}>Where</p>
                 </>
             )}
 
             {mode === 'room' && <p className={styles.sectionTitle}>Rooms</p>}
             <input
                 className={styles.input}
-                placeholder={mode === 'free' ? 'All rooms, or A12, M10...' : 'Find a room, like A3-007 or M3-007'}
+                placeholder={mode === 'free' ? 'Every room, or A12, M10…' : 'A room, like A3-007 or M3-007'}
+                aria-label="Find a room"
                 value={query}
                 onChange={e => setQuery(e.target.value)}
             />
-            {note && <div className={styles.rowMeta} style={{ marginTop: 6 }}>{note}</div>}
+            {note && <div className={`${styles.rowMeta} ${rs.note}`}>{note}</div>}
 
             {mode === 'room' && (
                 <div className={`${styles.navList} ${own.buildingList}`}>
@@ -205,7 +206,7 @@ function FreeRooms() {
     if (to <= from) {
         return (
             <div className={styles.empty}>
-                <div className={styles.emptyTitle}>Pick an end time after the start</div>
+                <div className={styles.emptyTitle}>The end has to come after the start.</div>
             </div>
         );
     }
@@ -240,7 +241,7 @@ function FreeRooms() {
 
             {free.length === 0 ? (
                 <div className={styles.empty}>
-                    <div className={styles.emptyTitle}>No free rooms</div>
+                    <div className={styles.emptyTitle}>No free rooms.</div>
                     <span>Every room here has a class at some point in that time.</span>
                 </div>
             ) : (
@@ -292,17 +293,17 @@ function RoomsMain() {
         <div className={styles.feedCard}>
             {error && <div className={styles.error}>{error}</div>}
             {loading ? (
-                <div className={styles.loading}><div className={styles.spinner} />Loading rooms...</div>
+                <div className={styles.loading}><div className={styles.spinner} />Reading rooms…</div>
             ) : mode === 'free' ? (
                 <FreeRooms />
             ) : !selected ? (
                 <div className={styles.empty}>
-                    <div className={styles.emptyTitle}>Pick a room</div>
-                    <span>Its week of classes this term shows here, like a student&apos;s schedule.</span>
+                    <div className={styles.emptyTitle}>Pick a room.</div>
+                    <span>Its week of classes this term is drawn here, like a student&apos;s timetable.</span>
                 </div>
             ) : (
                 <>
-                    <div className={own.mainHead} style={{ flexWrap: 'wrap' }}>
+                    <div className={own.mainHead}>
                         <div>
                             <div className={own.mainTitle}>{selected}</div>
                             <div className={styles.rowMeta}>
@@ -314,21 +315,26 @@ function RoomsMain() {
 
                     <Timetable schedule={groups} courseMap={courseMap} />
 
-                    <div className={styles.feedList} style={{ marginTop: 14 }}>
-                        {list.map(s => (
-                            <div key={s.crn} className={styles.row}>
-                                <div className={styles.rowMain}>
-                                    <div className={styles.rowTitle}>
-                                        {s.course_id}
-                                        {courseMap[s.course_id]?.name && ` · ${courseMap[s.course_id].name}`}
-                                        <span className={styles.badge}>Section {s.section_num}</span>
-                                    </div>
-                                    <div className={styles.rowMeta}>
-                                        {[s.class_time || 'No time set', s.instructor, `CRN ${s.crn}`].filter(Boolean).join(' · ')}
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
+                    <div className={`${styles.tableWrap} ${rs.sections}`}>
+                        <table className={styles.table}>
+                            <thead>
+                                <tr><th>Course</th><th>Section</th><th>When</th><th>Instructor</th><th>CRN</th></tr>
+                            </thead>
+                            <tbody>
+                                {list.map(s => (
+                                    <tr key={s.crn}>
+                                        <td>
+                                            <span className={`${styles.mono} ${styles.cellStrong}`}>{s.course_id}</span>
+                                            {courseMap[s.course_id]?.name && <> {courseMap[s.course_id].name}</>}
+                                        </td>
+                                        <td className={styles.mono}>§{s.section_num}</td>
+                                        <td>{s.class_time || <span className={styles.cellMuted}>no set time</span>}</td>
+                                        <td>{s.instructor}</td>
+                                        <td className={styles.mono}>{s.crn}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                 </>
             )}
