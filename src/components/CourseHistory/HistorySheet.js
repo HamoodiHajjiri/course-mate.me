@@ -5,8 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useSemester } from '@/lib/SemesterContext';
 import { historyTerms, fetchCourseHistory } from '@/lib/courseHistory';
 import { courseColor } from '@/lib/courseColor';
-import { Button, CourseSwatch, Dialog, Skeleton } from '@/components/ui';
-import { ArrowRightIcon } from '@/components/Icons';
+import { Button, CourseCode, Dialog, Skeleton } from '@/components/ui';
 import styles from './CourseHistory.module.css';
 
 /**
@@ -39,25 +38,22 @@ export default function HistorySheet({ course, onClose, onSeeAll }) {
             size="md"
             title={(
                 <span className={styles.sheetTitle}>
-                    <CourseSwatch courseId={course.course_id} />
-                    <span>
-                        {course.name || course.course_id}
-                        <small className={styles.mono}>{course.course_id}</small>
-                    </span>
+                    <CourseCode id={course.course_id} />
+                    <span>{course.name || course.course_id}</span>
                 </span>
             )}
             footer={newestOffered ? (
-                <Button variant="primary" trailingIcon={<ArrowRightIcon />} onClick={() => onSeeAll(newestOffered.code)}>
-                    See every section
+                <Button variant="primary" onClick={() => onSeeAll(newestOffered.code)}>
+                    See every section →
                 </Button>
             ) : null}
         >
             {!history && !failed && (
                 <div className={styles.sheetLoading}>
-                    <Skeleton height={96} radius={12} />
-                    <Skeleton height={14} width="40%" />
-                    <Skeleton height={40} radius={10} />
-                    <Skeleton height={40} radius={10} />
+                    <Skeleton height={96} />
+                    <Skeleton height={12} width="40%" />
+                    <Skeleton height={36} />
+                    <Skeleton height={36} />
                 </div>
             )}
             {failed && <p className={styles.sheetEmpty}>Couldn&rsquo;t load this course&rsquo;s history. Try again in a moment.</p>}
