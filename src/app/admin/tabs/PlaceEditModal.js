@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import campus from '@/app/map/campus.json';
 import { buildingOfRoom } from '@/app/map/buildings';
 import { DAYS, PLACE_KINDS, normalizeHours, openStatus } from '@/app/map/places';
+import { Dialog } from '@/components/ui';
 import styles from '../admin.module.css';
 import own from './MapTab.module.css';
 
@@ -244,12 +245,23 @@ export default function PlaceEditModal({ place, buildings, onClose, onSave }) {
     })();
 
     return (
-        <div className={own.overlay} onClick={onClose}>
-            <div className={own.dialog} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={isCreate ? 'Add place' : 'Edit place'}>
-                <div className={own.dialogHead}>
-                    <div className={own.mainTitle}>{isCreate ? 'Add place' : `Edit ${place.name}`}</div>
-                    <button type="button" className={styles.btn} onClick={onClose}>Close</button>
-                </div>
+        <Dialog
+            open
+            onClose={onClose}
+            dismissible={!saving}
+            size="lg"
+            title={isCreate ? 'A new place on the map' : place.name}
+            description={isCreate ? 'It shows on the campus map once it’s saved and visible.' : 'Changes show on the campus map as soon as they’re saved.'}
+            footer={(
+                <>
+                    <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={onClose}>Cancel</button>
+                    <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} disabled={saving || uploading} onClick={handleSave}>
+                        {saving ? 'Saving…' : isCreate ? 'Add to the map' : 'Save'}
+                    </button>
+                </>
+            )}
+        >
+            <div className={own.dialogBody}>
 
                 <section className={own.section}>
                     <div className={own.grid2}>
@@ -394,14 +406,8 @@ export default function PlaceEditModal({ place, buildings, onClose, onSave }) {
                 </section>
 
                 {err && <div className={styles.error}>{err}</div>}
-                <div className={own.dialogFoot}>
-                    <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={onClose}>Cancel</button>
-                    <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} disabled={saving || uploading} onClick={handleSave}>
-                        {saving ? 'Saving…' : isCreate ? 'Add to the map' : 'Save'}
-                    </button>
-                </div>
             </div>
-        </div>
+        </Dialog>
     );
 }
 
