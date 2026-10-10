@@ -4,12 +4,13 @@ import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useSemester } from '@/lib/SemesterContext';
 import { courseColor } from '@/lib/courseColor';
-import { HistoryIcon, ChevronLeftIcon, ChevronRightIcon, AlertIcon } from '@/components/Icons';
 import {
     historyTerms, termLabel, fetchCourseHistory, startGrid, meetingText, formatClock, CAMPUS_LABELS,
 } from '@/lib/courseHistory';
 import RoomLink from '@/components/RoomLink';
-import { Badge, Button, CourseSwatch, EmptyState, Field, SearchInput, SegmentedControl, Skeleton, Ticket } from '@/components/ui';
+import {
+    Button, CourseCode, CourseMark, CourseName, EmptyState, Field, Rubric, SearchInput, Section, SegmentedControl, Skeleton, Status,
+} from '@/components/ui';
 import styles from './CourseHistory.module.css';
 
 // PostgREST's or() splits on commas and parentheses, and ilike treats % and _
@@ -136,9 +137,7 @@ export default function CourseHistory({ request, onBackToBuild }) {
     return (
         <div className={styles.main}>
             {onBackToBuild && (
-                <Button variant="ghost" size="sm" icon={<ChevronLeftIcon />} onClick={onBackToBuild} className={styles.back}>
-                    Back to your schedule
-                </Button>
+                <Button variant="link" onClick={onBackToBuild} className={styles.back}>← Back to your schedule</Button>
             )}
 
             {!detail && (
@@ -148,7 +147,7 @@ export default function CourseHistory({ request, onBackToBuild }) {
                             <SearchInput
                                 id="history-search"
                                 size="lg"
-                                placeholder="Search by course name or ID"
+                                placeholder="A course code or name"
                                 autoComplete="off"
                                 value={query}
                                 onChange={handleSearchChange}
@@ -170,9 +169,8 @@ export default function CourseHistory({ request, onBackToBuild }) {
                                             className={`${styles.option} ${i === activeIdx ? styles.optionActive : ''}`}
                                             onClick={() => selectCourse(c)}
                                         >
-                                            <CourseSwatch courseId={c.course_id} size="sm" />
-                                            <span className={styles.optionName}>{c.name}</span>
-                                            <span className={styles.optionId}>{c.course_id}</span>
+                                            <CourseCode id={c.course_id} size="sm" />
+                                            <CourseName size="sm">{c.name}</CourseName>
                                         </button>
                                     ))}
                                 </div>
@@ -183,110 +181,87 @@ export default function CourseHistory({ request, onBackToBuild }) {
             )}
 
             {loading && (
-                <div className={styles.loadingCard} aria-busy="true">
-                    <div className={styles.headRow}>
-                        <Skeleton width={40} height={40} radius={11} />
-                        <span className={styles.loadingText}>
-                            <Skeleton width={260} height={18} />
-                            <Skeleton width={90} height={12} />
-                        </span>
-                    </div>
-                    <div className={styles.loadingStats}>
-                        <Skeleton height={56} radius={10} />
-                        <Skeleton height={56} radius={10} />
-                        <Skeleton height={56} radius={10} />
-                    </div>
-                    {[0, 1, 2].map(i => <Skeleton key={i} height={62} radius={12} />)}
+                <div className={styles.loading} aria-busy="true">
+                    <Skeleton width={120} height={12} />
+                    <Skeleton width={340} height={28} />
+                    <Skeleton height={64} />
+                    {[0, 1, 2].map(i => <Skeleton key={i} height={40} />)}
                 </div>
             )}
 
             {failed && (
-                <EmptyState tone="neutral" icon={<AlertIcon />} title="Couldn’t load this course’s history" actions={<Button variant="secondary" onClick={() => selectCourse(course)}>Try again</Button>}>
-                    Something went wrong fetching past terms. It&rsquo;s usually a blip; try again in a moment.
+                <EmptyState title="This course’s history didn’t load." actions={<Button variant="link" onClick={() => selectCourse(course)}>Try again</Button>}>
+                    It&rsquo;s usually a blip in the connection.
                 </EmptyState>
             )}
 
             {!course && !loading && (
-                <EmptyState icon={<HistoryIcon />} title="See how a course ran before">
+                <EmptyState title="How did a course run before?">
                     {terms.length
-                        ? `Times, instructors and sections from ${pastLabels.slice().reverse().join(', ')}. Useful when a course isn’t open yet, or you want to know who usually teaches it.`
-                        : 'Pick a semester first.'}
+                        ? `Times, instructors and sections from ${pastLabels.slice().reverse().join(', ')}. Useful when a course isn’t open yet, or to see who usually teaches it.`
+                        : 'Pick a term first.'}
                 </EmptyState>
             )}
 
             {course && history && !loading && !detail && (
                 <article className={styles.card}>
-                    <header className={styles.headRow}>
-                        <CourseSwatch courseId={course.course_id} size="lg" />
-                        <div className={styles.courseTitle}>
-                            <h2 className={styles.courseName}>{course.name}</h2>
-                            <span className={styles.courseMeta}>
-                                <span className={styles.mono}>{course.course_id}</span>
-                                {course.credit_hours > 0 && <span>{course.credit_hours} credits</span>}
-                            </span>
-                        </div>
+                    <header className={styles.head}>
+                        <span className={styles.headCode}>
+                            <CourseMark courseId={course.course_id} />
+                            <CourseCode id={course.course_id} />
+                            {course.credit_hours > 0 && <span className={styles.credits}>{course.credit_hours} credits</span>}
+                        </span>
+                        <CourseName as="h2" size="xl">{course.name}</CourseName>
                         {openNow != null && (
-                            <Badge tone={openNow > 0 ? 'success' : 'neutral'} dot className={styles.nowBadge}>
+                            <Status tone={openNow > 0 ? 'go' : 'muted'}>
                                 {openNow > 0
                                     ? `${openNow} ${openNow === 1 ? 'section' : 'sections'} open in ${termLabel(selectedTerm)}`
                                     : `Not open in ${termLabel(selectedTerm)}`}
-                            </Badge>
+                            </Status>
                         )}
                     </header>
 
-                    <div className={styles.stats}>
-                        <div className={styles.stat}>
-                            <span className={styles.statValue}>{history.offeredCount}<small>/{terms.length}</small></span>
-                            <span className={styles.statLabel}>terms offered</span>
-                        </div>
-                        <div className={styles.stat}>
-                            <span className={styles.statValue}>{history.sectionsPerTerm}</span>
-                            <span className={styles.statLabel}>sections a term</span>
-                        </div>
-                        <div className={styles.stat}>
-                            <span className={styles.statValue}>{history.instructors.length}</span>
-                            <span className={styles.statLabel}>{history.instructors.length === 1 ? 'instructor' : 'instructors'}</span>
-                        </div>
-                    </div>
+                    <dl className={styles.figures}>
+                        <div><dt>Terms offered</dt><dd>{history.offeredCount}<small>/{terms.length}</small></dd></div>
+                        <div><dt>Sections a term</dt><dd>{history.sectionsPerTerm}</dd></div>
+                        <div><dt>{history.instructors.length === 1 ? 'Instructor' : 'Instructors'}</dt><dd>{history.instructors.length}</dd></div>
+                    </dl>
 
-                    <div className={styles.timeline}>
-                        <span className={styles.timelineLabel}>Past terms, newest first</span>
-                        <ol className={styles.terms} style={{ '--c': courseColor(course.course_id) }}>
+                    <section aria-label="Past terms">
+                        <Rubric title="Past terms" meta="newest first" quiet />
+                        <ol className={styles.terms}>
                             {history.terms.map(t => t.offered ? (
-                                <li key={t.code} className={styles.termItem}>
-                                    <span className={styles.termDot} aria-hidden="true" />
-                                    <button type="button" className={styles.termRow} onClick={() => setOpenTerm(t.code)}>
-                                        <span className={styles.termRowHead}>
-                                            <span className={styles.termName}>{t.label}</span>
-                                            <span className={styles.termCount}>
-                                                {t.sections.length} {t.sections.length === 1 ? 'section' : 'sections'}
-                                                {t.fill != null && ` · ${t.fill}% full`}
-                                            </span>
-                                            <ChevronRightIcon className={styles.termChevron} />
+                                <li key={t.code}>
+                                    <button type="button" className={styles.term} onClick={() => setOpenTerm(t.code)}>
+                                        <span className={styles.termName}>{t.label}</span>
+                                        <span className={styles.termCount}>{t.sections.length} §</span>
+                                        <span className={styles.termWhen}>
+                                            {t.dayPatterns.slice(0, 3).join(', ')}
+                                            {t.earliest != null && <span className={styles.termClock}>{formatClock(t.earliest)}–{formatClock(t.latest)}</span>}
                                         </span>
-                                        <span className={styles.chips}>
-                                            {t.dayPatterns.slice(0, 3).map(d => <span key={d} className={styles.chip}>{d}</span>)}
-                                            {t.earliest != null && <span className={styles.chip}>{formatClock(t.earliest)}–{formatClock(t.latest)}</span>}
-                                            <span className={styles.chip}>
-                                                {t.instructors.length === 1 ? t.instructors[0] : `${t.instructors.length} instructors`}
-                                            </span>
-                                            {t.campuses.length === 1 && <span className={styles.chip}>{CAMPUS_LABELS[t.campuses[0]] || t.campuses[0]} campus only</span>}
+                                        <span className={styles.termWho}>{t.instructors.length === 1 ? t.instructors[0] : `${t.instructors.length} instructors`}</span>
+                                        <span className={styles.termFill}>
+                                            {t.fill != null && (
+                                                <>
+                                                    <span className={styles.fillLine}><span style={{ width: `${Math.min(100, t.fill)}%` }} /></span>
+                                                    <span className={styles.fillPct}>{t.fill}%</span>
+                                                </>
+                                            )}
                                         </span>
+                                        <span className={styles.termOpen} aria-hidden="true">→</span>
                                     </button>
                                 </li>
                             ) : (
-                                <li key={t.code} className={`${styles.termItem} ${styles.termOff}`}>
-                                    <span className={styles.termDot} aria-hidden="true" />
-                                    <span className={styles.termRowOff}>
-                                        <span className={styles.termName}>{t.label}</span>
-                                        <span className={styles.termCount}>Not offered</span>
-                                    </span>
+                                <li key={t.code} className={styles.termOff}>
+                                    <span className={styles.termName}>{t.label}</span>
+                                    <span className={styles.termCount}>—</span>
+                                    <span className={styles.termWhen}>not offered</span>
                                 </li>
                             ))}
                         </ol>
-                    </div>
+                    </section>
 
-                    <p className={styles.footnote}>Past terms show what ran, not what will. Times and instructors change every term.</p>
+                    <p className={styles.footnote}>Past terms show what ran, not what will: times and instructors change every term.</p>
                 </article>
             )}
 
@@ -310,31 +285,26 @@ function TermDetail({ course, history, term, onPickTerm, onBack }) {
 
     return (
         <article className={styles.card} style={{ '--c': courseColor(course.course_id) }}>
-            <header className={styles.headRow}>
-                <Button variant="ghost" size="sm" icon={<ChevronLeftIcon />} onClick={onBack} aria-label="Back to all terms" />
-                <CourseSwatch courseId={course.course_id} />
-                <div className={styles.courseTitle}>
-                    <h2 className={styles.courseNameSm}>{course.name}</h2>
-                    <span className={styles.courseMeta}>
-                        <span className={styles.mono}>{course.course_id}</span>
-                        <span>{term.label}</span>
-                    </span>
-                </div>
+            <Button variant="link" onClick={onBack} className={styles.back}>← All terms</Button>
+            <header className={styles.head}>
+                <span className={styles.headCode}>
+                    <CourseMark courseId={course.course_id} />
+                    <CourseCode id={course.course_id} />
+                </span>
+                <CourseName as="h2" size="lg">{course.name}</CourseName>
             </header>
 
-            <div className={styles.termPicker}>
-                <SegmentedControl
-                    label="Term"
-                    size="sm"
-                    value={term.code}
-                    onChange={onPickTerm}
-                    options={history.terms.map(t => ({ value: t.code, label: t.label, disabled: !t.offered, title: t.offered ? undefined : 'Not offered' }))}
-                />
-            </div>
+            <SegmentedControl
+                label="Term"
+                size="sm"
+                value={term.code}
+                onChange={onPickTerm}
+                options={history.terms.map(t => ({ value: t.code, label: t.label, disabled: !t.offered, title: t.offered ? undefined : 'Not offered' }))}
+            />
 
             {grid.starts.length > 0 && (
                 <section className={styles.heatBlock}>
-                    <span className={styles.timelineLabel}>When sections started</span>
+                    <Rubric title="When sections started" quiet description="Darker cells are times more sections began." />
                     <div className={styles.heat} style={{ gridTemplateColumns: `52px repeat(${grid.days.length}, minmax(0, 1fr))` }}>
                         <span />
                         {grid.days.map(d => <span key={d} className={styles.heatDay}>{d}</span>)}
@@ -345,41 +315,38 @@ function TermDetail({ course, history, term, onPickTerm, onBack }) {
                 </section>
             )}
 
-            <section className={styles.sectionBlock}>
-                <div className={styles.listHead}>
-                    <span className={styles.timelineLabel}>{term.sections.length} {term.sections.length === 1 ? 'section' : 'sections'}</span>
-                    {anySeats && <span className={styles.listNote}>Enrolment when last checked</span>}
-                </div>
-                <div className={styles.sectionGrid}>
+            <section aria-label="Sections">
+                <Rubric title="Sections" meta={term.sections.length} quiet description={anySeats ? 'Enrolment as last checked.' : undefined} />
+                <ul className={styles.sections}>
                     {term.sections.map(s => {
                         const hasSeats = s.enrollment != null && s.max_enrollment > 0;
                         const pct = hasSeats ? Math.min(100, Math.round((s.enrollment / s.max_enrollment) * 100)) : 0;
                         return (
-                            <div key={s.crn} className={styles.sectionCard}>
-                                <div className={styles.sectionTop}>
-                                    <Ticket size="sm" label="Sec" section={s.section_num} />
-                                    {s.campus && <Badge size="sm">{CAMPUS_LABELS[s.campus] || s.campus}</Badge>}
-                                </div>
+                            <li key={s.crn} className={styles.sectionRow}>
+                                <Section value={s.section_num} size="sm" />
                                 <span className={styles.sectionTime}>{meetingText(s.class_time)}</span>
-                                <span className={styles.sectionWho}>{s.instructor || 'Instructor not listed'}</span>
-                                {s.location && <span className={styles.sectionRoom}><RoomLink room={s.location} /></span>}
-                                {hasSeats && (
-                                    <div className={styles.fillRow}>
-                                        <div className={styles.fillTrack}><div className={styles.fillBar} style={{ width: `${pct}%` }} /></div>
-                                        <span className={styles.fillText}>{s.enrollment}/{s.max_enrollment}</span>
-                                    </div>
-                                )}
-                            </div>
+                                <span className={styles.sectionWho}>{s.instructor || 'not listed'}</span>
+                                <span className={styles.sectionRoom}>{s.location && <RoomLink room={s.location} />}</span>
+                                <span className={styles.sectionCampus}>{s.campus ? (CAMPUS_LABELS[s.campus] || s.campus) : ''}</span>
+                                <span className={styles.sectionFill}>
+                                    {hasSeats && (
+                                        <>
+                                            <span className={styles.fillLine}><span style={{ width: `${pct}%` }} /></span>
+                                            <span className={styles.fillPct}>{s.enrollment}/{s.max_enrollment}</span>
+                                        </>
+                                    )}
+                                </span>
+                            </li>
                         );
                     })}
-                </div>
+                </ul>
             </section>
         </article>
     );
 }
 
-// How many sections started in each slot, as the course's own colour at
-// growing strength.
+// How many sections started in each slot: the course's colour at growing
+// strength, in square cells.
 function StartRow({ label, row, days, max }) {
     return (
         <>
