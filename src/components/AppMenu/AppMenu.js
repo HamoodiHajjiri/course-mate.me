@@ -5,51 +5,29 @@ import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import styles from './AppMenu.module.css';
+import useUnreadCount from '@/lib/useUnreadCount';
+import useModKey from '@/lib/useModKey';
 import ThemeToggle from '@/components/ThemeToggle';
-import { useIsGuest, clearGuest, SIGN_UP_HREF } from '@/lib/guest';
-
-const MenuIcon = () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
-    </svg>
-);
-const PersonIcon = () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
-    </svg>
-);
-const MoonIcon = () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-    </svg>
-);
-const SignOutIcon = () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
-    </svg>
-);
+import { Avatar } from '@/components/ui';
+import {
+    ActivityIcon, BellIcon, CheckIcon, ChevronRightIcon, LoginIcon, LogoutIcon, MapIcon,
+    PaletteIcon, ProfileIcon, ScheduleIcon, SearchIcon, SparkleIcon,
+} from '@/components/Icons';
+import { useIsGuest, clearGuest, getGuest, SIGN_UP_HREF } from '@/lib/guest';
+import styles from './AppMenu.module.css';
 
 const DESKTOP_QUERY = '(min-width: 768px)';
-
-function initialsOf(name) {
-    const parts = (name || '').trim().split(/\s+/).filter(Boolean);
-    if (parts.length === 0) return '?';
-    return (parts[0][0] + (parts[1]?.[0] || '')).toUpperCase();
-}
+const CAMPUS = { male: "Men's campus", female: "Women's campus" };
 
 /**
- * The account menu behind the hamburger.
+ * The account menu behind the avatar in the app bar.
  *
- * Deliberately account-only: navigation lives in the bottom nav / top bar, so
- * this holds Profile & settings, the theme switch and Sign out. Admin is NOT
- * listed — it is reachable only by typing /admin on an admin account.
+ * Opens on who you are — name, major, student ID, campus — then the places
+ * you go back to most, appearance, and the way out. Admin is NOT listed; it
+ * is reachable only by typing /admin on an admin account.
  *
- * The panel is rendered through a portal to <body>. It has to be: every host
- * this sits in (PageHeader's .header, Browse's .sidebarCard) uses
- * backdrop-filter, which makes those elements the containing block for
- * position:fixed descendants — so an in-place sheet would be trapped inside
- * the header card instead of covering the viewport.
+ * An anchored dropdown from 768px, a bottom sheet below that. Rendered through
+ * a portal so no ancestor's stacking or blur can trap it.
  */
 export default function AppMenu() {
     const [open, setOpen] = useState(false);
@@ -57,6 +35,8 @@ export default function AppMenu() {
     const [isDesktop, setIsDesktop] = useState(false);
     const [anchorRect, setAnchorRect] = useState(null);
     const [profile, setProfile] = useState(null);
+    const [majorName, setMajorName] = useState(null);
+    const [guest, setGuestState] = useState(null);
 
     const panelRef = useRef(null);
     const triggerRef = useRef(null);
@@ -64,6 +44,9 @@ export default function AppMenu() {
     const pathname = usePathname();
     const supabase = createClient();
     const isGuest = useIsGuest();
+    const unreadAll = useUnreadCount('all');
+    const unreadActivity = useUnreadCount('activity');
+    const modKey = useModKey();
 
     useEffect(() => {
         setMounted(true);
@@ -77,20 +60,31 @@ export default function AppMenu() {
     useEffect(() => {
         let cancelled = false;
         (async () => {
+            const g = getGuest();
             const { data: { user } } = await supabase.auth.getUser();
-            if (!user || cancelled) return;
-            const { data } = await supabase
-                .from('profiles')
-                .select('name, student_id, major')
-                .eq('id', user.id)
-                .single();
-            if (!cancelled) setProfile(data || null);
+            let major = g?.major || null;
+            if (user) {
+                const { data } = await supabase
+                    .from('profiles')
+                    .select('name, student_id, major, gender')
+                    .eq('id', user.id)
+                    .single();
+                if (cancelled) return;
+                setProfile(data || null);
+                major = data?.major || null;
+            } else if (g) {
+                setGuestState(g);
+            }
+            if (major) {
+                const { data: m } = await supabase.from('majors').select('name').eq('code', major).maybeSingle();
+                if (!cancelled) setMajorName(m?.name || major);
+            }
         })();
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Close on route change, so tapping a link never leaves the sheet open.
+    // Close on route change, so tapping a link never leaves the menu open.
     useEffect(() => { setOpen(false); }, [pathname]);
 
     const measure = useCallback(() => {
@@ -98,20 +92,25 @@ export default function AppMenu() {
         if (el) setAnchorRect(el.getBoundingClientRect());
     }, []);
 
-    // Escape closes and returns focus to the trigger; focus moves into the
-    // panel on open so keyboard users aren't stranded behind the scrim.
     useEffect(() => {
-        if (!open) return;
+        if (!open) return undefined;
         const onKey = (e) => {
             if (e.key === 'Escape') {
                 setOpen(false);
                 triggerRef.current?.focus();
             }
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                const items = [...(panelRef.current?.querySelectorAll('[role="menuitem"]') || [])];
+                if (items.length === 0) return;
+                e.preventDefault();
+                const idx = items.indexOf(document.activeElement);
+                items[(idx + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length].focus();
+            }
         };
         document.addEventListener('keydown', onKey);
         window.addEventListener('resize', measure);
         window.addEventListener('scroll', measure, true);
-        panelRef.current?.querySelector('a, button')?.focus();
+        requestAnimationFrame(() => panelRef.current?.querySelector('[role="menuitem"]')?.focus());
         return () => {
             document.removeEventListener('keydown', onKey);
             window.removeEventListener('resize', measure);
@@ -124,8 +123,6 @@ export default function AppMenu() {
         setOpen(o => !o);
     };
 
-
-    // A guest's "sign out": forget the major and campus they picked.
     const exitGuest = () => {
         setOpen(false);
         clearGuest();
@@ -139,72 +136,115 @@ export default function AppMenu() {
         router.refresh();
     };
 
-    // Desktop anchors the dropdown under the trigger; phone uses the full-height
-    // sheet the stylesheet already positions.
+    const openSearch = () => {
+        setOpen(false);
+        window.dispatchEvent(new Event('cm-open-palette'));
+    };
+
+    const displayName = isGuest ? 'Guest' : profile?.name || 'Your account';
+    const campus = CAMPUS[isGuest ? guest?.gender : profile?.gender];
+
     const desktopStyle = isDesktop && anchorRect
-        ? { top: `${anchorRect.bottom + 10}px`, right: `${window.innerWidth - anchorRect.right}px` }
+        ? { top: `${anchorRect.bottom + 8}px`, right: `${Math.max(12, window.innerWidth - anchorRect.right)}px` }
         : undefined;
+
+    const shortcut = (href, Icon, label, count) => (
+        <Link href={href} className={styles.shortcut} role="menuitem">
+            <span className={styles.shortcutIcon}><Icon /></span>
+            <span className={styles.shortcutLabel}>{label}</span>
+            {count > 0 && <span className={styles.shortcutCount}>{count > 9 ? '9+' : count}</span>}
+        </Link>
+    );
 
     const panel = (
         <>
-            <div className={styles.scrim} onClick={() => setOpen(false)} aria-hidden="true" />
+            <div className={`${styles.scrim} ${isDesktop ? styles.scrimClear : ''}`} onClick={() => setOpen(false)} aria-hidden="true" />
             <div
-                className={`${styles.panel} ${isDesktop ? styles.panelDesktop : ''}`}
+                className={`${styles.panel} ${isDesktop ? styles.panelDesktop : styles.panelSheet}`}
                 style={desktopStyle}
                 ref={panelRef}
                 role="menu"
                 aria-label="Account menu"
             >
+                {!isDesktop && <span className={styles.handle} aria-hidden="true" />}
+
+                {/* Identity: who's signed in, on the brand's forest ground. */}
                 <div className={styles.identity}>
-                    <span className={styles.avatar}>{initialsOf(isGuest ? 'Guest' : profile?.name)}</span>
-                    <div className={styles.identityText}>
-                        <div className={styles.name}>{isGuest ? 'Guest' : profile?.name || 'Your account'}</div>
-                        <div className={styles.meta}>
-                            {isGuest ? 'No account' : [profile?.major, profile?.student_id].filter(Boolean).join(' · ') || 'CourseMate'}
+                    <div className={styles.identityTop}>
+                        <Avatar name={displayName} size={44} tone={isGuest ? 'neutral' : 'solid'} />
+                        <div className={styles.identityText}>
+                            <div className={styles.name}>{displayName}</div>
+                            <div className={styles.major}>
+                                {majorName || (isGuest ? 'Browsing without an account' : 'CourseMate student')}
+                            </div>
                         </div>
                     </div>
-                </div>
-
-                <div className={styles.rule} />
-
-                <div className={styles.rows}>
-                    {isGuest ? (
-                        <>
-                            <Link href={SIGN_UP_HREF} className={styles.row} role="menuitem">
-                                <PersonIcon />
-                                Create account
-                            </Link>
-                            <Link href="/auth" className={styles.row} role="menuitem">
-                                <SignOutIcon />
-                                Sign in
-                            </Link>
-                        </>
-                    ) : (
-                        <Link href="/profile" className={styles.row} role="menuitem">
-                            <PersonIcon />
-                            Profile &amp; settings
-                        </Link>
+                    {(profile?.student_id || campus || isGuest) && (
+                        <div className={styles.facts}>
+                            {profile?.student_id && <span className={styles.fact}><span className={styles.factMono}>{profile.student_id}</span></span>}
+                            {campus && <span className={styles.fact}>{campus}</span>}
+                            {isGuest && <span className={styles.fact}>Guest mode</span>}
+                        </div>
                     )}
-
-                    <div className={`${styles.row} ${styles.themeRow}`}>
-                        <MoonIcon />
-                        Theme
-                        <ThemeToggle compact />
-                    </div>
                 </div>
 
-                <div className={styles.spacer} />
-                <div className={styles.rule} />
+                {isGuest ? (
+                    <div className={styles.guestPitch}>
+                        <ul className={styles.pitchList}>
+                            {['Post swaps and get matched automatically', 'Save up to three schedules', 'Alerts when a section opens up'].map(t => (
+                                <li key={t}><CheckIcon strokeWidth={2.25} />{t}</li>
+                            ))}
+                        </ul>
+                        <Link href={SIGN_UP_HREF} className={styles.pitchCta} role="menuitem">
+                            <SparkleIcon />
+                            Create a free account
+                        </Link>
+                        <Link href="/auth" className={styles.row} role="menuitem">
+                            <LoginIcon />
+                            <span className={styles.rowLabel}>I already have an account</span>
+                            <ChevronRightIcon className={styles.chevron} />
+                        </Link>
+                    </div>
+                ) : (
+                    <>
+                        <div className={styles.shortcuts}>
+                            {shortcut('/matches', ActivityIcon, 'Activity', unreadActivity)}
+                            {shortcut('/notifications', BellIcon, 'Notifications', unreadAll)}
+                            {shortcut('/schedule', ScheduleIcon, 'Schedules', 0)}
+                            {shortcut('/map', MapIcon, 'Campus map', 0)}
+                        </div>
+                        <div className={styles.group}>
+                            <Link href="/profile" className={styles.row} role="menuitem">
+                                <ProfileIcon />
+                                <span className={styles.rowLabel}>Profile &amp; settings</span>
+                                <ChevronRightIcon className={styles.chevron} />
+                            </Link>
+                            <button type="button" className={styles.row} role="menuitem" onClick={openSearch}>
+                                <SearchIcon />
+                                <span className={styles.rowLabel}>Search CourseMate</span>
+                                <span className={styles.rowKeys}><kbd>{modKey}</kbd><kbd>K</kbd></span>
+                            </button>
+                        </div>
+                    </>
+                )}
 
-                <div className={styles.rows}>
+                <div className={styles.themeBlock}>
+                    <span className={styles.themeLabel}>
+                        <PaletteIcon />
+                        Appearance
+                    </span>
+                    <ThemeToggle compact />
+                </div>
+
+                <div className={styles.group}>
                     <button
                         type="button"
-                        className={`${styles.row} ${styles.danger}`}
+                        className={`${styles.row} ${styles.signOut}`}
                         role="menuitem"
                         onClick={isGuest ? exitGuest : signOut}
                     >
-                        <SignOutIcon />
-                        {isGuest ? 'Exit guest mode' : 'Sign out'}
+                        <LogoutIcon />
+                        <span className={styles.rowLabel}>{isGuest ? 'Exit guest mode' : 'Sign out'}</span>
                     </button>
                 </div>
             </div>
@@ -220,9 +260,9 @@ export default function AppMenu() {
                 onClick={toggleOpen}
                 aria-expanded={open}
                 aria-haspopup="menu"
-                aria-label="Menu"
+                aria-label="Account menu"
             >
-                <MenuIcon />
+                <Avatar name={displayName} size={30} tone={isGuest ? 'neutral' : 'accent'} />
             </button>
 
             {open && mounted && createPortal(panel, document.body)}
