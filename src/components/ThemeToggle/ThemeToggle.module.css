@@ -1,280 +1,214 @@
-/* ===== Compact: four swatches =====
-   Each previews the ground it switches to. Hard-coded colours on purpose:
-   a swatch shows its own theme, not the current one. */
-
+/* ===== Compact: the names as a choice line ===== */
 .compact {
-    display: inline-flex;
-    gap: 2px;
-    padding: 3px;
-    border-radius: var(--r-full);
-    background: var(--surface-2);
-    box-shadow: inset 0 0 0 1px var(--line-subtle);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 16px;
 }
 
 .compactPlaceholder {
-    width: 132px;
-    height: 34px;
+    height: 30px;
 }
 
-.swatchBtn {
-    display: grid;
-    place-items: center;
-    width: 30px;
-    height: 28px;
-    padding: 0;
+.word {
+    padding: 4px 0;
     border: 0;
-    border-radius: var(--r-full);
-    background: transparent;
-    cursor: pointer;
-    transition: background-color var(--dur-1) var(--ease-out), box-shadow var(--dur-1) var(--ease-out);
+    background: none;
+    font-size: var(--text-small);
+    font-weight: 500;
+    color: var(--ink-3);
 }
 
-.swatchBtn:hover {
-    background: var(--surface-hover);
+.word:hover {
+    color: var(--ink);
 }
 
-.swatchBtn[aria-checked='true'] {
-    background: var(--surface);
-    box-shadow: var(--e1), inset 0 0 0 1px var(--line);
+.word[aria-checked='true'] {
+    color: var(--mark-ink);
 }
 
-[data-theme="dark"] .swatchBtn[aria-checked='true'],
-[data-theme="black"] .swatchBtn[aria-checked='true'] {
-    background: var(--surface-3);
+.word[aria-checked='true'] span {
+    background-image: linear-gradient(var(--mark), var(--mark));
+    background-repeat: no-repeat;
+    background-size: 100% 80%;
+    background-position: 0 72%;
+    padding: 0 3px;
+    margin: 0 -3px;
+    animation: cm-mark-draw var(--dur-2) var(--ease-out) both;
 }
 
-.swatch {
-    position: relative;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    overflow: hidden;
-    box-shadow: inset 0 0 0 1px rgba(127, 140, 135, 0.45);
-}
-
-.swatchBtn[aria-checked='true'] .swatch {
-    box-shadow: inset 0 0 0 1px rgba(127, 140, 135, 0.45), 0 0 0 2px var(--accent);
-}
-
-.swatch_light { background: #F5F4EF; }
-.swatch_dark { background: #0D1726; }
-.swatch_black { background: #000000; }
-
-/* Two solid halves rather than a gradient, for a clean edge at this size. */
-.swatch_system { background: #F5F4EF; }
-
-.swatch_system::after {
-    content: '';
-    position: absolute;
-    inset: 0 0 0 50%;
-    background: #0D1726;
-}
-
-/* ===== Full: preview cards ===== */
-
+/* ===== Full: four specimens ===== */
 .grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 12px;
+    gap: 20px;
 }
 
 .gridPlaceholder {
-    height: 158px;
+    height: 150px;
 }
 
 .card {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 6px 6px 10px;
-    border: 1px solid var(--line);
-    border-radius: var(--r-lg);
-    background: var(--surface);
+    gap: 4px;
+    padding: 0;
+    border: 0;
+    background: none;
     text-align: left;
-    cursor: pointer;
-    transition: border-color var(--dur-1) var(--ease-out), box-shadow var(--dur-2) var(--ease-out), transform var(--dur-1) var(--ease-out);
 }
 
-.card:hover {
-    border-color: var(--line-strong);
-}
-
-.card:active {
-    transform: scale(0.985);
-}
-
-.card[aria-checked='true'] {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-soft-2);
-}
-
-.previewFrame {
+.frame {
     position: relative;
     display: block;
     height: 96px;
-    border-radius: 10px;
-    overflow: hidden;
+    outline: 1px solid var(--rule);
+    transition: outline-color var(--dur-1) var(--ease-out);
 }
 
-/* Hard-coded on purpose: each miniature shows its own theme. */
-.preview {
-    --pv-canvas: #F5F4EF;
-    --pv-surface: #FFFFFF;
-    --pv-line: rgba(28, 40, 33, 0.12);
-    --pv-ink: #0F1D17;
-    --pv-ink-2: #C9CDC8;
-    --pv-forest: #0C3A2C;
-    --pv-accent: #00C389;
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding: 9px 10px 10px;
-    background: var(--pv-canvas);
-    box-shadow: inset 0 0 0 1px var(--pv-line);
-    border-radius: inherit;
+.card:hover .frame {
+    outline-color: var(--rule-control);
 }
 
-.preview_dark {
-    --pv-canvas: #070D16;
-    --pv-surface: #111B29;
-    --pv-line: rgba(150, 178, 214, 0.16);
-    --pv-ink: #ECF1F7;
-    --pv-ink-2: #3A4757;
-    --pv-forest: #0B2B22;
-    --pv-accent: #2ED39C;
-}
-
-.preview_black {
-    --pv-canvas: #000000;
-    --pv-surface: #111312;
-    --pv-line: rgba(255, 255, 255, 0.12);
-    --pv-ink: #F3F5F4;
-    --pv-ink-2: #3B403D;
-    --pv-forest: #08221A;
-    --pv-accent: #2ED39C;
-}
-
-/* Auto: light on the left, navy on the right, split on the diagonal. */
-.previewHalf {
-    clip-path: polygon(64% 0, 100% 0, 100% 100%, 36% 100%);
-}
-
-.pvBar {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-}
-
-.pvDot {
-    width: 7px;
-    height: 7px;
-    border-radius: 2px;
-    background: var(--pv-accent);
-}
-
-.pvBarLine {
-    width: 34%;
-    height: 5px;
-    border-radius: 3px;
-    background: var(--pv-ink);
-    opacity: 0.8;
-}
-
-.pvForest {
-    display: flex;
-    align-items: flex-end;
-    height: 22px;
-    padding: 0 7px 6px;
-    border-radius: 6px;
-    background: var(--pv-forest);
-}
-
-.pvForestLine {
-    width: 46%;
-    height: 4px;
-    border-radius: 2px;
-    background: rgba(255, 255, 255, 0.75);
-}
-
-.pvCard {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 8px;
-    flex: 1;
-    padding: 7px;
-    border-radius: 6px;
-    background: var(--pv-surface);
-    box-shadow: inset 0 0 0 1px var(--pv-line);
-}
-
-.pvLines {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    flex: 1;
-}
-
-.pvLine {
-    width: 86%;
-    height: 4px;
-    border-radius: 2px;
-    background: var(--pv-ink-2);
-}
-
-.pvLineShort {
-    width: 56%;
-}
-
-.pvPill {
-    width: 26%;
-    height: 9px;
-    border-radius: 3px;
-    background: var(--pv-accent);
-}
-
-.cardText {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-    padding: 0 4px;
+.card[aria-checked='true'] .frame {
+    outline: 2px solid var(--ink);
+    outline-offset: 3px;
 }
 
 .cardLabel {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 6px;
-    font-size: var(--text-small);
-    font-weight: var(--weight-semibold);
+    margin-top: 8px;
+    font-size: var(--text-body);
+    font-weight: 500;
     color: var(--ink);
 }
 
-.check {
-    display: grid;
-    place-items: center;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: var(--accent);
-    color: var(--on-accent);
-    animation: cm-pop-in var(--dur-2) var(--ease-out);
-}
-
-.check svg {
-    width: 11px;
-    height: 11px;
+.card[aria-checked='true'] .cardLabel span {
+    background-image: linear-gradient(var(--mark), var(--mark));
+    background-repeat: no-repeat;
+    background-size: 100% 80%;
+    background-position: 0 72%;
+    padding: 0 3px;
+    margin: 0 -3px;
+    color: var(--mark-ink);
 }
 
 .cardNote {
     font-size: var(--text-caption);
+    line-height: 1.35;
     color: var(--ink-3);
+}
+
+/* A specimen sets its own colours: it shows its theme, not the current one. */
+.specimen {
+    --sp-ground: #F3F1EA;
+    --sp-ink: #131B17;
+    --sp-rule: rgba(19, 27, 23, 0.16);
+    --sp-a: #2C5EA8;
+    --sp-b: #C1502A;
+    --sp-c: #1C7A68;
+    --sp-tint: 16%;
+    --sp-go: #11A05A;
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 10px 0;
+    background: var(--sp-ground);
+    overflow: hidden;
+}
+
+.sp_dark {
+    --sp-ground: #0C1826;
+    --sp-ink: #E9EFF6;
+    --sp-rule: rgba(170, 200, 240, 0.22);
+    --sp-a: #79A6F0;
+    --sp-b: #F08A63;
+    --sp-c: #4FC7AE;
+    --sp-tint: 22%;
+    --sp-go: #5BE09B;
+}
+
+.sp_black {
+    --sp-ground: #000000;
+    --sp-ink: #F1F3F1;
+    --sp-rule: rgba(255, 255, 255, 0.2);
+    --sp-a: #79A6F0;
+    --sp-b: #F08A63;
+    --sp-c: #4FC7AE;
+    --sp-tint: 22%;
+    --sp-go: #5BE09B;
+}
+
+/* Auto: Paper on the left, Blueprint on the right, cut on the diagonal. */
+.half {
+    clip-path: polygon(62% 0, 100% 0, 100% 100%, 38% 100%);
+}
+
+.spTitle {
+    width: 46%;
+    height: 6px;
+    background: var(--sp-ink);
+}
+
+.spGrid {
+    position: relative;
+    flex: 1;
+    border-top: 1px solid var(--sp-ink);
+    background-image: linear-gradient(90deg, var(--sp-rule) 1px, transparent 1px);
+    background-size: 25% 100%;
+}
+
+.spBlock {
+    position: absolute;
+    width: calc(25% - 3px);
+    background: color-mix(in srgb, var(--c) var(--sp-tint), var(--sp-ground));
+    border-top: 2px solid var(--c);
+}
+
+.spBlockA {
+    --c: var(--sp-a);
+    left: 2px;
+    top: 6px;
+    height: 26px;
+}
+
+.spBlockB {
+    --c: var(--sp-b);
+    left: calc(25% + 2px);
+    top: 20px;
+    height: 34px;
+}
+
+.spBlockC {
+    --c: var(--sp-c);
+    left: calc(75% + 2px);
+    top: 4px;
+    height: 22px;
+}
+
+.spNow {
+    position: absolute;
+    left: 25%;
+    width: 25%;
+    top: 40px;
+    height: 1.5px;
+    background: var(--sp-go);
+}
+
+.spNow::before {
+    content: '';
+    position: absolute;
+    left: -3px;
+    top: -2.25px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--sp-go);
 }
 
 @media (max-width: 640px) {
     .grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 20px 16px;
     }
 }
