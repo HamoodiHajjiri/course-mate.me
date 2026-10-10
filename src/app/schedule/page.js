@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { campusFilter } from '@/lib/campus';
@@ -10,14 +9,26 @@ import { useSemester } from '@/lib/SemesterContext';
 import { getGuest, setGuest, clearGuest, guestProfile, refuse } from '@/lib/guest';
 import PageShell from '@/components/PageShell';
 import PageHeader from '@/components/PageHeader';
+import SemesterPicker from '@/components/SemesterPicker';
 import InstructorFinder from '@/components/InstructorFinder';
 import CourseHistory, { HistorySheet } from '@/components/CourseHistory';
-import { ScheduleIcon, UserCheckIcon, DownloadIcon, CopyIcon, CheckIcon, CalendarPlusIcon, HistoryIcon, LockIcon } from '@/components/Icons';
+import {
+    Badge, Button, Callout, Checkbox, CourseSwatch, Dialog, EmptyState, Field, Input, SearchInput,
+    SegmentedControl, Select, Skeleton, Spinner, Switch, Tabs, Ticket, Tooltip, useConfirm, useToast,
+} from '@/components/ui';
+import {
+    AlertIcon, CalendarPlusIcon, CheckIcon, ChevronDownIcon, ChevronRightIcon, CloseIcon, CopyIcon, DownloadIcon,
+    EditIcon, HistoryIcon, LayersIcon, LockIcon, PlusIcon, RefreshIcon, ScheduleIcon, SlidersIcon, SparkleIcon,
+    StarIcon, UserCheckIcon,
+} from '@/components/Icons';
+import { formatDuration, formatRange } from '@/lib/classTime';
+import { paletteFor } from '@/lib/courseColor';
 import { historyTerms, termLabel, fetchHistoryCounts } from '@/lib/courseHistory';
 import { decodeHtmlEntities } from '@/lib/text';
 import { downloadSchedulePng, copySchedulePng } from '@/lib/schedulePng';
 import { downloadScheduleIcs } from '@/lib/scheduleIcs';
 import RoomLink from '@/components/RoomLink';
+import WeekGrid from '@/components/WeekGrid/WeekGrid';
 import styles from './schedule.module.css';
 
 // ===== TIME PARSING UTILITIES =====
@@ -545,6 +556,10 @@ export default function SchedulePage() {
     const [restoringFromSave, setRestoringFromSave] = useState(false);
     const [xorCourseIds, setXorCourseIds] = useState(new Set());
     const [isSavingSchedule, setIsSavingSchedule] = useState(false);
+    // Whether the saved cart has been read back. Until it has, the autosave
+    // below must not run: it would write an empty cart over the real one if
+    // the restore took longer than the autosave's one-second wait.
+    const [cartReady, setCartReady] = useState(false);
     // course_id -> [cart course ids Banner lists as its prerequisites]. UOS
     // files corequisites in the same list, so this only ever drives a warning.
     const [prereqMap, setPrereqMap] = useState({});
@@ -715,6 +730,7 @@ export default function SchedulePage() {
         // If we arrived via /schedule?course=ID (e.g. from the dashboard
         // "Electives offered" list), add that course to the cart.
         await addCourseFromQuery(profileData, restored || []);
+        setCartReady(true);
     };
 
     const fetchDbSavedSchedules = async (prof, term) => {
@@ -971,7 +987,11 @@ export default function SchedulePage() {
     // doesn't clobber the addition.
     const addCourseFromQuery = async (prof, currentCourses) => {
         if (typeof window === 'undefined') return;
-        const courseId = new URLSearchParams(window.location.search).get('course');
+        const params = new URLSearchParams(window.location.search);
+        // ?mode=history&course=… opens that course's history; it isn't a
+        // request to add it to the cart.
+        if (params.get('mode') === 'history') return;
+        const courseId = params.get('course');
         if (!courseId || courseId.startsWith('BASKET_')) return;
 
         // Strip the param so a refresh doesn't re-add the course.
@@ -996,7 +1016,7 @@ export default function SchedulePage() {
 
     // Persist selected courses to Supabase (debounced, keyed by term)
     useEffect(() => {
-        if (!profile || !selectedTerm) return;
+        if (!profile || !selectedTerm || !cartReady) return;
         // Don't save on initial mount — wait for restore to finish
         const activeTerm = selectedTerm;
         const timer = setTimeout(async () => {
@@ -1035,7 +1055,7 @@ export default function SchedulePage() {
                 .eq('id', profile.id);
         }, 1000);
         return () => clearTimeout(timer);
-    }, [selectedCourses, xorCourseIds, profile, selectedTerm]);
+    }, [selectedCourses, xorCourseIds, profile, selectedTerm, cartReady]);
 
     // Guest mode: the campus a profile would supply, picked on the page instead.
     // Reloads the cart's sections for it, as a term change does.
@@ -1449,6 +1469,27 @@ export default function SchedulePage() {
             .sort((a, b) => a.section_num.localeCompare(b.section_num));
     };
 
+    // Every legal way to take one cart course: its Banner-linked section
+    // groups, or for an elective slot, the groups of every course in it.
+    const buildGroupsForCourse = (c) => {
+        const sections = allSections[c.course_id] || [];
+        if (c.course_id.startsWith('BASKET_')) {
+            const sectionsByCourse = {};
+            for (const sec of sections) {
+                if (!sectionsByCourse[sec.course_id]) sectionsByCourse[sec.course_id] = [];
+                sectionsByCourse[sec.course_id].push(sec);
+            }
+            let basketOptions = [];
+            for (const [subCourseId, subSections] of Object.entries(sectionsByCourse)) {
+                const subGroups = buildSectionGroups(subSections, subCourseId, linkMap);
+                subGroups.forEach(g => g.originalCourseId = c.course_id);
+                basketOptions = basketOptions.concat(subGroups);
+            }
+            return basketOptions;
+        }
+        return buildSectionGroups(sections, c.course_id, linkMap);
+    };
+
     const handleGenerate = () => {
         setError('');
         if (selectedCourses.length === 0) { setError('Please add at least one course'); return; }
@@ -1464,27 +1505,6 @@ export default function SchedulePage() {
         // Use setTimeout to avoid blocking the UI
         setTimeout(() => {
             try {
-                // Helper to build groups for a single course
-                const buildGroupsForCourse = (c) => {
-                    const sections = allSections[c.course_id] || [];
-                    if (c.course_id.startsWith('BASKET_')) {
-                        const sectionsByCourse = {};
-                        for (const sec of sections) {
-                            if (!sectionsByCourse[sec.course_id]) sectionsByCourse[sec.course_id] = [];
-                            sectionsByCourse[sec.course_id].push(sec);
-                        }
-                        let basketOptions = [];
-                        for (const [subCourseId, subSections] of Object.entries(sectionsByCourse)) {
-                            const subGroups = buildSectionGroups(subSections, subCourseId, linkMap);
-                            subGroups.forEach(g => g.originalCourseId = c.course_id);
-                            basketOptions = basketOptions.concat(subGroups);
-                        }
-                        return basketOptions;
-                    } else {
-                        return buildSectionGroups(sections, c.course_id, linkMap);
-                    }
-                };
-
                 // Build course name map
                 const courseNames = {};
                 for (const c of selectedCourses) {
@@ -1567,26 +1587,6 @@ export default function SchedulePage() {
 
         setTimeout(() => {
             try {
-                const buildGroupsForCourse = (c) => {
-                    const sections = allSections[c.course_id] || [];
-                    if (c.course_id.startsWith('BASKET_')) {
-                        const sectionsByCourse = {};
-                        for (const sec of sections) {
-                            if (!sectionsByCourse[sec.course_id]) sectionsByCourse[sec.course_id] = [];
-                            sectionsByCourse[sec.course_id].push(sec);
-                        }
-                        let basketOptions = [];
-                        for (const [subCourseId, subSections] of Object.entries(sectionsByCourse)) {
-                            const subGroups = buildSectionGroups(subSections, subCourseId, linkMap);
-                            subGroups.forEach(g => g.originalCourseId = c.course_id);
-                            basketOptions = basketOptions.concat(subGroups);
-                        }
-                        return basketOptions;
-                    } else {
-                        return buildSectionGroups(sections, c.course_id, linkMap);
-                    }
-                };
-
                 const courseNames = {};
                 const allCourseGroups = {};
                 for (const c of selectedCourses) {
@@ -1596,21 +1596,20 @@ export default function SchedulePage() {
                         allCourseGroups[c.course_id] = groups;
                     }
                 }
-
                 const courseIds = Object.keys(allCourseGroups);
 
                 // Generate all combinations of a given size
                 const getCombinations = (arr, size) => {
                     if (size === 0) return [[]];
                     if (arr.length < size) return [];
-                    const results = [];
+                    const out = [];
                     for (let i = 0; i <= arr.length - size; i++) {
                         const rest = getCombinations(arr.slice(i + 1), size - 1);
                         for (const combo of rest) {
-                            results.push([arr[i], ...combo]);
+                            out.push([arr[i], ...combo]);
                         }
                     }
-                    return results;
+                    return out;
                 };
 
                 // Try subsets from largest (N-1) to smallest (1)
@@ -1663,6 +1662,27 @@ export default function SchedulePage() {
         return m;
     }, [selectedCourses, extraCourseCredits]);
 
+    // When nothing fits: the pairs of courses that clash in every possible
+    // combination of their sections, so the student knows what to change.
+    const conflictPairs = useMemo(() => {
+        if (!results || results.length !== 0) return [];
+        const list = selectedCourses
+            .filter(c => !xorCourseIds.has(c.course_id))
+            .map(c => ({ c, groups: buildGroupsForCourse(c) }))
+            .filter(x => x.groups.length > 0 && x.groups.length <= 400);
+        const pairs = [];
+        for (let i = 0; i < list.length; i++) {
+            for (let j = i + 1; j < list.length; j++) {
+                const a = list[i];
+                const b = list[j];
+                const always = a.groups.every(ga => b.groups.every(gb => groupConflicts(ga, gb) || ga.courseId === gb.courseId));
+                if (always) pairs.push([a.c, b.c]);
+            }
+        }
+        return pairs;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [results, selectedCourses, xorCourseIds, allSections, linkMap]);
+
     // Warning text for a course whose listed prerequisite is also in the cart.
     const prereqNote = (courseId) => {
         const names = (prereqMap[courseId] || []).map(id => courseNameMap[id] || id);
@@ -1687,164 +1707,193 @@ export default function SchedulePage() {
         }
     }, [error]);
 
+    const [activeIdx, setActiveIdx] = useState(-1);
+    useEffect(() => { setActiveIdx(-1); }, [courseSearch]);
+
     if (!profile) {
         return (
-            <PageShell>
-                <div className={styles.spinner} style={{ margin: '60px auto' }}></div>
+            <PageShell width="wide">
+                <div className={styles.loadingPage} aria-busy="true">
+                    <Skeleton width={180} height={30} radius={8} />
+                    <Skeleton width={360} height={14} />
+                    <div className={styles.loadingGrid}>
+                        <Skeleton height={420} radius={18} />
+                        <Skeleton height={420} radius={18} />
+                    </div>
+                </div>
             </PageShell>
         );
     }
 
+    const hasResults = !!(results && results.length > 0);
+    const cartCredits = selectedCourses.reduce((sum, c) => sum + (c.is_basket || c.course_id.startsWith('BASKET_') ? 0 : (c.credit_hours || 0)), 0);
+    const hasBasketCredits = selectedCourses.some(c => c.course_id.startsWith('BASKET_'));
+    const prefCount = [
+        prefs.noClassesBefore, prefs.noClassesAfter, prefs.languagePref !== 'any', prefs.gapPref !== 'none',
+        prefs.compactPref !== 'none', prefs.hideMixedSections, prefs.strictTime,
+        ...Object.values(prefs.preferredInstructors).filter(Boolean),
+        ...Object.values(prefs.pinnedSections).filter(Boolean),
+        ...Object.values(prefs.pinnedLabs || {}).filter(Boolean),
+        ...Object.values(prefs.preferredElectives || {}).filter(v => v && v.length),
+    ].filter(Boolean).length;
+    const loadingAny = loadingCourseIds.size > 0;
+    const cartIndex = (id) => selectedCourses.findIndex(c => c.course_id === id);
+
+    const onCourseKeyDown = (e) => {
+        if (!showDropdown || filteredCourses.length === 0) return;
+        if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx(i => Math.min(filteredCourses.length - 1, i + 1)); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIdx(i => Math.max(0, i - 1)); }
+        else if (e.key === 'Enter' && activeIdx >= 0) {
+            e.preventDefault();
+            const course = filteredCourses[activeIdx];
+            if (!notOpenNote(course.course_id)) addCourse(course);
+        } else if (e.key === 'Escape') setShowDropdown(false);
+    };
+
+    const segment = (value, label) => ({ value, label });
+
     return (
-        <PageShell>
-                <PageHeader title="Schedule" />
+        <PageShell width="wide">
+            <PageHeader
+                title="Schedule"
+                subtitle={mode === 'build'
+                    ? 'Pick your courses and CourseMate finds every timetable that fits, ranked by your preferences.'
+                    : mode === 'instructor'
+                        ? 'Look up anyone teaching this term and see their whole week.'
+                        : 'See how a course ran in recent terms before you plan around it.'}
+            >
+                <SemesterPicker />
+            </PageHeader>
 
-                {/* Building a timetable and looking up an instructor answer the
-                    same question — when does this happen — so they are peer
-                    modes here rather than separate destinations. */}
-                <div className={styles.modeCard} role="tablist" aria-label="Schedule mode">
-                    <button
-                        type="button"
-                        role="tab"
-                        aria-selected={mode === 'build'}
-                        className={`${styles.modeBtn} ${mode === 'build' ? styles.modeBtnActive : ''}`}
-                        onClick={() => switchMode('build')}
-                    >
-                        <ScheduleIcon width={16} height={16} />
-                        <span className={styles.modeLabelLong}>Build schedule</span>
-                        <span className={styles.modeLabelShort}>Build</span>
-                    </button>
-                    <button
-                        type="button"
-                        role="tab"
-                        aria-selected={mode === 'instructor'}
-                        className={`${styles.modeBtn} ${mode === 'instructor' ? styles.modeBtnActive : ''}`}
-                        onClick={() => switchMode('instructor')}
-                    >
-                        <UserCheckIcon width={16} height={16} />
-                        <span className={styles.modeLabelLong}>Find instructor</span>
-                        <span className={styles.modeLabelShort}>Instructor</span>
-                    </button>
-                    <button
-                        type="button"
-                        role="tab"
-                        aria-selected={mode === 'history'}
-                        className={`${styles.modeBtn} ${mode === 'history' ? styles.modeBtnActive : ''}`}
-                        onClick={() => switchMode('history')}
-                    >
-                        <HistoryIcon width={16} height={16} />
-                        <span className={styles.modeLabelLong}>Course history</span>
-                        <span className={styles.modeLabelShort}>History</span>
-                    </button>
-                </div>
+            {/* Building a timetable, looking up an instructor and checking a
+                course's past answer the same question — when does this
+                happen — so they are peer modes of one page. */}
+            <Tabs
+                label="Schedule mode"
+                value={mode}
+                onChange={switchMode}
+                tabs={[
+                    { value: 'build', label: 'Build', icon: <ScheduleIcon /> },
+                    { value: 'instructor', label: 'Find instructor', icon: <UserCheckIcon /> },
+                    { value: 'history', label: 'Course history', icon: <HistoryIcon /> },
+                ]}
+            />
 
-                {mode === 'instructor' && <InstructorFinder />}
+            {mode === 'instructor' && <InstructorFinder />}
 
-                {mode === 'history' && (
-                    <CourseHistory
-                        request={historyRequest}
-                        onBackToBuild={historyFromBuild ? () => switchMode('build') : null}
-                    />
-                )}
+            {mode === 'history' && (
+                <CourseHistory
+                    request={historyRequest}
+                    onBackToBuild={historyFromBuild ? () => switchMode('build') : null}
+                />
+            )}
 
-                {sheetCourse && (
-                    <HistorySheet
-                        course={sheetCourse}
-                        onClose={() => setSheetCourse(null)}
-                        onSeeAll={(term) => openHistory(sheetCourse, term)}
-                    />
-                )}
+            {sheetCourse && (
+                <HistorySheet
+                    course={sheetCourse}
+                    onClose={() => setSheetCourse(null)}
+                    onSeeAll={(term) => openHistory(sheetCourse, term)}
+                />
+            )}
 
-                <main className={styles.main} hidden={mode !== 'build'}>
-                    {error && <div className={styles.error}>{error}</div>}
-
-                    {/* A signed-in student's campus comes from their profile. A
-                        guest has none, so they pick which sections to see. */}
-                    {profile.isGuest && (
-                        <div className={`${styles.card} ${styles.section}`}>
-                            <div className={styles.sectionTitle}>Campus</div>
-                            <div className={styles.toggleRow}>
-                                {[['male', "Men's campus"], ['female', "Women's campus"]].map(([g, label]) => (
-                                    <button
-                                        key={g}
-                                        type="button"
-                                        className={`${styles.toggleBtn} ${profile.gender === g ? styles.toggleBtnActive : ''}`}
-                                        onClick={() => switchGuestCampus(g)}
-                                    >
-                                        {label}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* SAVED SCHEDULES WIDGET */}
-                    {dbSavedSchedules.length > 0 && (
-                        <div className={styles.section}>
-                            <div className={styles.sectionHeader}>
-                                <h2 className={styles.sectionTitle}>Your Saved Schedules ({dbSavedSchedules.length}/3)</h2>
-                            </div>
-                            {dbSavedSchedules.map((savedObj, i) => (
-                                <ScheduleCard
-                                    key={savedObj.dbId}
-                                    result={savedObj}
-                                    rank={savedObj.name || `Saved schedule ${i + 1}`}
-                                    courseNameMap={courseNameMap}
-                                    courseCreditsMap={courseCreditsMap}
-                                    selectedCourses={savedObj.storedSelectedCourses}
-                                    onSave={null}
-                                    onUnsave={() => handleDeleteSavedSchedule(savedObj.dbId)}
-                                    isSaved={true}
-                                    initiallyCollapsed={true}
-                                    isSavingSchedule={isSavingSchedule}
-                                />
-                            ))}
-                        </div>
-                    )}
-
-                    {/* Step 1: Course Selection — compact when results exist */}
-                    {results && results.length > 0 ? (
+            <div className={`${styles.workspace} ${hasResults ? styles.hasResults : ''}`} hidden={mode !== 'build'}>
+                {/* ===== Builder ===== */}
+                <aside className={styles.builder} aria-label="Your courses and preferences">
+                    {/* Phones, once there are results: the cart folds to a strip. */}
+                    {hasResults && (
                         <div className={styles.compactBar}>
                             <div className={styles.compactCourses}>
                                 {selectedCourses.map(c => (
                                     <span
                                         key={c.course_id}
                                         className={`${styles.compactChip} ${prereqMap[c.course_id] ? styles.compactChipPrereq : ''}`}
-                                        title={prereqNote(c.course_id) || undefined}
-                                    >{c.course_id}</span>
+                                        title={prereqNote(c.course_id) || c.name}
+                                    >
+                                        <span className={styles.compactDot} style={{ '--c': paletteFor(cartIndex(c.course_id)) }} />
+                                        {c.course_id.startsWith('BASKET_') ? c.name.replace(/University Elective \(Basket (\d)\)/, 'Univ. elective $1') : c.course_id}
+                                    </span>
                                 ))}
                             </div>
-                            <button className={styles.editCoursesBtn} onClick={() => setResults(null)}>Edit Courses</button>
+                            <Button size="sm" variant="secondary" icon={<EditIcon />} onClick={() => setResults(null)}>Edit</Button>
                         </div>
-                    ) : (
-                        <div className={`${styles.card} ${styles.section}`}>
-                            <div className={styles.sectionTitle}>Select Courses</div>
+                    )}
+
+                    <div className={styles.builderStack}>
+                        {/* A guest has no profile campus, so they pick which sections to see. */}
+                        {profile.isGuest && (
+                            <section className={styles.panel}>
+                                <div className={styles.panelHead}>
+                                    <h2 className={styles.panelTitle}>Campus</h2>
+                                    <span className={styles.panelMeta}>Which sections you can take</span>
+                                </div>
+                                <SegmentedControl
+                                    full
+                                    label="Campus"
+                                    value={profile.gender}
+                                    onChange={switchGuestCampus}
+                                    options={[
+                                        { value: 'male', label: "Men's campus" },
+                                        { value: 'female', label: "Women's campus" },
+                                    ]}
+                                />
+                            </section>
+                        )}
+
+                        {/* ===== Courses ===== */}
+                        <section className={styles.panel} aria-labelledby="cart-title">
+                            <div className={styles.panelHead}>
+                                <h2 id="cart-title" className={styles.panelTitle}>Courses</h2>
+                                <span className={styles.panelMeta}>
+                                    <strong>{selectedCourses.length}</strong> of 8
+                                    {cartCredits > 0 && <> · <strong>{cartCredits}</strong>{hasBasketCredits ? '+' : ''} credits</>}
+                                </span>
+                            </div>
+
                             <div className={styles.searchWrapper} onClick={e => e.stopPropagation()}>
-                                <input type="text" value={courseSearch} onChange={(e) => { setCourseSearch(e.target.value); setShowDropdown(true); }} onFocus={() => setShowDropdown(true)} className={styles.input} placeholder="Search by course name or ID..." autoComplete="off" />
+                                <SearchInput
+                                    value={courseSearch}
+                                    onChange={(e) => { setCourseSearch(e.target.value); setShowDropdown(true); }}
+                                    onFocus={() => setShowDropdown(true)}
+                                    onKeyDown={onCourseKeyDown}
+                                    placeholder={selectedCourses.length >= 8 ? 'Eight courses is the most' : 'Add a course by name or ID'}
+                                    disabled={selectedCourses.length >= 8}
+                                    autoComplete="off"
+                                    role="combobox"
+                                    aria-expanded={showDropdown && filteredCourses.length > 0}
+                                    aria-controls="cart-search-list"
+                                    aria-label="Add a course"
+                                />
                                 {showDropdown && filteredCourses.length > 0 && (
-                                    <div className={styles.dropdown}>
-                                        {filteredCourses.map(course => {
+                                    <div className={styles.dropdown} id="cart-search-list" role="listbox">
+                                        {filteredCourses.map((course, i) => {
                                             const closedNote = notOpenNote(course.course_id);
                                             if (!closedNote) {
                                                 return (
-                                                    <button key={course.course_id} type="button" className={styles.dropdownItem} onClick={() => addCourse(course)}>
-                                                        <span className={styles.dropdownId}>{course.course_id}</span>
-                                                        <span className={styles.dropdownName}>{course.name}</span>
+                                                    <button
+                                                        key={course.course_id}
+                                                        type="button"
+                                                        role="option"
+                                                        aria-selected={i === activeIdx}
+                                                        className={`${styles.dropdownItem} ${i === activeIdx ? styles.dropdownItemActive : ''}`}
+                                                        onClick={() => addCourse(course)}
+                                                    >
+                                                        <CourseSwatch courseId={course.course_id} size="sm" />
+                                                        <span className={styles.dropdownText}>
+                                                            <span className={styles.dropdownName}>{course.name}</span>
+                                                            <span className={styles.dropdownId}>{course.course_id}{course.credit_hours ? ` · ${course.credit_hours} credits` : ''}</span>
+                                                        </span>
+                                                        <PlusIcon className={styles.dropdownAdd} />
                                                     </button>
                                                 );
                                             }
                                             return (
                                                 <div key={course.course_id} className={styles.dropdownClosed}>
-                                                    <div className={styles.dropdownClosedHead}>
-                                                        <span className={styles.dropdownId}>{course.course_id}</span>
+                                                    <CourseSwatch courseId={course.course_id} size="sm" className={styles.dropdownClosedSwatch} />
+                                                    <span className={styles.dropdownText}>
                                                         <span className={styles.dropdownName}>{course.name}</span>
-                                                    </div>
-                                                    <div className={styles.dropdownClosedFoot}>
-                                                        <span>{closedNote}</span>
-                                                        <button type="button" className={styles.dropdownHistoryBtn} onClick={() => openHistory(course)}>
-                                                            History
-                                                        </button>
-                                                    </div>
+                                                        <span className={styles.dropdownClosedNote}>{closedNote}</span>
+                                                    </span>
+                                                    <Button size="sm" variant="ghost" icon={<HistoryIcon />} onClick={() => openHistory(course)}>History</Button>
                                                 </div>
                                             );
                                         })}
@@ -1852,175 +1901,206 @@ export default function SchedulePage() {
                                 )}
                             </div>
 
-
-
                             {selectedCourses.length > 0 ? (
-                                <div className={styles.selectedCourses}>
-                                    {selectedCourses.map(c => (
-                                        <div key={c.course_id} className={`${styles.courseChip} ${xorCourseIds.has(c.course_id) ? styles.courseChipXor : ''}`}>
-                                            <div className={styles.courseChipInfo}>
-                                                <span className={styles.courseChipName}>{c.name}</span>
-                                                <span className={styles.courseChipId}>{c.course_id}</span>
-                                                {loadingCourseIds.has(c.course_id) && <span className={styles.spinner} style={{ width: 12, height: 12, borderWidth: 2, marginLeft: 8 }}></span>}
-                                                {prereqMap[c.course_id] && (
-                                                    <span className={styles.prereqNote}>
-                                                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                                            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" />
-                                                            <path d="M12 9v4" />
-                                                            <path d="M12 17h.01" />
-                                                        </svg>
-                                                        <span>{prereqNote(c.course_id)}</span>
+                                <ul className={styles.cart}>
+                                    {selectedCourses.map((c, i) => {
+                                        const isBasket = c.course_id.startsWith('BASKET_');
+                                        const isXor = xorCourseIds.has(c.course_id);
+                                        return (
+                                            <li key={c.course_id} className={`${styles.cartItem} ${isXor ? styles.cartItemXor : ''}`}>
+                                                <div className={styles.cartRow}>
+                                                    <CourseSwatch
+                                                        courseId={c.course_id}
+                                                        color={paletteFor(i)}
+                                                        label={isBasket ? (c.course_id.startsWith('BASKET_DEPT') ? 'D' : c.course_id.startsWith('BASKET_SUPPORT') ? 'S' : `U${c.course_id.slice(-1)}`) : undefined}
+                                                    />
+                                                    <span className={styles.cartText}>
+                                                        <span className={styles.cartName}>{c.name}</span>
+                                                        <span className={styles.cartMeta}>
+                                                            {isBasket ? 'Any course in this slot' : c.course_id}
+                                                            {!isBasket && c.credit_hours ? ` · ${c.credit_hours} cr` : ''}
+                                                            {loadingCourseIds.has(c.course_id) && <span className={styles.cartLoading}><Spinner /> loading sections</span>}
+                                                        </span>
                                                     </span>
+                                                    <span className={styles.cartActions}>
+                                                        <Tooltip label={isXor ? 'Either-or: on' : 'Either-or'}>
+                                                            <button
+                                                                type="button"
+                                                                className={`${styles.xorToggle} ${isXor ? styles.xorToggleActive : ''}`}
+                                                                onClick={() => toggleXor(c.course_id)}
+                                                                aria-pressed={isXor}
+                                                                aria-label={`Either-or for ${c.name}: only one either-or course appears per schedule`}
+                                                            >
+                                                                OR
+                                                            </button>
+                                                        </Tooltip>
+                                                        {/^\d+$/.test(c.course_id) && (
+                                                            <Tooltip label="Past terms">
+                                                                <button
+                                                                    type="button"
+                                                                    className={styles.iconBtn}
+                                                                    onClick={() => setSheetCourse(c)}
+                                                                    aria-label={`Past terms for ${c.name}`}
+                                                                >
+                                                                    <HistoryIcon />
+                                                                </button>
+                                                            </Tooltip>
+                                                        )}
+                                                        <Tooltip label="Remove">
+                                                            <button
+                                                                type="button"
+                                                                className={`${styles.iconBtn} ${styles.iconBtnDanger}`}
+                                                                onClick={() => removeCourse(c.course_id)}
+                                                                aria-label={`Remove ${c.name}`}
+                                                            >
+                                                                <CloseIcon />
+                                                            </button>
+                                                        </Tooltip>
+                                                    </span>
+                                                </div>
+                                                {prereqMap[c.course_id] && (
+                                                    <p className={styles.prereqNote}>
+                                                        <AlertIcon />
+                                                        <span>{prereqNote(c.course_id)}</span>
+                                                    </p>
                                                 )}
-                                            </div>
-                                            <div className={styles.courseChipActions}>
-                                                {/^\d+$/.test(c.course_id) && (
-                                                    <button
-                                                        type="button"
-                                                        className={styles.historyBtn}
-                                                        onClick={() => setSheetCourse(c)}
-                                                        aria-label={`Past terms for ${c.name}`}
-                                                        title="How this course ran in past terms"
-                                                    >
-                                                        <HistoryIcon width={16} height={16} />
-                                                    </button>
-                                                )}
-                                                <button className={`${styles.xorToggle} ${xorCourseIds.has(c.course_id) ? styles.xorToggleActive : ''}`} onClick={() => toggleXor(c.course_id)} title="Exclusive Or: only one XOR course will appear per schedule">XOR</button>
-                                                <button className={styles.removeBtn} onClick={() => removeCourse(c.course_id)}>×</button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {xorCourseIds.size >= 1 && (
-                                        <div className={styles.xorInfo}>
-                                            Schedules will include only one of the XOR courses at a time.
-                                        </div>
-                                    )}
-                                </div>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
                             ) : (
-                                <div className={styles.emptyCourses}>
-                                    Add courses to build your schedule
+                                <div className={styles.cartEmpty}>
+                                    <span className={styles.cartEmptyIcon}><LayersIcon /></span>
+                                    <span>
+                                        <strong>Start with the courses you plan to take.</strong>
+                                        Search above, or hold a place for an elective below and let the builder pick it.
+                                    </span>
                                 </div>
                             )}
 
-                            <div className={styles.basketButtons}>
-                                <button className={styles.basketBtn} onClick={() => addCourse({ course_id: 'BASKET_1', name: 'University Elective (Basket 1)', is_basket: true, basket_name: 'Basket 1' })}>
-                                    + <span className={styles.basketBtnLong}>University</span><span className={styles.basketBtnShort}>Univ.</span> Elective 1
-                                </button>
-                                <button className={styles.basketBtn} onClick={() => addCourse({ course_id: 'BASKET_2', name: 'University Elective (Basket 2)', is_basket: true, basket_name: 'Basket 2' })}>
-                                    + <span className={styles.basketBtnLong}>University</span><span className={styles.basketBtnShort}>Univ.</span> Elective 2
-                                </button>
-                                {majorInfo?.dept_electives_count > 0 && majorInfo?.support_electives_count > 0 ? (
-                                    <>
-                                        <button className={styles.basketBtn} onClick={addDeptElective}>
-                                            + Major Elective
-                                        </button>
-                                        <button className={styles.basketBtn} onClick={addSupportElective}>
-                                            + Support Elective
-                                        </button>
-                                    </>
-                                ) : majorInfo?.dept_electives_count > 0 ? (
-                                    <button className={`${styles.basketBtn} ${styles.basketBtnFull}`} onClick={addDeptElective}>
-                                        + Department Elective
-                                    </button>
-                                ) : null}
-                            </div>
-                        </div>
-                    )}
+                            {xorCourseIds.size >= 1 && (
+                                <p className={styles.xorInfo}>
+                                    <strong>Either-or:</strong> each schedule includes only one of the courses marked OR.
+                                </p>
+                            )}
 
-                    {/* Step 2: Preferences — hidden when results showing */}
-                    {selectedCourses.length > 0 && !results && (
-                        <div className={styles.section}>
-                            <div className={styles.prefsCard}>
-                                <div className={styles.prefsHeader} onClick={() => setPrefsOpen(!prefsOpen)}>
-                                    <span className={styles.prefsHeaderTitle}>Preferences</span>
-                                    <span className={`${styles.prefsChevron} ${prefsOpen ? styles.prefsChevronOpen : ''}`}>
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                            <path d="m6 9 6 6 6-6" />
-                                        </svg>
-                                    </span>
+                            <div className={styles.slots}>
+                                <span className={styles.slotsLabel}>Elective slots</span>
+                                <div className={styles.slotGrid}>
+                                    <button type="button" className={styles.slotBtn} onClick={() => addCourse({ course_id: 'BASKET_1', name: 'University Elective (Basket 1)', is_basket: true, basket_name: 'Basket 1' })}>
+                                        <PlusIcon />University elective 1
+                                    </button>
+                                    <button type="button" className={styles.slotBtn} onClick={() => addCourse({ course_id: 'BASKET_2', name: 'University Elective (Basket 2)', is_basket: true, basket_name: 'Basket 2' })}>
+                                        <PlusIcon />University elective 2
+                                    </button>
+                                    {majorInfo?.dept_electives_count > 0 && majorInfo?.support_electives_count > 0 ? (
+                                        <>
+                                            <button type="button" className={styles.slotBtn} onClick={addDeptElective}>
+                                                <PlusIcon />Major elective
+                                            </button>
+                                            <button type="button" className={styles.slotBtn} onClick={addSupportElective}>
+                                                <PlusIcon />Support elective
+                                            </button>
+                                        </>
+                                    ) : majorInfo?.dept_electives_count > 0 ? (
+                                        <button type="button" className={`${styles.slotBtn} ${styles.slotBtnWide}`} onClick={addDeptElective}>
+                                            <PlusIcon />Department elective
+                                        </button>
+                                    ) : null}
                                 </div>
+                            </div>
+                        </section>
+
+                        {/* ===== Preferences ===== */}
+                        {selectedCourses.length > 0 && (
+                            <section className={`${styles.panel} ${styles.prefsPanel}`}>
+                                <button type="button" className={styles.prefsHeader} onClick={() => setPrefsOpen(!prefsOpen)} aria-expanded={prefsOpen}>
+                                    <span className={styles.prefsHeaderIcon}><SlidersIcon /></span>
+                                    <span className={styles.prefsHeaderText}>
+                                        <span className={styles.panelTitle}>Preferences</span>
+                                        <span className={styles.panelMeta}>{prefCount > 0 ? `${prefCount} set` : 'Times, days, gaps, instructors'}</span>
+                                    </span>
+                                    <ChevronDownIcon className={`${styles.prefsChevron} ${prefsOpen ? styles.prefsChevronOpen : ''}`} />
+                                </button>
                                 {prefsOpen && (
                                     <div className={styles.prefsBody}>
-                                        {/* Time Constraints */}
                                         <div className={styles.prefGroup}>
-                                            <span className={styles.prefLabel}>Time Constraints</span>
+                                            <span className={styles.prefLabel}>Class times</span>
                                             <div className={styles.timeRow}>
-                                                <span className={styles.timeSep}>No classes before</span>
-                                                <select className={styles.timeInput} value={prefs.noClassesBefore} onChange={e => setPrefs(p => ({ ...p, noClassesBefore: e.target.value }))}>
-                                                    <option value="">Any</option>
-                                                    <option value="09:30 AM">9:30 AM</option>
-                                                    <option value="11:00 AM">11:00 AM</option>
-                                                    <option value="12:30 PM">12:30 PM</option>
-                                                    <option value="02:00 PM">2:00 PM</option>
-                                                </select>
+                                                <Field label="Not before" className={styles.timeField}>
+                                                    <Select size="sm" value={prefs.noClassesBefore} onChange={e => setPrefs(p => ({ ...p, noClassesBefore: e.target.value }))}>
+                                                        <option value="">Any time</option>
+                                                        <option value="09:30 AM">9:30 AM</option>
+                                                        <option value="11:00 AM">11:00 AM</option>
+                                                        <option value="12:30 PM">12:30 PM</option>
+                                                        <option value="02:00 PM">2:00 PM</option>
+                                                    </Select>
+                                                </Field>
+                                                <Field label="Not after" className={styles.timeField}>
+                                                    <Select size="sm" value={prefs.noClassesAfter} onChange={e => setPrefs(p => ({ ...p, noClassesAfter: e.target.value }))}>
+                                                        <option value="">Any time</option>
+                                                        <option value="02:00 PM">2:00 PM</option>
+                                                        <option value="03:15 PM">3:30 PM</option>
+                                                        <option value="05:00 PM">5:00 PM</option>
+                                                        <option value="06:30 PM">6:30 PM</option>
+                                                    </Select>
+                                                </Field>
                                             </div>
-                                            <div className={styles.timeRow}>
-                                                <span className={styles.timeSep}>No classes after</span>
-                                                <select className={styles.timeInput} value={prefs.noClassesAfter} onChange={e => setPrefs(p => ({ ...p, noClassesAfter: e.target.value }))}>
-                                                    <option value="">Any</option>
-                                                    <option value="02:00 PM">2:00 PM</option>
-                                                    <option value="03:15 PM">3:30 PM</option>
-                                                    <option value="05:00 PM">5:00 PM</option>
-                                                    <option value="06:30 PM">6:30 PM</option>
-                                                </select>
-                                            </div>
-                                        </div>
-
-                                        <div className={styles.prefGroup}>
-                                            <span className={styles.prefLabel}>Section Language</span>
-                                            <div className={styles.toggleRow}>
-                                                <button className={`${styles.toggleBtn} ${prefs.languagePref === 'any' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, languagePref: 'any' }))}>Any</button>
-                                                <button className={`${styles.toggleBtn} ${prefs.languagePref === 'english' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, languagePref: 'english' }))}>English</button>
-                                                <button className={`${styles.toggleBtn} ${prefs.languagePref === 'arabic' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, languagePref: 'arabic' }))}>Arabic</button>
-                                            </div>
-                                        </div>
-
-                                        <div className={styles.prefGroup}>
-                                            <label className={styles.checkboxLabel} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={prefs.strictTime}
-                                                    onChange={e => setPrefs(p => ({ ...p, strictTime: e.target.checked }))}
-                                                    style={{ width: '16px', height: '16px' }}
-                                                />
-                                                Strict time constraints (don't show alternatives)
+                                            <label className={styles.switchRow}>
+                                                <span>
+                                                    <span className={styles.switchLabel}>Strict times</span>
+                                                    <span className={styles.switchSub}>Don&rsquo;t suggest schedules that break them</span>
+                                                </span>
+                                                <Switch checked={prefs.strictTime} onChange={v => setPrefs(p => ({ ...p, strictTime: v }))} label="Strict time constraints" />
                                             </label>
                                         </div>
 
                                         <div className={styles.prefGroup}>
-                                            <label className={styles.checkboxLabel} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={prefs.hideMixedSections}
-                                                    onChange={e => setPrefs(p => ({ ...p, hideMixedSections: e.target.checked }))}
-                                                    style={{ width: '16px', height: '16px' }}
-                                                />
-                                                Hide mixed sections (main campus)
-                                            </label>
+                                            <span className={styles.prefLabel}>Section language</span>
+                                            <SegmentedControl
+                                                full
+                                                size="sm"
+                                                label="Section language"
+                                                value={prefs.languagePref}
+                                                onChange={v => setPrefs(p => ({ ...p, languagePref: v }))}
+                                                options={[segment('any', 'Any'), segment('english', 'English'), segment('arabic', 'Arabic')]}
+                                            />
                                         </div>
 
-                                        {/* Gap Preference */}
                                         <div className={styles.prefGroup}>
-                                            <span className={styles.prefLabel}>Gap Preference</span>
-                                            <div className={styles.toggleRow}>
-                                                <button className={`${styles.toggleBtn} ${prefs.gapPref === 'none' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, gapPref: 'none' }))}>No preference</button>
-                                                <button className={`${styles.toggleBtn} ${prefs.gapPref === 'minimize' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, gapPref: 'minimize' }))}>No gaps</button>
-                                                <button className={`${styles.toggleBtn} ${prefs.gapPref === 'prefer' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, gapPref: 'prefer' }))}>Prefer gaps</button>
-                                            </div>
+                                            <span className={styles.prefLabel}>Gaps between classes</span>
+                                            <SegmentedControl
+                                                full
+                                                size="sm"
+                                                label="Gaps between classes"
+                                                value={prefs.gapPref}
+                                                onChange={v => setPrefs(p => ({ ...p, gapPref: v }))}
+                                                options={[segment('none', 'Any'), segment('minimize', 'Fewer gaps'), segment('prefer', 'Some gaps')]}
+                                            />
                                         </div>
 
-                                        {/* Compactness */}
                                         <div className={styles.prefGroup}>
-                                            <span className={styles.prefLabel}>Day Spread</span>
-                                            <div className={styles.toggleRow}>
-                                                <button className={`${styles.toggleBtn} ${prefs.compactPref === 'none' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, compactPref: 'none' }))}>No preference</button>
-                                                <button className={`${styles.toggleBtn} ${prefs.compactPref === 'fewer' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, compactPref: 'fewer' }))}>Fewer days</button>
-                                                <button className={`${styles.toggleBtn} ${prefs.compactPref === 'spread' ? styles.toggleBtnActive : ''}`} onClick={() => setPrefs(p => ({ ...p, compactPref: 'spread' }))}>Spread out</button>
-                                            </div>
+                                            <span className={styles.prefLabel}>Days on campus</span>
+                                            <SegmentedControl
+                                                full
+                                                size="sm"
+                                                label="Days on campus"
+                                                value={prefs.compactPref}
+                                                onChange={v => setPrefs(p => ({ ...p, compactPref: v }))}
+                                                options={[segment('none', 'Any'), segment('fewer', 'Fewer days'), segment('spread', 'Spread out')]}
+                                            />
                                         </div>
+
+                                        <label className={styles.switchRow}>
+                                            <span>
+                                                <span className={styles.switchLabel}>Hide mixed sections</span>
+                                                <span className={styles.switchSub}>Skip sections taught on the main campus</span>
+                                            </span>
+                                            <Switch checked={prefs.hideMixedSections} onChange={v => setPrefs(p => ({ ...p, hideMixedSections: v }))} label="Hide mixed sections" />
+                                        </label>
 
                                         {/* Per-course preferences */}
-                                        {selectedCourses.map(c => {
+                                        {selectedCourses.map((c, ci) => {
                                             const isBasket = c.course_id.startsWith('BASKET_');
                                             const isDeptBasket = c.course_id.startsWith('BASKET_DEPT_');
                                             const isSupportBasket = c.course_id.startsWith('BASKET_SUPPORT_');
@@ -2037,7 +2117,7 @@ export default function SchedulePage() {
 
                                             if (isBasket) {
                                                 const prefsKey = isDeptBasket ? 'BASKET_DEPT' : isSupportBasket ? 'BASKET_SUPPORT' : c.course_id;
-                                                const displayName = isDeptBasket ? (majorInfo?.support_electives_count > 0 ? 'Major Electives' : 'Department Electives') : isSupportBasket ? 'Support Electives' : c.name;
+                                                const displayName = isDeptBasket ? (majorInfo?.support_electives_count > 0 ? 'Major electives' : 'Department electives') : isSupportBasket ? 'Support electives' : c.name;
 
                                                 const basketSections = allSections[c.course_id] || [];
                                                 const subCourseIds = [...new Set(basketSections.map(s => s.course_id))].sort();
@@ -2057,26 +2137,32 @@ export default function SchedulePage() {
                                                 };
 
                                                 return (
-                                                    <div key={prefsKey} className={styles.prefCourseItem}>
-                                                        <div className={styles.prefCourseName}>{displayName}</div>
-                                                        <div className={styles.prefGroup}>
-                                                            <span className={styles.prefLabel}>Preferred Courses</span>
-                                                            <div className={styles.electiveList}>
-                                                                {subCourseIds.map(subId => (
-                                                                    <label key={subId} className={styles.electiveItem}>
-                                                                        <input type="checkbox" checked={preferred.includes(subId)} onChange={() => toggleElective(subId)} />
-                                                                        <span className={styles.electiveId}>{subId}</span>
-                                                                        {extraCourseNames[subId] && (
-                                                                            <span className={styles.electiveName}>{extraCourseNames[subId]}</span>
-                                                                        )}
-                                                                    </label>
-                                                                ))}
-                                                            </div>
+                                                    <div key={prefsKey} className={styles.prefCourse}>
+                                                        <div className={styles.prefCourseHead}>
+                                                            <span className={styles.compactDot} style={{ '--c': paletteFor(ci) }} />
+                                                            <span className={styles.prefCourseName}>{displayName}</span>
+                                                            <span className={styles.panelMeta}>{preferred.length ? `${preferred.length} preferred` : `${subCourseIds.length} options`}</span>
+                                                        </div>
+                                                        <div className={styles.electiveList}>
+                                                            {subCourseIds.map(subId => (
+                                                                <Checkbox
+                                                                    key={subId}
+                                                                    checked={preferred.includes(subId)}
+                                                                    onChange={() => toggleElective(subId)}
+                                                                    className={styles.electiveItem}
+                                                                >
+                                                                    <span className={styles.electiveId}>{subId}</span>
+                                                                    {extraCourseNames[subId] && <span className={styles.electiveName}> {extraCourseNames[subId]}</span>}
+                                                                </Checkbox>
+                                                            ))}
                                                         </div>
                                                         {preferred.length > 0 && (
-                                                            <label className={styles.electiveHardFilter}>
-                                                                <input type="checkbox" checked={isHard} onChange={e => setPrefs(p => ({ ...p, hardElectiveFilter: { ...p.hardElectiveFilter, [prefsKey]: e.target.checked } }))} />
-                                                                <span>Only show schedules with selected courses</span>
+                                                            <label className={styles.switchRow}>
+                                                                <span>
+                                                                    <span className={styles.switchLabel}>Only these</span>
+                                                                    <span className={styles.switchSub}>Show only schedules with a preferred course</span>
+                                                                </span>
+                                                                <Switch checked={isHard} onChange={v => setPrefs(p => ({ ...p, hardElectiveFilter: { ...p.hardElectiveFilter, [prefsKey]: v } }))} label="Only show schedules with selected courses" />
                                                             </label>
                                                         )}
                                                     </div>
@@ -2089,24 +2175,26 @@ export default function SchedulePage() {
                                             const pinnedBaseId = prefs.pinnedSections[c.course_id] || '';
                                             const labSections = getLabSections(c.course_id, pinnedBaseId);
 
-                                            if (instructors.length === 0 && baseSections.length === 0 && labSections.length === 0) return null;
+                                            if (instructors.length <= 1 && baseSections.length <= 1 && labSections.length <= 1) return null;
 
                                             return (
-                                                <div key={c.course_id} className={styles.prefCourseItem}>
-                                                    <div className={styles.prefCourseName}>{c.course_id} · {c.name}</div>
+                                                <div key={c.course_id} className={styles.prefCourse}>
+                                                    <div className={styles.prefCourseHead}>
+                                                        <span className={styles.compactDot} style={{ '--c': paletteFor(ci) }} />
+                                                        <span className={styles.prefCourseName}>{c.name}</span>
+                                                        <span className={styles.prefCourseId}>{c.course_id}</span>
+                                                    </div>
                                                     {instructors.length > 1 && (
-                                                        <div className={styles.prefGroup}>
-                                                            <span className={styles.prefLabel}>Preferred Instructor</span>
-                                                            <select className={styles.select} value={prefs.preferredInstructors[c.course_id] || ''} onChange={e => setPrefs(p => ({ ...p, preferredInstructors: { ...p.preferredInstructors, [c.course_id]: e.target.value } }))}>
+                                                        <Field label="Instructor">
+                                                            <Select size="sm" value={prefs.preferredInstructors[c.course_id] || ''} onChange={e => setPrefs(p => ({ ...p, preferredInstructors: { ...p.preferredInstructors, [c.course_id]: e.target.value } }))}>
                                                                 <option value="">Any instructor</option>
-                                                                {instructors.map(i => <option key={i} value={i}>{i}</option>)}
-                                                            </select>
-                                                        </div>
+                                                                {instructors.map(ins => <option key={ins} value={ins}>{ins}</option>)}
+                                                            </Select>
+                                                        </Field>
                                                     )}
                                                     {baseSections.length > 1 && (
-                                                        <div className={styles.prefGroup}>
-                                                            <span className={styles.prefLabel}>Pin Lecture Section</span>
-                                                            <select className={styles.select} value={pinnedBaseId} onChange={e => {
+                                                        <Field label="Lecture section">
+                                                            <Select size="sm" value={pinnedBaseId} onChange={e => {
                                                                 const newVal = e.target.value;
                                                                 setPrefs(p => {
                                                                     const next = { ...p, pinnedSections: { ...p.pinnedSections, [c.course_id]: newVal } };
@@ -2129,44 +2217,102 @@ export default function SchedulePage() {
                                                                         </option>
                                                                     );
                                                                 })}
-                                                            </select>
-                                                        </div>
+                                                            </Select>
+                                                        </Field>
                                                     )}
                                                     {labSections.length > 1 && (
-                                                        <div className={styles.prefGroup}>
-                                                            <span className={styles.prefLabel}>Pin Lab Section</span>
-                                                            <select className={styles.select} value={prefs.pinnedLabs?.[c.course_id] || ''} onChange={e => setPrefs(p => ({ ...p, pinnedLabs: { ...(p.pinnedLabs || {}), [c.course_id]: e.target.value } }))}>
+                                                        <Field label="Lab section">
+                                                            <Select size="sm" value={prefs.pinnedLabs?.[c.course_id] || ''} onChange={e => setPrefs(p => ({ ...p, pinnedLabs: { ...(p.pinnedLabs || {}), [c.course_id]: e.target.value } }))}>
                                                                 <option value="">Any lab</option>
                                                                 {labSections.map(s => (
                                                                     <option key={s.section_num} value={s.section_num}>
                                                                         Lab {s.section_num}{s.class_time ? ` · ${s.class_time}` : ''}{s.instructor ? ` · ${s.instructor}` : ''}{(() => { const q = seatStatus(s); return q ? ` · ${q.label}` : ''; })()}
                                                                     </option>
                                                                 ))}
-                                                            </select>
-                                                        </div>
+                                                            </Select>
+                                                        </Field>
                                                     )}
                                                 </div>
                                             );
                                         })}
                                     </div>
                                 )}
+                            </section>
+                        )}
+                    </div>
+
+                    {/* Generate */}
+                    {selectedCourses.length > 0 && (
+                        <div className={styles.generateBar}>
+                            <Button
+                                variant="primary"
+                                size="lg"
+                                block
+                                onClick={handleGenerate}
+                                loading={generating}
+                                disabled={loadingAny}
+                                icon={hasResults ? <RefreshIcon /> : <SparkleIcon />}
+                            >
+                                {loadingAny ? 'Loading course data…' : hasResults ? 'Regenerate schedules' : 'Generate schedules'}
+                            </Button>
+                        </div>
+                    )}
+                </aside>
+
+                {/* ===== Canvas ===== */}
+                <section className={styles.canvas} aria-label="Schedules">
+                    {error && (
+                        <Callout tone="danger" title="Something needs a look" action={<Button size="sm" variant="ghost" onClick={() => setError('')}>Dismiss</Button>}>
+                            {error}
+                        </Callout>
+                    )}
+
+                    {/* Saved schedules */}
+                    {dbSavedSchedules.length > 0 && (
+                        <div className={styles.group}>
+                            <div className={styles.groupHead}>
+                                <h2 className={styles.groupTitle}>
+                                    <StarIcon />
+                                    Saved
+                                </h2>
+                                <span className={styles.groupMeta}>{dbSavedSchedules.length} of 3</span>
                             </div>
+                            {dbSavedSchedules.map((savedObj, i) => (
+                                <ScheduleCard
+                                    key={savedObj.dbId}
+                                    result={savedObj}
+                                    rank={savedObj.name || `Saved schedule ${i + 1}`}
+                                    courseNameMap={courseNameMap}
+                                    courseCreditsMap={courseCreditsMap}
+                                    selectedCourses={savedObj.storedSelectedCourses}
+                                    onSave={null}
+                                    onUnsave={() => handleDeleteSavedSchedule(savedObj.dbId)}
+                                    isSaved={true}
+                                    initiallyCollapsed={true}
+                                    isSavingSchedule={isSavingSchedule}
+                                />
+                            ))}
                         </div>
                     )}
 
-                    {/* Generate Button — hidden when results showing */}
-                    {selectedCourses.length > 0 && !results && (
-                        <button className={styles.generateBtn} onClick={handleGenerate} disabled={generating || loadingCourseIds.size > 0} style={loadingCourseIds.size > 0 ? { opacity: 0.7, cursor: 'not-allowed' } : {}}>
-                            {generating ? <span className={styles.spinner}></span> : (loadingCourseIds.size > 0 ? 'Loading course data...' : 'Generate Schedules')}
-                        </button>
+                    {/* Results */}
+                    {generating && !results && (
+                        <div className={styles.generating} aria-live="polite">
+                            <div className={styles.generatingGrid} aria-hidden="true">
+                                {Array.from({ length: 15 }).map((_, i) => <span key={i} style={{ animationDelay: `${(i % 5) * 80 + Math.floor(i / 5) * 60}ms` }} />)}
+                            </div>
+                            <p>Fitting {selectedCourses.length} courses together…</p>
+                        </div>
                     )}
 
-                    {/* Results */}
-                    {results && results.length > 0 && (
-                        <div className={styles.section}>
-                            <div className={styles.resultsHeader}>
-                                <span className={styles.resultsTitle}>Generated Schedules</span>
-                                <span className={styles.resultsCount}>{results.length} found</span>
+                    {hasResults && (
+                        <div className={styles.group}>
+                            <div className={styles.groupHead}>
+                                <h2 className={styles.groupTitle}>
+                                    <SparkleIcon />
+                                    {results.length === 100 ? '100+ schedules' : `${results.length} ${results.length === 1 ? 'schedule' : 'schedules'}`} fit
+                                </h2>
+                                <span className={styles.groupMeta}>Best fit first</span>
                             </div>
                             {results
                                 .slice(0, showCount)
@@ -2186,8 +2332,9 @@ export default function SchedulePage() {
                                             guest={profile.isGuest}
                                             onUnsave={isSaved ? () => handleDeleteSavedSchedule(dbId) : null}
                                             isSaved={isSaved}
-                                            initiallyCollapsed={false}
+                                            initiallyCollapsed={idx > 0}
                                             isSavingSchedule={isSavingSchedule}
+                                            savedCount={dbSavedSchedules.length}
                                         />
                                     );
                                 })}
@@ -2195,8 +2342,9 @@ export default function SchedulePage() {
                             {(() => {
                                 const remaining = results.length;
                                 return showCount < remaining && (
-                                    <button className={styles.showMoreBtn} onClick={() => (showCount >= 9 ? setShowCount(remaining + 100) : setShowCount(prev => prev + 3))}>
-                                        {showCount >= 9 ? `Show All Remaining (${remaining - showCount} schedules)` : `Show More (${Math.min(3, remaining - showCount)} of ${remaining - showCount})`}
+                                    <button type="button" className={styles.showMoreBtn} onClick={() => (showCount >= 9 ? setShowCount(remaining + 100) : setShowCount(prev => prev + 3))}>
+                                        {showCount >= 9 ? `Show all ${remaining - showCount} remaining` : `Show ${Math.min(3, remaining - showCount)} more`}
+                                        <ChevronDownIcon />
                                     </button>
                                 );
                             })()}
@@ -2205,51 +2353,90 @@ export default function SchedulePage() {
 
                     {results && results.length === 0 && (
                         <div className={styles.noResults}>
-                            <div className={styles.noResultsIcon}></div>
-                            <div className={styles.noResultsTitle}>No valid schedules found</div>
-                            <div className={styles.noResultsText}>
-                                All {selectedCourses.length} courses could not fit into a single schedule without conflicts.
+                            <EmptyState
+                                tone="neutral"
+                                icon={<AlertIcon />}
+                                title={`These ${selectedCourses.length} courses don’t fit together`}
+                                actions={(
+                                    <>
+                                        <Button variant="primary" onClick={handleGenerateBestEffort} loading={generating} icon={<SparkleIcon />}>Find the best fit</Button>
+                                        <Button variant="secondary" onClick={() => { setResults(null); setPrefsOpen(true); }}>Adjust preferences</Button>
+                                    </>
+                                )}
+                            >
+                                Every combination of sections has a clash. Best fit builds schedules with as many of your courses as possible and tells you which it left out.
+                            </EmptyState>
+                            {conflictPairs.length > 0 && (
+                                <div className={styles.conflicts}>
+                                    <span className={styles.conflictsLabel}>Always clash</span>
+                                    <ul>
+                                        {conflictPairs.map(([a, b]) => (
+                                            <li key={`${a.course_id}-${b.course_id}`}>
+                                                <span className={styles.conflictCourse}><span className={styles.compactDot} style={{ '--c': paletteFor(cartIndex(a.course_id)) }} />{a.name}</span>
+                                                <span className={styles.conflictX} aria-label="clashes with"><CloseIcon /></span>
+                                                <span className={styles.conflictCourse}><span className={styles.compactDot} style={{ '--c': paletteFor(cartIndex(b.course_id)) }} />{b.name}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                    <p>Every section of one meets at the same time as every section of the other. Drop one, or mark both OR to try each in turn.</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {!results && !generating && (
+                        <div className={styles.placeholder}>
+                            <div className={styles.ghostGrid} aria-hidden="true">
+                                <div className={styles.ghostHead}>
+                                    <span />
+                                    {ALL_DAYS.map(d => <span key={d}>{d}</span>)}
+                                </div>
+                                {[8, 9, 10, 11, 12, 13, 14, 15].map(h => (
+                                    <div key={h} className={styles.ghostRow}>
+                                        <span>{formatTimeShort(h * 60)}</span>
+                                        {ALL_DAYS.map(d => <span key={d} />)}
+                                    </div>
+                                ))}
+                                <span className={styles.ghostBlock} style={{ '--c': 'var(--course-1)', '--col': 2, '--row': 1, '--span': 2 }} />
+                                <span className={styles.ghostBlock} style={{ '--c': 'var(--course-2)', '--col': 4, '--row': 1, '--span': 2 }} />
+                                <span className={styles.ghostBlock} style={{ '--c': 'var(--course-3)', '--col': 3, '--row': 3, '--span': 2 }} />
+                                <span className={styles.ghostBlock} style={{ '--c': 'var(--course-4)', '--col': 1, '--row': 5, '--span': 2 }} />
+                                <span className={styles.ghostBlock} style={{ '--c': 'var(--course-5)', '--col': 5, '--row': 4, '--span': 2 }} />
                             </div>
-                            <div className={styles.noResultsButtons}>
-                                <button className={styles.generateBtn} onClick={handleGenerateBestEffort} disabled={generating} style={{ width: 'auto', padding: '10px 20px', marginTop: '12px' }}>
-                                    {generating ? <span className={styles.spinner}></span> : 'Generate Best Fit'}
-                                </button>
-                                <button className={styles.secondaryBtn} onClick={() => setResults(null)} style={{ width: 'auto', padding: '10px 20px', marginTop: '8px' }}>
-                                    Modify Preferences
-                                </button>
-                            </div>
-                            <div className={styles.noResultsHint}>
-                                Best Fit will generate schedules with as many courses as possible,
-                                excluding the ones that cause conflicts.
+                            <div className={styles.placeholderText}>
+                                <p className={styles.placeholderTitle}>
+                                    {selectedCourses.length === 0 ? 'Your timetable will appear here' : `${selectedCourses.length} ${selectedCourses.length === 1 ? 'course' : 'courses'} ready`}
+                                </p>
+                                <p className={styles.placeholderBody}>
+                                    {selectedCourses.length === 0
+                                        ? 'Add the courses you plan to take. CourseMate tries every combination of their sections and keeps the ones without a clash.'
+                                        : 'Set any preferences you care about, then generate. Schedules come back ranked by how well they fit.'}
+                                </p>
                             </div>
                         </div>
                     )}
-                </main>
+                </section>
+            </div>
         </PageShell>
     );
 }
 
 // ===== SCHEDULE CARD COMPONENT =====
 
-function ScheduleCard({ result, rank, courseNameMap, courseCreditsMap, selectedCourses, onSave, onUnsave, isSaved, initiallyCollapsed = false, isSavingSchedule = false, guest = false }) {
+function ScheduleCard({ result, rank, courseNameMap, courseCreditsMap, selectedCourses, onSave, onUnsave, isSaved, initiallyCollapsed = false, isSavingSchedule = false, guest = false, savedCount = 0 }) {
     const { schedule, score, warnings } = result;
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [cardOpen, setCardOpen] = useState(!initiallyCollapsed);
     const [exporting, setExporting] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [crnsCopied, setCrnsCopied] = useState(false);
     const [naming, setNaming] = useState(false);
     const [saveName, setSaveName] = useState('');
     const { selectedTerm, semesters } = useSemester();
+    const confirm = useConfirm();
+    const toast = useToast();
     // Carries the term's dates from Banner, which the calendar export needs.
     const termInfo = semesters?.find(s => s.term_code === selectedTerm);
-
-    // Escape closes the naming dialog, as it does for any other dialog.
-    useEffect(() => {
-        if (!naming) return undefined;
-        const onKey = (e) => { if (e.key === 'Escape' && !isSavingSchedule) setNaming(false); };
-        document.addEventListener('keydown', onKey);
-        return () => document.removeEventListener('keydown', onKey);
-    }, [naming, isSavingSchedule]);
 
     // Compute total credit hours for this schedule
     const totalCredits = schedule.reduce((sum, group) => {
@@ -2288,21 +2475,18 @@ function ScheduleCard({ result, rank, courseNameMap, courseCreditsMap, selectedC
     const maxTime = Math.max(...blocks.map(b => b.end));
     const startHour = Math.floor(minTime / 60);
     const endHour = Math.ceil(maxTime / 60);
-    const totalMinutes = (endHour - startHour) * 60;
 
-    // Hour labels
-    const hours = [];
-    for (let h = startHour; h <= endHour; h++) hours.push(h);
+    const PX_PER_MIN = 1;
 
-    const HEADER_HEIGHT = 28;
-    const PX_PER_MIN = 0.8; // scale factor
-    const gridHeight = totalMinutes * PX_PER_MIN;
-
-    const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'];
-    const bgColors = [
-        'rgba(59,130,246,0.15)', 'rgba(16,185,129,0.15)', 'rgba(245,158,11,0.15)', 'rgba(239,68,68,0.15)',
-        'rgba(139,92,246,0.15)', 'rgba(236,72,153,0.15)', 'rgba(20,184,166,0.15)', 'rgba(249,115,22,0.15)',
-    ];
+    // The shape of the week, for comparing schedules at a glance.
+    const gapMinutes = days.reduce((sum, d) => {
+        const list = blocks.filter(b => b.day === d).sort((a, b) => a.start - b.start);
+        let g = 0;
+        for (let i = 1; i < list.length; i++) g += Math.max(0, list[i].start - list[i - 1].end);
+        return sum + g;
+    }, 0);
+    const earliest = Math.min(...days.map(d => Math.min(...blocks.filter(b => b.day === d).map(b => b.start))));
+    const latest = Math.max(...days.map(d => Math.max(...blocks.filter(b => b.day === d).map(b => b.end))));
 
     // Full sections do not stop a schedule being built -- it is a plan, and a
     // seat may free up -- but burying that in a badge inside a collapsed
@@ -2314,7 +2498,7 @@ function ScheduleCard({ result, rank, courseNameMap, courseCreditsMap, selectedC
             return seats && seats.tone === 'full';
         });
 
-    const scheduleTitle = Number.isInteger(rank) ? `Schedule #${rank}` : String(rank);
+    const scheduleTitle = Number.isInteger(rank) ? `Option ${rank}` : String(rank);
     // Everything the downloadable sheet shows. Sections come along too, so one
     // with no set time, which has no block on the grid, still gets a mention.
     const exportData = {
@@ -2329,6 +2513,7 @@ function ScheduleCard({ result, rank, courseNameMap, courseCreditsMap, selectedC
         }))),
     };
     const pngFileName = `coursemate-${scheduleTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'schedule'}.png`;
+    const allCrns = schedule.flatMap(g => g.sections.filter(s => !s.isMissing && s.crn).map(s => s.crn));
 
     const handleExportPng = async () => {
         setExporting(true);
@@ -2336,7 +2521,7 @@ function ScheduleCard({ result, rank, courseNameMap, courseCreditsMap, selectedC
             await downloadSchedulePng({ ...exportData, title: scheduleTitle, fileName: pngFileName });
         } catch (err) {
             console.error('PNG export failed:', err);
-            window.alert('Could not create the image. Please try again.');
+            toast.error('Could not create the image. Please try again.');
         } finally {
             setExporting(false);
         }
@@ -2353,16 +2538,16 @@ function ScheduleCard({ result, rank, courseNameMap, courseCreditsMap, selectedC
             },
             fileName: pngFileName.replace(/\.png$/, '.ics'),
         });
-        if (!ok) window.alert('This semester has no class dates yet, so a calendar file cannot be made.');
+        if (!ok) toast.error('This semester has no class dates yet, so a calendar file cannot be made.');
     };
 
     const handleCopyPng = async () => {
         setExporting(true);
         try {
-            const result = await copySchedulePng(exportData);
+            const res = await copySchedulePng(exportData);
             // Firefox and plain HTTP have no image clipboard; the image is
             // still worth having, so it downloads instead.
-            if (result === 'copied') {
+            if (res === 'copied') {
                 setCopied(true);
                 setTimeout(() => setCopied(false), 2000);
             } else {
@@ -2370,290 +2555,309 @@ function ScheduleCard({ result, rank, courseNameMap, courseCreditsMap, selectedC
             }
         } catch (err) {
             console.error('PNG copy failed:', err);
-            window.alert('Could not copy the image. Please try again.');
+            toast.error('Could not copy the image. Please try again.');
         } finally {
             setExporting(false);
         }
     };
 
+    // Registration day: every CRN, ready to paste into the portal.
+    const handleCopyCrns = async () => {
+        try {
+            await navigator.clipboard.writeText(allCrns.join(', '));
+            setCrnsCopied(true);
+            setTimeout(() => setCrnsCopied(false), 2000);
+        } catch {
+            toast.error('Could not copy. Your browser blocked the clipboard.');
+        }
+    };
+
+    const handleUnsave = async () => {
+        const ok = await confirm({
+            title: `Remove “${scheduleTitle}” from saved?`,
+            body: 'You can save it again any time you generate it.',
+            confirmLabel: 'Remove',
+            tone: 'danger',
+        });
+        if (ok) onUnsave();
+    };
+
+    const fitTone = score >= 80 ? 'accent' : score >= 60 ? 'neutral' : 'warning';
+
     return (
-        <div className={styles.scheduleCard}>
-            <div className={styles.scheduleCardHeader} onClick={() => setCardOpen(!cardOpen)} style={{ cursor: 'pointer', userSelect: 'none' }}>
-                <span className={styles.scheduleRank}>
-                    <span style={{ display: 'inline-block', width: '16px', textAlign: 'center', marginRight: '6px', transform: cardOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s', fontSize: '12px' }}>▶</span>
-                    {Number.isInteger(rank) ? `Schedule #${rank}` : rank}
-                </span>
-                <div className={styles.scheduleCardMeta}>
-                    {totalCredits > 0 && <span className={styles.scheduleCredits}>{totalCredits} cr</span>}
-                    <span className={styles.scheduleScore}>Score: {Math.round(score)}</span>
+        <article className={`${styles.scheduleCard} ${isSaved ? styles.scheduleCardSaved : ''}`}>
+            <header className={styles.cardHeader}>
+                <button
+                    type="button"
+                    className={styles.cardToggle}
+                    onClick={() => setCardOpen(!cardOpen)}
+                    aria-expanded={cardOpen}
+                >
+                    <ChevronRightIcon className={`${styles.cardChevron} ${cardOpen ? styles.cardChevronOpen : ''}`} />
+                    <span className={styles.cardTitleWrap}>
+                        <span className={styles.cardTitle}>{scheduleTitle}</span>
+                        <span className={styles.cardSub}>
+                            {isSaved && !Number.isInteger(rank) ? 'Saved' : `${schedule.length} ${schedule.length === 1 ? 'course' : 'courses'}`}
+                            {totalCredits > 0 && ` · ${totalCredits} credits`}
+                        </span>
+                    </span>
+                </button>
+                <Badge tone={fitTone} className={styles.fitBadge} title="How well this schedule fits your preferences, out of 100">
+                    Fit {Math.round(score)}
+                </Badge>
+                <div className={styles.cardActions}>
                     {termInfo?.classes_start && termInfo?.classes_end && (
+                        <Tooltip label="Add to calendar">
+                            <button type="button" className={styles.iconBtn} onClick={handleExportIcs} aria-label="Download this schedule as a calendar file">
+                                <CalendarPlusIcon />
+                            </button>
+                        </Tooltip>
+                    )}
+                    <Tooltip label={copied ? 'Copied' : 'Copy image'}>
                         <button
                             type="button"
-                            className={styles.exportBtn}
-                            onClick={(e) => { e.stopPropagation(); handleExportIcs(); }}
-                            title="Add to a calendar"
-                            aria-label="Download this schedule as a calendar file"
+                            className={`${styles.iconBtn} ${copied ? styles.iconBtnDone : ''}`}
+                            onClick={handleCopyPng}
+                            disabled={exporting}
+                            aria-label="Copy this schedule as an image"
                         >
-                            <CalendarPlusIcon width={15} height={15} />
+                            {copied ? <CheckIcon strokeWidth={2.25} /> : <CopyIcon />}
                         </button>
+                    </Tooltip>
+                    <Tooltip label="Download PNG">
+                        <button type="button" className={styles.iconBtn} onClick={handleExportPng} disabled={exporting} aria-label="Export this schedule as a PNG">
+                            <DownloadIcon />
+                        </button>
+                    </Tooltip>
+                    {onSave && !isSaved && (
+                        <Button
+                            size="sm"
+                            variant="primary"
+                            icon={<StarIcon />}
+                            onClick={() => setNaming(true)}
+                            disabled={isSavingSchedule || savedCount >= 3}
+                            title={savedCount >= 3 ? 'You have 3 saved schedules. Remove one to save another.' : undefined}
+                            className={styles.saveBtn}
+                        >
+                            Save
+                        </Button>
                     )}
-                    <button
-                        type="button"
-                        className={`${styles.exportBtn} ${copied ? styles.exportBtnDone : ''}`}
-                        onClick={(e) => { e.stopPropagation(); handleCopyPng(); }}
-                        disabled={exporting}
-                        title={copied ? 'Copied' : 'Copy as an image'}
-                        aria-label="Copy this schedule as an image"
-                    >
-                        {copied ? <CheckIcon width={15} height={15} /> : <CopyIcon width={15} height={15} />}
-                    </button>
-                    <button
-                        type="button"
-                        className={styles.exportBtn}
-                        onClick={(e) => { e.stopPropagation(); handleExportPng(); }}
-                        disabled={exporting}
-                        title="Export as PNG"
-                        aria-label="Export this schedule as a PNG"
-                    >
-                        <DownloadIcon width={15} height={15} />
-                    </button>
+                    {isSaved && onUnsave && (
+                        <Button size="sm" variant="soft" icon={<StarIcon className={styles.starFilled} />} onClick={handleUnsave} disabled={isSavingSchedule} className={styles.saveBtn} title="Saved. Click to remove.">
+                            Saved
+                        </Button>
+                    )}
+                    {guest && (
+                        <Button size="sm" variant="secondary" icon={<LockIcon />} onClick={refuse} aria-disabled="true" className={styles.saveBtn} title="Create an account to save schedules">
+                            Save
+                        </Button>
+                    )}
                 </div>
+            </header>
+
+            {/* The week at a glance: always visible, even folded. */}
+            <div className={styles.stats}>
+                <span className={styles.stat}>
+                    <span className={styles.statValue}>{days.length}</span>
+                    <span className={styles.statLabel}>{days.length === 1 ? 'day' : 'days'} · {days.map(d => d[0] + d.slice(1, 2)).join(' ')}</span>
+                </span>
+                <span className={styles.stat}>
+                    <span className={styles.statValue}>{formatTimeShort(earliest).replace(' ', '')}</span>
+                    <span className={styles.statLabel}>earliest start</span>
+                </span>
+                <span className={styles.stat}>
+                    <span className={styles.statValue}>{formatTimeShort(latest).replace(' ', '')}</span>
+                    <span className={styles.statLabel}>latest finish</span>
+                </span>
+                <span className={styles.stat}>
+                    <span className={styles.statValue}>{gapMinutes === 0 ? '0' : formatDuration(gapMinutes)}</span>
+                    <span className={styles.statLabel}>between classes</span>
+                </span>
+                {!cardOpen && <MiniWeek blocks={blocks} days={days} startHour={startHour} endHour={endHour} />}
             </div>
 
             {cardOpen && (<>
-                {fullSections.length > 0 && (
-                    <div className={styles.fullWarning}>
-                        Full: {fullSections.map(sec => `${courseNameMap[sec.course_id] || sec.course_id} ${sec.section_num}`).join(', ')}
-                    </div>
-                )}
-                {result.xorSelected && (() => {
-                    let displayName = result.xorSelected.name;
-                    let displayId = result.xorSelected.id;
-                    // For baskets, find the actual course from the schedule
-                    if (result.xorSelected.id.startsWith('BASKET_')) {
-                        const basketGroup = schedule.find(g => g.originalCourseId === result.xorSelected.id);
-                        if (basketGroup) {
-                            displayId = basketGroup.courseId;
-                            displayName = courseNameMap[basketGroup.courseId] || displayId;
-                        }
-                    }
-                    return (
-                        <div className={styles.xorSelectedInfo}>
-                            Includes: {displayName} ({displayId})
-                        </div>
-                    );
-                })()}
-
-                {warnings.length > 0 && (
-                    <div className={styles.prefWarnings}>
-                        {warnings.map((w, i) => <span key={i} className={styles.prefWarning}>{w}</span>)}
+                {(fullSections.length > 0 || result.xorSelected || warnings.length > 0) && (
+                    <div className={styles.notes}>
+                        {fullSections.length > 0 && (
+                            <span className={`${styles.note} ${styles.noteWarn}`}>
+                                <AlertIcon />
+                                Full now: {fullSections.map(sec => `${courseNameMap[sec.course_id] || sec.course_id} ${sec.section_num}`).join(', ')}
+                            </span>
+                        )}
+                        {result.xorSelected && (() => {
+                            let displayName = result.xorSelected.name;
+                            let displayId = result.xorSelected.id;
+                            // For baskets, find the actual course from the schedule
+                            if (result.xorSelected.id.startsWith('BASKET_')) {
+                                const basketGroup = schedule.find(g => g.originalCourseId === result.xorSelected.id);
+                                if (basketGroup) {
+                                    displayId = basketGroup.courseId;
+                                    displayName = courseNameMap[basketGroup.courseId] || displayId;
+                                }
+                            }
+                            return (
+                                <span className={`${styles.note} ${styles.noteAccent}`}>
+                                    <CheckIcon />
+                                    Includes {displayName} ({displayId})
+                                </span>
+                            );
+                        })()}
+                        {warnings.map((w, i) => (
+                            <span key={i} className={styles.note}>{w.replace(/^⚠️\s*/, '')}</span>
+                        ))}
                     </div>
                 )}
 
                 <div className={styles.timetable}>
-                    <div className={styles.ttContainer} style={{ height: gridHeight + HEADER_HEIGHT }}>
-                        {/* Time axis labels */}
-                        <div className={styles.ttTimeAxis} style={{ height: gridHeight, top: HEADER_HEIGHT }}>
-                            {hours.map(h => (
-                                <div key={h} className={styles.ttTimeLabel} style={{ top: (h - startHour) * 60 * PX_PER_MIN }}>
-                                    {formatTimeShort(h * 60)}
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Day columns */}
-                        <div className={styles.ttColumns}>
-                            {days.map(day => (
-                                <div key={day} className={styles.ttColumn}>
-                                    <div className={styles.ttDayHeader}>{day}</div>
-                                    <div className={styles.ttDayBody} style={{ height: gridHeight }}>
-                                        {/* Hour grid lines */}
-                                        {hours.slice(0, -1).map(h => (
-                                            <div key={`h-${h}`} className={styles.ttGridLine} style={{ top: (h - startHour) * 60 * PX_PER_MIN }} />
-                                        ))}
-
-                                        {/* Half hour grid lines */}
-                                        {hours.slice(0, -1).map(h => (
-                                            <div key={`half-${h}`} className={`${styles.ttGridLine} ${styles.ttGridLineHalf}`} style={{ top: ((h - startHour) * 60 + 30) * PX_PER_MIN }} />
-                                        ))}
-
-                                        {/* Class blocks */}
-                                        {blocks
-                                            .filter(b => b.day === day)
-                                            .map((block, bi) => {
-                                                const top = (block.start - startHour * 60) * PX_PER_MIN;
-                                                const height = (block.end - block.start) * PX_PER_MIN;
-                                                // Course and section take two lines (about 30px with
-                                                // padding); the name gets whatever whole lines remain,
-                                                // so nothing is ever sliced through the middle.
-                                                const nameLines = Math.floor((height - 30) / 11);
-                                                const tint = bgColors[block.colorIdx];
-                                                return (
-                                                    <div
-                                                        key={bi}
-                                                        className={styles.ttBlock}
-                                                        title={`${block.courseId}${block.courseName ? ` ${block.courseName}` : ''}, section ${block.sectionNum}`}
-                                                        style={{
-                                                            top,
-                                                            height,
-                                                            // The tint over a solid base, so nothing behind the
-                                                            // block shows through its text.
-                                                            background: `linear-gradient(${tint}, ${tint}), var(--bg-secondary)`,
-                                                            borderLeftColor: colors[block.colorIdx],
-                                                            color: colors[block.colorIdx],
-                                                        }}
-                                                    >
-                                                        <span className={styles.ttBlockCourse}>{block.courseId}</span>
-                                                        {block.courseName && nameLines > 0 && (
-                                                            <span className={styles.ttBlockName} style={{ WebkitLineClamp: nameLines }}>{block.courseName}</span>
-                                                        )}
-                                                        {height >= 24 && <span className={styles.ttBlockSection}>{block.sectionNum}</span>}
-                                                    </div>
-                                                );
-                                            })}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                    <WeekGrid
+                        days={days}
+                        startHour={startHour}
+                        endHour={endHour}
+                        pxPerMin={PX_PER_MIN}
+                        blocks={blocks.map(block => ({
+                            day: block.day,
+                            start: block.start,
+                            end: block.end,
+                            color: paletteFor(block.colorIdx),
+                            code: block.courseId,
+                            section: block.sectionNum,
+                            name: block.courseName,
+                            meta: block.location,
+                            title: `${block.courseId}${block.courseName ? ` ${block.courseName}` : ''} · section ${block.sectionNum} · ${formatRange(block.start, block.end)}${block.location ? ` · ${block.location}` : ''}${block.instructor ? ` · ${block.instructor}` : ''}`,
+                        }))}
+                    />
                 </div>
 
-                {/* Section details (collapsible) */}
-                <div
-                    className={styles.detailsToggle}
-                    onClick={() => setDetailsOpen(prev => !prev)}
-                >
-                    {detailsOpen ? 'Hide details' : 'Show details'}
+                {/* Section details */}
+                <div className={styles.detailsBar}>
+                    <button
+                        type="button"
+                        className={styles.detailsToggle}
+                        onClick={() => setDetailsOpen(prev => !prev)}
+                        aria-expanded={detailsOpen}
+                    >
+                        <ChevronDownIcon className={`${styles.detailsChevron} ${detailsOpen ? styles.detailsChevronOpen : ''}`} />
+                        {detailsOpen ? 'Hide sections' : 'Sections, CRNs and rooms'}
+                    </button>
+                    {allCrns.length > 0 && (
+                        <button type="button" className={`${styles.copyCrns} ${crnsCopied ? styles.copyCrnsDone : ''}`} onClick={handleCopyCrns}>
+                            {crnsCopied ? <CheckIcon strokeWidth={2.25} /> : <CopyIcon />}
+                            {crnsCopied ? 'CRNs copied' : `Copy ${allCrns.length} CRNs`}
+                        </button>
+                    )}
                 </div>
                 {detailsOpen && (
-                    <div className={styles.scheduleDetails}>
+                    <ul className={styles.details}>
                         {schedule.map((group) => {
                             const courseIdx = selectedCourses.findIndex(c => c.course_id === (group.originalCourseId || group.courseId));
-                            return group.sections.map((sec, secIdx) => (
-                                <div key={sec.crn || `${sec.course_id}-${sec.section_num}-${secIdx}`} className={styles.detailRow}>
-                                    <div className={styles.detailColorBar} style={{ background: colors[courseIdx % 8] }}></div>
-                                    <div className={styles.detailContent}>
-                                        <div className={styles.detailHeader}>
-                                            <span className={styles.detailCourseName}>{courseNameMap[sec.course_id] || sec.course_id}</span>
+                            return group.sections.map((sec, secIdx) => {
+                                const seats = seatStatus(sec);
+                                return (
+                                    <li key={sec.crn || `${sec.course_id}-${sec.section_num}-${secIdx}`} className={styles.detailRow} style={{ '--c': paletteFor(courseIdx) }}>
+                                        <span className={styles.detailBar} aria-hidden="true" />
+                                        <div className={styles.detailMain}>
+                                            <span className={styles.detailCourse}>
+                                                <span className={styles.detailCourseName}>{courseNameMap[sec.course_id] || sec.course_id}</span>
+                                                <span className={styles.detailCourseId}>{sec.course_id}</span>
+                                            </span>
+                                            <span className={styles.detailMeta}>
+                                                <span className={styles.detailTime}>{sec.class_time}</span>
+                                                {sec.instructor && <span>{sec.instructor}</span>}
+                                                {sec.location && <RoomLink room={sec.location} className={styles.detailRoom} />}
+                                            </span>
                                         </div>
-                                        <div className={styles.detailMeta}>
-                                            <span className={styles.detailSection}>{sec.section_num}</span>
-                                            {sec.crn && (
-                                                <>
-                                                    <span className={styles.detailSep}>•</span>
-                                                    <span className={styles.detailCrn}>CRN {sec.crn}</span>
-                                                </>
+                                        <div className={styles.detailSide}>
+                                            <Ticket size="sm" label="Sec" section={sec.section_num} tone={sec.isMissing ? 'muted' : 'neutral'} />
+                                            {sec.crn && <span className={styles.detailCrn}>CRN {sec.crn}</span>}
+                                            {seats && (
+                                                <Badge size="sm" dot tone={seats.tone === 'open' ? 'success' : seats.tone === 'low' ? 'warning' : 'neutral'} title={seats.title}>
+                                                    {seats.detail}
+                                                </Badge>
                                             )}
-                                            {(() => {
-                                                const seats = seatStatus(sec);
-                                                return seats ? (
-                                                    <>
-                                                        <span className={styles.detailSep}>•</span>
-                                                        <span
-                                                            className={`${styles.detailSeats} ${styles[`seats_${seats.tone}`]}`}
-                                                            title={seats.title}
-                                                        >
-                                                            {seats.detail}
-                                                        </span>
-                                                    </>
-                                                ) : null;
-                                            })()}
-                                            <span className={styles.detailSep}>•</span>
-                                            <span className={styles.detailTime}>{sec.class_time}</span>
-                                            {sec.instructor && (
-                                                <>
-                                                    <span className={styles.detailSep}>•</span>
-                                                    <span className={styles.detailProf}>{sec.instructor}</span>
-                                                </>
-                                            )}
-                                            {sec.location && (
-                                                <>
-                                                    <span className={styles.detailSep}>•</span>
-                                                    <RoomLink room={sec.location} className={styles.detailRoom} />
-                                                </>
+                                            {isSaved && (
+                                                <a className={styles.requestLink} href={`/post?type=request&course=${sec.course_id}&section=${sec.section_num}`}>
+                                                    Request
+                                                </a>
                                             )}
                                         </div>
-                                    </div>
-                                    {/* Its own column at the row's right edge, beside both lines: up in
-                                        the title line it sat right above the room's Map button. */}
-                                    {isSaved && (
-                                        <a className={styles.requestLink} href={`/post?type=request&course=${sec.course_id}&section=${sec.section_num}`}>Request</a>
-                                    )}
-                                </div>
-                            ));
+                                    </li>
+                                );
+                            });
                         })}
-                    </div>
-                )}
-
-                {onSave && !isSaved && (
-                    <div className={styles.saveFooter}>
-                        <button className={styles.saveBtn} onClick={() => setNaming(true)} disabled={isSavingSchedule}>
-                            Save Schedule
-                        </button>
-                    </div>
-                )}
-
-                {guest && (
-                    <div className={styles.saveFooter}>
-                        <button type="button" className={`${styles.unsaveBtn} ${styles.lockedSaveBtn}`} onClick={refuse} aria-disabled="true">
-                            <LockIcon width={14} height={14} />
-                            Save Schedule
-                        </button>
-                    </div>
-                )}
-
-                {/* Three saved schedules all called "Saved schedule 2" help nobody,
-                    so saving asks what to call this one. A dialog, because the
-                    same question sat in the footer unnoticed. */}
-                {/* Through a portal: the card's own blur would otherwise pin the
-                    dialog inside the card instead of over the page. */}
-                {naming && createPortal((
-                    <div
-                        className={styles.saveDialogBackdrop}
-                        role="dialog"
-                        aria-modal="true"
-                        aria-label="Name this schedule"
-                        onClick={() => !isSavingSchedule && setNaming(false)}
-                    >
-                        <form
-                            className={styles.saveDialog}
-                            onClick={(e) => e.stopPropagation()}
-                            onSubmit={async (e) => {
-                                e.preventDefault();
-                                await onSave(saveName);
-                                setNaming(false);
-                            }}
-                        >
-                            <h3 className={styles.saveDialogTitle}>Name this schedule</h3>
-                            <input
-                                className={styles.saveNameInput}
-                                value={saveName}
-                                onChange={(e) => setSaveName(e.target.value)}
-                                placeholder={`e.g. ${scheduleTitle}`}
-                                maxLength={60}
-                                autoFocus
-                                disabled={isSavingSchedule}
-                            />
-                            <div className={styles.saveDialogActions}>
-                                <button type="button" className={styles.unsaveBtn} onClick={() => setNaming(false)} disabled={isSavingSchedule}>
-                                    Cancel
-                                </button>
-                                <button type="submit" className={styles.saveBtn} disabled={isSavingSchedule || !saveName.trim()}>
-                                    {isSavingSchedule ? <span className={styles.spinner} style={{ width: 14, height: 14, borderWidth: 2, borderColor: '#fff', borderTopColor: 'transparent' }}></span> : 'Save'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                ), document.body)}
-
-                {isSaved && onUnsave && (
-                    <div className={styles.saveFooter}>
-                        <button className={styles.unsaveBtn} onClick={onUnsave} disabled={isSavingSchedule} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                            Unsave
-                        </button>
-                    </div>
+                    </ul>
                 )}
             </>)}
-        </div>
+
+            {/* Three saved schedules all called "Saved schedule 2" help nobody,
+                so saving asks what to call this one. */}
+            <Dialog
+                open={naming}
+                onClose={() => !isSavingSchedule && setNaming(false)}
+                dismissible={!isSavingSchedule}
+                title="Name this schedule"
+                description="Saved schedules stay on your account for this term. You can keep up to three."
+                footer={(
+                    <>
+                        <Button variant="secondary" onClick={() => setNaming(false)} disabled={isSavingSchedule}>Cancel</Button>
+                        <Button
+                            variant="primary"
+                            type="submit"
+                            form="save-schedule-form"
+                            loading={isSavingSchedule}
+                            disabled={!saveName.trim()}
+                        >
+                            Save schedule
+                        </Button>
+                    </>
+                )}
+            >
+                <form
+                    id="save-schedule-form"
+                    onSubmit={async (e) => {
+                        e.preventDefault();
+                        if (!saveName.trim()) return;
+                        await onSave(saveName);
+                        setNaming(false);
+                        toast.success(`Saved “${saveName.trim()}”`);
+                    }}
+                >
+                    <Field label="Name" hint={`${saveName.length}/60`}>
+                        <Input
+                            value={saveName}
+                            onChange={(e) => setSaveName(e.target.value)}
+                            placeholder={`e.g. ${scheduleTitle}, or “Mornings off”`}
+                            maxLength={60}
+                            data-autofocus
+                            disabled={isSavingSchedule}
+                        />
+                    </Field>
+                </form>
+            </Dialog>
+        </article>
+    );
+}
+
+/** The week as a thumbnail: five columns and the blocks, no words. */
+function MiniWeek({ blocks, days, startHour, endHour }) {
+    const span = Math.max(60, (endHour - startHour) * 60);
+    return (
+        <span className={styles.miniWeek} aria-hidden="true">
+            {ALL_DAYS.map(d => (
+                <span key={d} className={`${styles.miniDay} ${days.includes(d) ? '' : styles.miniDayOff}`}>
+                    {blocks.filter(b => b.day === d).map((b, i) => (
+                        <span
+                            key={i}
+                            className={styles.miniBlock}
+                            style={{
+                                top: `${((b.start - startHour * 60) / span) * 100}%`,
+                                height: `${((b.end - b.start) / span) * 100}%`,
+                                '--c': paletteFor(b.colorIdx),
+                            }}
+                        />
+                    ))}
+                </span>
+            ))}
+        </span>
     );
 }
