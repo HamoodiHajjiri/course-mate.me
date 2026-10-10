@@ -6,6 +6,7 @@ import campus from '@/app/map/campus.json';
 import { buildingInfo } from '@/app/map/buildings';
 import { PLACE_KINDS, openStatus } from '@/app/map/places';
 import PlaceIcon from '@/app/map/PlaceIcon';
+import { useConfirm, useToast } from '@/components/ui';
 import PlaceEditModal from './PlaceEditModal';
 import styles from '../admin.module.css';
 import own from './MapTab.module.css';
@@ -37,6 +38,8 @@ function MapProvider({ children }) {
     const [query, setQuery] = useState('');
     // The place in the editor: a row, a fresh draft ({}), or null when closed.
     const [editing, setEditing] = useState(null);
+    const confirm = useConfirm();
+    const toast = useToast();
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -68,7 +71,7 @@ function MapProvider({ children }) {
             body: JSON.stringify(body),
         });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || 'Something went wrong');
+        if (!res.ok) throw new Error(data.error || `The server refused the change (${res.status}).`);
         return data;
     };
 
@@ -81,18 +84,26 @@ function MapProvider({ children }) {
     const toggleVisible = async (place) => {
         try {
             await save({ ...place, is_visible: !place.is_visible });
+            toast.success(place.is_visible ? `${place.name} hidden from the map` : `${place.name} is on the map`);
         } catch (e) {
-            alert(e.message);
+            toast.error(e.message);
         }
     };
 
     const remove = async (place) => {
-        if (!confirm(`Delete "${place.name}" from the map?`)) return;
+        const ok = await confirm({
+            title: `Delete ${place.name}?`,
+            body: 'It comes off the campus map for everyone. To take it off for a while, hide it instead.',
+            confirmLabel: 'Delete place',
+            tone: 'danger',
+        });
+        if (!ok) return;
         try {
             await send('DELETE', { id: place.id });
             setPlaces(prev => prev.filter(p => p.id !== place.id));
+            toast.success(`${place.name} deleted`);
         } catch (e) {
-            alert(e.message);
+            toast.error(e.message);
         }
     };
 
@@ -140,14 +151,15 @@ function MapSidebar() {
         <div className={styles.sidebarCard}>
             <p className={styles.sectionTitle}>Places on the map</p>
             <div className={styles.navList}>
-                {entry(ALL, 'All places', places.length)}
+                {entry(ALL, 'Every place', places.length)}
                 {entry(PINS_ONLY, 'Pins outside buildings', pinsOnly)}
             </div>
 
-            <p className={styles.sectionTitle} style={{ marginTop: 14 }}>Buildings</p>
+            <p className={`${styles.sectionTitle} ${own.sidebarGap}`}>Buildings</p>
             <input
                 className={styles.input}
                 placeholder="Find a building"
+                aria-label="Find a building"
                 value={query}
                 onChange={e => setQuery(e.target.value)}
             />
@@ -171,17 +183,17 @@ function PlaceRow({ place }) {
             <div className={styles.rowMain}>
                 <div className={styles.rowTitle}>
                     {place.name}
-                    <span className={styles.badge}>{PLACE_KINDS[place.kind]?.label}</span>
+                    <span className={styles.rowMeta}>{PLACE_KINDS[place.kind]?.label}</span>
                     {!place.is_visible && <span className={`${styles.badge} ${styles.badgeExpired}`}>hidden</span>}
-                    {place.pin_x != null && <span className={styles.badge}>pin</span>}
-                    {place.show_sign && <span className={`${styles.badge} ${styles.badgeAccent}`}>sign</span>}
+                    {place.pin_x != null && <span className={`${styles.badge} ${styles.badgeExpired}`}>own pin</span>}
+                    {place.show_sign && <span className={`${styles.badge} ${styles.badgeAccent}`}>sign on map</span>}
                 </div>
                 <div className={styles.rowMeta}>
                     {[
                         place.building_id ? buildingLabel(place.building_id) : 'No building',
                         place.room && `Room ${place.room}`,
                         place.location_note,
-                        status ? status.text : 'No hours yet',
+                        status ? status.text : 'no hours yet',
                     ].filter(Boolean).join(' · ')}
                 </div>
             </div>
@@ -211,7 +223,7 @@ function MapMain() {
     // scope has none of it, so it can still be turned off.
     const kinds = Object.keys(PLACE_KINDS).filter(k => k === kind || inScope.some(p => p.kind === k));
     const info = isBuilding ? BUILDINGS.find(b => b.id === selected) : null;
-    const title = selected === ALL ? 'All places' : selected === PINS_ONLY ? 'Pins outside buildings' : buildingLabel(selected);
+    const title = selected === ALL ? 'Every place' : selected === PINS_ONLY ? 'Pins outside buildings' : buildingLabel(selected);
     // A new place starts in the building and type being looked at.
     const addPlace = () => setEditing({ building_id: isBuilding ? selected : null, ...(kind && { kind }) });
 
@@ -237,7 +249,7 @@ function MapMain() {
         <div className={styles.feedCard}>
             <div className={own.mainHead}>
                 <div>
-                    <div className={own.mainTitle}>{title}</div>
+                    <h2 className={own.mainTitle}>{title}</h2>
                     <div className={styles.rowMeta}>
                         {isBuilding
                             ? [info?.zoneName, 'Departments, food, shops and services inside it'].filter(Boolean).join(' · ')
@@ -245,6 +257,7 @@ function MapMain() {
                     </div>
                 </div>
                 <button
+                    type="button"
                     className={`${styles.btn} ${styles.btnPrimary} ${own.addBtn}`}
                     onClick={addPlace}
                 >
@@ -254,22 +267,22 @@ function MapMain() {
 
             {!loading && kinds.length > 0 && (
                 <div className={own.kindChips} role="group" aria-label="Filter by type">
-                    {chip(null, 'All types', inScope.length)}
+                    {chip(null, 'Every kind', inScope.length)}
                     {kinds.map(k => chip(k, PLACE_KINDS[k].plural, inScope.filter(p => p.kind === k).length))}
                 </div>
             )}
 
             {error && <div className={styles.error}>{error}</div>}
             {loading ? (
-                <div className={styles.loading}><div className={styles.spinner} />Loading places...</div>
+                <div className={styles.loading}><div className={styles.spinner} />Reading places…</div>
             ) : shown.length === 0 && kind && inScope.length > 0 ? (
                 <div className={styles.empty}>
-                    <div className={styles.emptyTitle}>No {PLACE_KINDS[kind].plural.toLowerCase()} here</div>
-                    <button type="button" className={own.linkBtn} onClick={() => setKind(null)}>Show all types</button>
+                    <div className={styles.emptyTitle}>No {PLACE_KINDS[kind].plural.toLowerCase()} here.</div>
+                    <button type="button" className={own.linkBtn} onClick={() => setKind(null)}>Show every kind</button>
                 </div>
             ) : shown.length === 0 ? (
                 <div className={styles.empty}>
-                    <div className={styles.emptyTitle}>Nothing here yet</div>
+                    <div className={styles.emptyTitle}>Nothing here yet.</div>
                     <span>
                         {isBuilding
                             ? 'Add the departments, restaurants or shops inside this building.'
@@ -285,7 +298,7 @@ function MapMain() {
             {/* The same button, floating, for screens where the header is far
                 down the page. CSS shows one or the other. */}
             {createPortal(
-                <button className={`${styles.btn} ${styles.btnPrimary} ${own.addFab}`} onClick={addPlace}>
+                <button type="button" className={`${styles.btn} ${styles.btnPrimary} ${own.addFab}`} onClick={addPlace}>
                     Add place
                 </button>,
                 document.body,
