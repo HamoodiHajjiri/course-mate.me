@@ -1,0 +1,118 @@
+/* ===== Day timeline ===== */
+
+.timeline {
+    --tl-line: var(--line);
+    --tl-label: var(--ink-3);
+    --tl-track: var(--surface-2);
+    --tl-ink: var(--ink);
+    padding-bottom: 20px;
+}
+
+.tone_forest {
+    --tl-line: var(--forest-line);
+    --tl-label: var(--forest-ink-3);
+    --tl-track: var(--forest-raised);
+    --tl-ink: var(--forest-ink);
+}
+
+.track {
+    position: relative;
+    height: 44px;
+    border-radius: 10px;
+    background: var(--tl-track);
+    box-shadow: inset 0 0 0 1px var(--tl-line);
+}
+
+.tick {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--tl-line);
+}
+
+.tick:first-child,
+.tick:last-of-type {
+    background: transparent;
+}
+
+.tickLabel {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    transform: translateX(-50%);
+    font-size: 0.625rem;
+    font-weight: var(--weight-medium);
+    color: var(--tl-label);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.tick:first-child .tickLabel {
+    transform: none;
+}
+
+.tick:last-of-type .tickLabel {
+    transform: translateX(-100%);
+}
+
+.block {
+    --c: var(--course-1);
+    position: absolute;
+    top: 5px;
+    bottom: 5px;
+    display: flex;
+    align-items: center;
+    min-width: 6px;
+    padding: 0 7px;
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--c) 22%, var(--surface));
+    box-shadow: inset 2px 0 0 var(--c), inset 0 0 0 1px color-mix(in srgb, var(--c) 35%, transparent);
+    color: color-mix(in srgb, var(--c) var(--course-ink), var(--course-ink-base));
+    overflow: hidden;
+    transition: opacity var(--dur-2) var(--ease-out);
+}
+
+.tone_forest .block {
+    background: color-mix(in srgb, var(--c) 34%, var(--forest));
+    box-shadow: inset 2px 0 0 var(--c), inset 0 0 0 1px color-mix(in srgb, var(--c) 45%, transparent);
+    color: var(--forest-ink);
+}
+
+.blockPast {
+    opacity: 0.45;
+}
+
+.blockLive {
+    box-shadow: inset 2px 0 0 var(--c), 0 0 0 2px var(--c);
+}
+
+.blockCode {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.now {
+    position: absolute;
+    top: -4px;
+    bottom: -4px;
+    width: 2px;
+    margin-left: -1px;
+    border-radius: 2px;
+    background: var(--accent);
+    z-index: 2;
+}
+
+.nowDot {
+    position: absolute;
+    top: -3px;
+    left: 50%;
+    width: 8px;
+    height: 8px;
+    margin-left: -4px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
+}
