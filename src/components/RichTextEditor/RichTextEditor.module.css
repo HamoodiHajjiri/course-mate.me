@@ -1,144 +1,176 @@
+/* ===== The notice editor: a ruled sheet ===== */
 .wrapper {
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    background: var(--bg-secondary);
-    overflow: hidden;
     display: flex;
     flex-direction: column;
+    border: 1px solid var(--rule-control);
+    border-radius: var(--r-2);
+    background: var(--sheet);
+    overflow: hidden;
+}
+
+.wrapper:focus-within {
+    border-color: var(--ink);
 }
 
 .toolbar {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 2px;
-    padding: 6px;
-    background: var(--bg-tertiary);
-    border-bottom: 1px solid var(--border-color);
+    gap: 0 2px;
+    padding: 4px 6px;
+    border-bottom: 1px solid var(--rule);
 }
 
 .toolBtn {
-    min-width: 28px;
-    height: 28px;
-    padding: 0 8px;
-    border: 1px solid transparent;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--text-secondary);
-    font-family: inherit;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all var(--transition-fast);
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    min-width: 26px;
+    height: 26px;
+    padding: 0 7px;
+    border: 0;
+    border-radius: var(--r-1);
+    background: transparent;
+    font-size: var(--text-caption);
+    font-weight: 500;
+    color: var(--ink-2);
+    cursor: pointer;
 }
 
 .toolBtn:hover:not(:disabled) {
-    background: var(--bg-card);
-    color: var(--text-primary);
-    border-color: var(--border-color);
+    background: var(--wash);
+    color: var(--ink);
 }
 
 .toolBtnActive,
 .toolBtnActive:hover {
-    background: var(--color-accent-muted);
-    color: var(--color-accent);
-    border-color: var(--color-accent);
+    background: var(--ink);
+    color: var(--on-ink);
 }
 
 .toolBtn:disabled {
-    opacity: 0.4;
+    opacity: 0.35;
     cursor: not-allowed;
 }
 
 .divider {
     width: 1px;
-    height: 18px;
-    background: var(--border-color);
+    height: 16px;
     margin: 0 4px;
+    background: var(--rule);
+}
+
+.linkRow {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px;
+    border-bottom: 1px solid var(--rule);
+    background: var(--wash);
+}
+
+.linkInput {
+    flex: 1;
+    height: 26px;
+    padding: 0 8px;
+    border: 1px solid var(--rule-control);
+    border-radius: var(--r-1);
+    background: var(--sheet);
+    font-family: var(--font-mono);
+    font-size: var(--text-caption);
+    color: var(--ink);
+}
+
+.linkInput:focus {
+    outline: none;
+    border-color: var(--ink);
 }
 
 .editor {
-    padding: 14px 16px;
     min-height: 200px;
     max-height: 420px;
+    padding: 14px 16px;
     overflow-y: auto;
-    color: var(--text-primary);
-    font-size: 0.9375rem;
+    font-size: var(--text-body);
     line-height: 1.6;
+    color: var(--ink);
     outline: none;
 }
 
 .editor :global(p) { margin: 0 0 10px; }
 .editor :global(p:last-child) { margin-bottom: 0; }
+
 .editor :global(h2) {
+    margin: 14px 0 6px;
+    font-family: var(--font-serif);
     font-size: 1.25rem;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    margin: 14px 0 8px;
+    font-weight: 500;
 }
+
 .editor :global(h3) {
-    font-size: 1.0625rem;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    margin: 12px 0 6px;
+    margin: 12px 0 4px;
+    font-size: var(--text-body);
+    font-weight: 600;
 }
-.editor :global(ul), .editor :global(ol) {
+
+.editor :global(ul),
+.editor :global(ol) {
     margin: 0 0 10px;
-    padding-left: 22px;
+    padding-left: 20px;
 }
+
 .editor :global(li) { margin: 2px 0; }
+
 .editor :global(blockquote) {
-    border-left: 3px solid var(--color-accent);
     margin: 0 0 10px;
-    padding: 4px 0 4px 12px;
-    color: var(--text-secondary);
-    font-style: italic;
+    padding: 2px 0 2px 12px;
+    border-left: 2px solid var(--rule-control);
+    color: var(--ink-2);
 }
+
 .editor :global(a) {
-    color: var(--color-accent);
+    color: var(--brand-ink);
     text-decoration: underline;
+    text-underline-offset: 3px;
 }
+
 .editor :global(img) {
+    display: block;
     max-width: 100%;
     height: auto;
-    border-radius: var(--radius-md);
     margin: 8px 0;
-    display: block;
+    border: 1px solid var(--rule);
 }
+
 .editor :global(hr) {
-    border: none;
-    border-top: 1px solid var(--border-color);
     margin: 14px 0;
+    border: 0;
+    border-top: 1px solid var(--rule-strong);
 }
+
 .editor :global(code) {
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
-    padding: 1px 5px;
+    padding: 1px 4px;
+    background: var(--wash);
+    font-family: var(--font-mono);
     font-size: 0.85em;
-    font-family: 'JetBrains Mono', monospace;
 }
+
 .editor :global(pre) {
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
+    margin: 0 0 10px;
     padding: 10px 12px;
     overflow-x: auto;
-    margin: 0 0 10px;
+    background: var(--wash);
 }
+
 .editor :global(pre code) {
-    background: transparent;
-    border: none;
     padding: 0;
+    background: transparent;
 }
 
 .editor :global(p.is-editor-empty:first-child::before) {
     content: attr(data-placeholder);
-    color: var(--text-muted);
     float: left;
-    pointer-events: none;
     height: 0;
+    color: var(--ink-4);
+    pointer-events: none;
 }
