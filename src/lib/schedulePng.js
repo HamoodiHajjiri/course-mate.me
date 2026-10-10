@@ -11,22 +11,25 @@
  */
 import { decodeHtmlEntities } from '@/lib/text';
 
-// The schedule card's course colors, in the same order. Text uses a darker
-// shade of each, since amber or teal text on its own tint is hard to read.
-const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'];
-const TEXT_COLORS = ['#1D4ED8', '#047857', '#B45309', '#B91C1C', '#6D28D9', '#BE185D', '#0F766E', '#C2410C'];
+// The timetable's course inks (Paper theme, globals.css), in the same order.
+// Text uses a darker shade of each, as the timetable mixes its inks with black.
+const COLORS = ['#2C5EA8', '#C1502A', '#1C7A68', '#8350AE', '#A87A16', '#BB3F69', '#4C7A26', '#22809F'];
+const TEXT_COLORS = ['#1D3E6F', '#80351C', '#135145', '#573573', '#6F510F', '#7C2A46', '#325119', '#175569'];
 
 // Light theme values from globals.css. An image gets shared and printed, so it
 // does not follow the viewer's dark mode.
-const INK_SECONDARY = '#475569';
-const INK_MUTED = '#94A3B8';
-const INK_FAINT = '#CBD5E1';
-const LINE = '#E2E8F0';
-const LINE_SOFT = '#F1F5F9';
-const PAGE = '#FFFFFF';
+const INK = '#131B17';
+const INK_SECONDARY = '#3B4640';
+const INK_MUTED = '#66706A';
+const INK_FAINT = '#848C87';
+const LINE = 'rgba(19, 27, 23, 0.16)';
+const LINE_SOFT = 'rgba(19, 27, 23, 0.07)';
+const PAGE = '#FBFAF6';
 
-const SANS = 'Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
-const MONO = '"JetBrains Mono", ui-monospace, Menlo, Consolas, monospace';
+const SANS = '"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif';
+const COND = '"IBM Plex Sans Condensed", "IBM Plex Sans", "Arial Narrow", sans-serif';
+const MONO = '"IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace';
+const SERIF = 'Newsreader, Georgia, serif';
 
 // A little narrower than A4 (794 at 96 dpi), which Karam found too wide. The
 // height follows the day's hours, so a class block is the same size on every
@@ -59,16 +62,13 @@ function withAlpha(hex, alpha) {
     return `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
 }
 
-function clock12(minutes) {
-    const h = Math.floor(minutes / 60);
-    const m = minutes % 60;
-    const period = h >= 12 && h < 24 ? 'PM' : 'AM';
-    return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')} ${period}`;
+// The sheet keeps the timetable's 24-hour clock: 08:00–09:15.
+function clock24(minutes) {
+    return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 }
 
 function hourLabel(h) {
-    const period = h >= 12 && h < 24 ? 'PM' : 'AM';
-    return `${h % 12 === 0 ? 12 : h % 12} ${period}`;
+    return String(h).padStart(2, '0');
 }
 
 // UOS term codes start with the academic year: 202610 is Fall of 2026/2027.
@@ -163,10 +163,8 @@ function measureBadge(ctx, text) {
 
 function drawBadge(ctx, x, y, text, color, height) {
     const w = measureBadge(ctx, text);
-    roundedRect(ctx, x, y, w, height, 3);
-    ctx.fillStyle = 'rgba(15, 23, 41, 0.06)';
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(15, 23, 41, 0.10)';
+    roundedRect(ctx, x, y, w, height, 0);
+    ctx.strokeStyle = withAlpha(color.length === 7 ? color : '#131B17', 0.25);
     ctx.lineWidth = 1;
     ctx.stroke();
     ctx.fillStyle = color;
@@ -177,14 +175,14 @@ function drawBadge(ctx, x, y, text, color, height) {
 }
 
 const F = {
-    dayHeader: `700 9.5px ${SANS}`,
-    hour: `500 9px ${SANS}`,
-    code: `700 9.5px ${MONO}`,
-    name: `800 11px ${SANS}`,
-    detail: `600 9.5px ${SANS}`,
-    blockBadge: `700 8.5px ${SANS}`,
-    note: `500 9.5px ${SANS}`,
-    footer: `500 8.5px ${SANS}`,
+    dayHeader: `600 9.5px ${COND}`,
+    hour: `400 9px ${MONO}`,
+    code: `500 9.5px ${MONO}`,
+    name: `500 12px ${SERIF}`,
+    detail: `500 9.5px ${COND}`,
+    blockBadge: `500 8.5px ${MONO}`,
+    note: `400 9.5px ${SANS}`,
+    footer: `400 8.5px ${SANS}`,
 };
 
 /**
@@ -223,25 +221,19 @@ function drawBlock(ctx, block, x, y, w, h) {
     const color = COLORS[idx];
     const text = TEXT_COLORS[idx];
 
+    // The timetable's block: square, the course's tint, its colour as a tab
+    // along the top edge.
     ctx.save();
-    // A soft drop shadow, as in the design.
-    ctx.shadowColor = 'rgba(15, 23, 41, 0.08)';
-    ctx.shadowBlur = 6;
-    ctx.shadowOffsetY = 1.5;
-    roundedRect(ctx, x, y, w, h, 6);
+    roundedRect(ctx, x, y, w, h, 0);
     ctx.fillStyle = PAGE;
     ctx.fill();
-    ctx.restore();
-
-    ctx.save();
-    roundedRect(ctx, x, y, w, h, 6);
-    ctx.fillStyle = withAlpha(color, 0.12);
+    ctx.fillStyle = withAlpha(color, 0.13);
     ctx.fill();
     ctx.clip();
     ctx.fillStyle = color;
-    ctx.fillRect(x, y, 3, h);
+    ctx.fillRect(x, y, w, 2);
 
-    const tx = x + 9;
+    const tx = x + 7;
     const tw = w - 14;
     const top = y + 5;
     const { parts, nameLines } = planBlock(ctx, block, tw, h - 10);
@@ -254,7 +246,7 @@ function drawBlock(ctx, block, x, y, w, h) {
     spaced(ctx, 0);
     cy += parts.code;
 
-    ctx.fillStyle = text;
+    ctx.fillStyle = INK;
     ctx.font = F.name;
     if (parts.name0) {
         const first = parts.name1 || !nameLines[1] ? nameLines[0] : fit(ctx, `${nameLines[0]}…`, tw);
@@ -283,7 +275,7 @@ function drawBlock(ctx, block, x, y, w, h) {
         by -= 14;
         ctx.font = F.blockBadge;
         let bx = tx;
-        const items = [block.sectionNum && `Sec ${block.sectionNum}`, block.location].filter(Boolean);
+        const items = [block.sectionNum && `§${block.sectionNum}`, block.location].filter(Boolean);
         for (const item of items) {
             const label = fit(ctx, item, tw - (bx - tx) - 8);
             if (bx + measureBadge(ctx, label) > tx + tw + 0.5) break;
@@ -295,7 +287,7 @@ function drawBlock(ctx, block, x, y, w, h) {
     ctx.font = F.detail;
     drawClockIcon(ctx, tx, by + 1.5, 8, withAlpha(text, 0.7));
     ctx.fillStyle = withAlpha(text, 0.75);
-    ctx.fillText(fit(ctx, `${clock12(block.start)} – ${clock12(block.end)}`, tw - 12), tx + 12, by);
+    ctx.fillText(fit(ctx, `${clock24(block.start)}–${clock24(block.end)}`, tw - 12), tx + 12, by);
     ctx.restore();
 }
 
@@ -318,7 +310,7 @@ function drawSheet(sheet) {
     measure.font = F.note;
     const unscheduled = entries.filter(e => !/\d{1,2}:\d{2}/.test(e.classTime || ''));
     const noteLines = unscheduled.length
-        ? wrap(measure, `No set time: ${unscheduled.map(e => [e.courseId, e.courseName, e.sectionNum && `Sec ${e.sectionNum}`].filter(Boolean).join(' ')).join(' · ')}`, contentW)
+        ? wrap(measure, `No set time: ${unscheduled.map(e => [e.courseId, e.courseName, e.sectionNum && `§${e.sectionNum}`].filter(Boolean).join(' ')).join(' · ')}`, contentW)
         : [];
 
     // ── Vertical budget: a fixed height per hour, the page as tall as that makes it ──
@@ -346,7 +338,7 @@ function drawSheet(sheet) {
     const hourY = (h) => bodyTop + BODY_PAD + (h - startHour) * pxPerHour;
 
     ctx.save();
-    roundedRect(ctx, gridX, gridTop, gridW, DAY_HEADER + gridBodyH, 6);
+    roundedRect(ctx, gridX, gridTop, gridW, DAY_HEADER + gridBodyH, 0);
     ctx.fillStyle = PAGE;
     ctx.fill();
     ctx.clip();
@@ -392,7 +384,7 @@ function drawSheet(sheet) {
 
     ctx.strokeStyle = LINE;
     ctx.lineWidth = 1;
-    roundedRect(ctx, gridX + 0.5, gridTop + 0.5, gridW - 1, DAY_HEADER + gridBodyH - 1, 6);
+    roundedRect(ctx, gridX + 0.5, gridTop + 0.5, gridW - 1, DAY_HEADER + gridBodyH - 1, 0);
     ctx.stroke();
 
     // Hour labels in the gutter, centred on their lines.
