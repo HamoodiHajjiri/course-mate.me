@@ -1,43 +1,55 @@
 'use client';
 
-import { forwardRef, useCallback, useId, useLayoutEffect, useRef, useState } from 'react';
-import { AlertIcon, ChevronDownIcon, CloseIcon, InfoIcon, CheckCircleIcon, SearchIcon } from '@/components/Icons';
+import { forwardRef, useId, useRef } from 'react';
+import { ChevronDownIcon, CloseIcon, SearchIcon } from '@/components/Icons';
 import styles from './ui.module.css';
 
 export const cx = (...parts) => parts.filter(Boolean).join(' ');
 
-/* ===== Badge ===== */
+/* ===== Status and tags ===== */
 /**
- * tone: neutral | accent | success | warning | danger | info | swap |
- *       giveaway | request | solid
+ * A state, said in words with a square of colour before it. Not a pill: the
+ * square carries the colour, the words stay ink.
+ *
+ * tone: neutral | go (open, free, confirmed) | warn (pending, soon) |
+ *       danger (declined, full, conflict) | brand | muted |
+ *       swap | giveaway | request
  */
-export function Badge({ tone = 'neutral', size = 'md', dot = false, icon, className = '', children, ...props }) {
+export function Status({ tone = 'neutral', live = false, className = '', children, ...props }) {
     return (
-        <span
-            className={cx(styles.badge, tone !== 'neutral' && styles[`tone_${tone}`], size === 'sm' && styles.badgeSm, dot && styles.badgeDot, className)}
-            {...props}
-        >
-            {icon}
+        <span className={cx(styles.status, styles[`status_${tone}`], live && styles.statusLive, className)} {...props}>
             {children}
         </span>
     );
 }
 
-/** A small number for navigation, tabs and bells. 9+ past nine. */
+/** Older name. `dot` and `icon` are accepted; the square replaces both. */
+export function Badge({ tone = 'neutral', size = 'md', dot, icon, className = '', children, ...props }) {
+    const map = { accent: 'go', success: 'go', warning: 'warn', info: 'neutral', solid: 'brand' };
+    return (
+        <Status tone={map[tone] || tone} className={cx(size === 'sm' && styles.statusSm, className)} {...props}>
+            {children}
+        </Status>
+    );
+}
+
+/** A small number for navigation and the bell: a square, 9+ past nine. */
 export function Count({ value, tone = 'alert', className = '', max = 9 }) {
     if (!value) return null;
     return (
-        <span className={cx(styles.count, tone === 'quiet' && styles.countQuiet, tone === 'accent' && styles.countAccent, className)}>
+        <span className={cx(styles.count, tone === 'quiet' && styles.countQuiet, tone === 'accent' && styles.countGo, className)}>
             {value > max ? `${max}+` : value}
         </span>
     );
 }
 
-/* ===== Segmented control ===== */
+/* ===== Choice line ===== */
 /**
- * options: [{ value, label, icon?, count?, alert?, disabled?, title? }]
- * The selected background slides to the chosen option. Renders as a
- * radiogroup by default, or as a tablist with `as="tabs"`.
+ * Choosing what to show: a line of words, the chosen one highlighted the way
+ * a student marks a printout. Counts sit after each word in mono. Distinct
+ * from Tabs, which say where you are; this says what you're looking at.
+ *
+ * options: [{ value, label, count?, alert?, disabled?, title? }]
  */
 export function SegmentedControl({
     options,
@@ -50,25 +62,6 @@ export function SegmentedControl({
     className = '',
 }) {
     const wrapRef = useRef(null);
-    const [indicator, setIndicator] = useState(null);
-
-    const measure = useCallback(() => {
-        const wrap = wrapRef.current;
-        if (!wrap) return;
-        const active = wrap.querySelector('[data-active="true"]');
-        if (!active) { setIndicator(null); return; }
-        setIndicator({ left: active.offsetLeft, width: active.offsetWidth });
-    }, []);
-
-    useLayoutEffect(() => {
-        measure();
-        const wrap = wrapRef.current;
-        if (!wrap || typeof ResizeObserver === 'undefined') return undefined;
-        const ro = new ResizeObserver(measure);
-        ro.observe(wrap);
-        return () => ro.disconnect();
-    }, [measure, value, options.length]);
-
     const role = as === 'tabs' ? 'tablist' : 'radiogroup';
     const itemRole = as === 'tabs' ? 'tab' : 'radio';
 
@@ -89,16 +82,9 @@ export function SegmentedControl({
             ref={wrapRef}
             role={role}
             aria-label={label}
-            className={cx(styles.segmented, full && styles.segmentedFull, size === 'sm' && styles.segmentedSm, className)}
+            className={cx(styles.choices, full && styles.choicesFull, size === 'sm' && styles.choicesSm, className)}
             onKeyDown={onKeyDown}
         >
-            {indicator && (
-                <span
-                    className={styles.segmentIndicator}
-                    style={{ width: indicator.width, transform: `translateX(${indicator.left}px)` }}
-                    aria-hidden="true"
-                />
-            )}
             {options.map(opt => {
                 const active = opt.value === value;
                 return (
@@ -112,13 +98,12 @@ export function SegmentedControl({
                         data-active={active}
                         disabled={opt.disabled}
                         title={opt.title}
-                        className={styles.segment}
+                        className={styles.choice}
                         onClick={() => onChange(opt.value)}
                     >
-                        {opt.icon}
-                        {opt.label}
+                        <span className={styles.choiceLabel}>{opt.icon}{opt.label}</span>
                         {opt.count != null && opt.count !== false && (
-                            <span className={cx(styles.segmentCount, opt.alert && styles.segmentCountAlert)}>{opt.count}</span>
+                            <span className={cx(styles.choiceCount, opt.alert && styles.choiceCountAlert)}>{opt.count}</span>
                         )}
                     </button>
                 );
@@ -129,8 +114,9 @@ export function SegmentedControl({
 
 /* ===== Fields ===== */
 /**
- * Label, control, then hint or error — errors sit directly under the field
- * they belong to. Pass the control as children; Field wires the ids.
+ * Label, control, then hint or error. The error sits under the field it's
+ * about and says what to do. Pass the control as children, or a function
+ * that receives { id, invalid, describedBy }.
  */
 export function Field({ label, optional = false, hint, error, htmlFor, className = '', children, aside }) {
     const autoId = useId();
@@ -139,16 +125,13 @@ export function Field({ label, optional = false, hint, error, htmlFor, className
         <div className={cx(styles.field, className)}>
             {label && (
                 <label htmlFor={id} className={styles.label}>
-                    <span>{label}{optional && <span className={styles.labelOptional}> · optional</span>}</span>
+                    <span>{label}{optional && <span className={styles.labelOptional}>optional</span>}</span>
                     {aside}
                 </label>
             )}
             {typeof children === 'function' ? children({ id, invalid: !!error, describedBy: error ? `${id}-error` : hint ? `${id}-hint` : undefined }) : children}
             {error ? (
-                <span id={`${id}-error`} className={styles.error} role="alert">
-                    <AlertIcon />
-                    {error}
-                </span>
+                <span id={`${id}-error`} className={styles.error} role="alert">{error}</span>
             ) : hint ? (
                 <span id={`${id}-hint`} className={styles.hint}>{hint}</span>
             ) : null}
@@ -168,7 +151,7 @@ export const Input = forwardRef(function Input({ size = 'md', mono = false, inva
 });
 
 export const Textarea = forwardRef(function Textarea({ invalid, className = '', ...props }, ref) {
-    return <textarea ref={ref} className={cx(styles.input, className)} aria-invalid={invalid || undefined} {...props} />;
+    return <textarea ref={ref} className={cx(styles.input, styles.textarea, className)} aria-invalid={invalid || undefined} {...props} />;
 });
 
 export const Select = forwardRef(function Select({ size = 'md', invalid, className = '', wrapClassName = '', children, ...props }, ref) {
@@ -176,7 +159,7 @@ export const Select = forwardRef(function Select({ size = 'md', invalid, classNa
         <span className={cx(styles.selectWrap, wrapClassName)}>
             <select
                 ref={ref}
-                className={cx(styles.input, size === 'sm' && styles.inputSm, size === 'lg' && styles.inputLg, className)}
+                className={cx(styles.input, styles.select, size === 'sm' && styles.inputSm, size === 'lg' && styles.inputLg, className)}
                 aria-invalid={invalid || undefined}
                 {...props}
             >
@@ -187,7 +170,7 @@ export const Select = forwardRef(function Select({ size = 'md', invalid, classNa
     );
 });
 
-/** A search box with its icon, and a clear button once there is text. */
+/** A search box: the glass in front, a clear button once there's text. */
 export const SearchInput = forwardRef(function SearchInput({
     value,
     onChange,
@@ -227,7 +210,7 @@ export const SearchInput = forwardRef(function SearchInput({
                 )}
                 {...props}
             />
-            <SearchIcon className={cx(styles.inputLeading, size === 'lg' && styles.inputLeadingLg)} />
+            <SearchIcon className={styles.inputLeading} />
             {(hasText || trailing) && (
                 <span className={styles.inputTrailing}>
                     {hasText ? (
@@ -250,7 +233,7 @@ export function Checkbox({ label, className = '', children, ...props }) {
     );
 }
 
-/** role="switch". `busy` shows a spinning knob while a save is in flight. */
+/** role="switch": a square knob in a square track. `busy` while saving. */
 export function Switch({ checked, onChange, disabled = false, busy = false, label, className = '', ...props }) {
     return (
         <button
@@ -271,7 +254,8 @@ export function Kbd({ children }) {
     return <kbd className={styles.kbd}>{children}</kbd>;
 }
 
-/* ===== Surfaces ===== */
+/* ===== Structure ===== */
+/** A sheet of paper on the page. Use sparingly: most content sits on the page itself. */
 export function Card({ as: Tag = 'section', padded = true, interactive = false, className = '', children, ...props }) {
     return (
         <Tag className={cx(styles.card, padded && styles.cardPad, interactive && styles.cardInteractive, className)} {...props}>
@@ -280,30 +264,54 @@ export function Card({ as: Tag = 'section', padded = true, interactive = false, 
     );
 }
 
-export function SectionHeader({ title, description, icon, overline = false, actions, as: Tag = 'h2', className = '', id }) {
+/**
+ * The rubric: how a section of a page begins. A solid ink rule across the
+ * column, the section's name under it, and whatever belongs at the right
+ * (a count, an action). It replaces the box around a section.
+ */
+export function Rubric({ title, meta, description, actions, as: Tag = 'h2', id, className = '', quiet = false }) {
     return (
-        <div className={cx(styles.sectionHeader, className)}>
-            <div className={styles.sectionHeaderText}>
-                <Tag id={id} className={overline ? styles.overline : styles.sectionTitle}>
-                    {icon}
-                    {title}
-                </Tag>
-                {description && <p className={styles.sectionDescription}>{description}</p>}
+        <div className={cx(styles.rubric, quiet && styles.rubricQuiet, className)}>
+            <div className={styles.rubricMain}>
+                <Tag id={id} className={styles.rubricTitle}>{title}</Tag>
+                {meta != null && meta !== false && <span className={styles.rubricMeta}>{meta}</span>}
+                {actions && <div className={styles.rubricActions}>{actions}</div>}
             </div>
-            {actions && <div className={styles.sectionActions}>{actions}</div>}
+            {description && <p className={styles.rubricDescription}>{description}</p>}
         </div>
+    );
+}
+
+/** Older name for a rubric. */
+export function SectionHeader({ title, description, actions, as = 'h2', className = '', id }) {
+    return <Rubric title={title} description={description} actions={actions} as={as} id={id} className={className} />;
+}
+
+/**
+ * A figure that matters: the number in the serif, its unit and label in
+ * condensed capitals beneath. For the few numbers a screen is about.
+ */
+export function Figure({ value, of, label, tone = 'ink', size = 'md', className = '' }) {
+    return (
+        <span className={cx(styles.figure, styles[`figure_${size}`], styles[`figure_${tone}`], className)}>
+            <span className={styles.figureValue}>
+                {value}
+                {of != null && <span className={styles.figureOf}>/{of}</span>}
+            </span>
+            {label && <span className={styles.figureLabel}>{label}</span>}
+        </span>
     );
 }
 
 /* ===== States ===== */
 /**
- * What happened, whether it's normal, and what to do next — in that order.
- * `tone="neutral"` for states that aren't an invitation (nothing matches).
+ * Nothing to show. A sentence in the serif saying what's true, a line of
+ * what to do about it, and the action as a link. No illustration, no icon in
+ * a circle: an empty page should look calm, not decorated.
  */
-export function EmptyState({ icon, title, children, actions, compact = false, align = 'center', tone = 'accent', className = '' }) {
+export function EmptyState({ title, children, actions, compact = false, align = 'start', className = '' }) {
     return (
-        <div className={cx(styles.empty, compact && styles.emptyCompact, align === 'start' && styles.emptyStart, className)}>
-            {icon && <span className={cx(styles.emptyIcon, tone === 'neutral' && styles.emptyIconNeutral)} aria-hidden="true">{icon}</span>}
+        <div className={cx(styles.empty, compact && styles.emptyCompact, align === 'center' && styles.emptyCenter, className)}>
             {title && <p className={styles.emptyTitle}>{title}</p>}
             {children && <div className={styles.emptyBody}>{children}</div>}
             {actions && <div className={styles.emptyActions}>{actions}</div>}
@@ -311,11 +319,11 @@ export function EmptyState({ icon, title, children, actions, compact = false, al
     );
 }
 
-export function Skeleton({ width = '100%', height = 14, radius, className = '', style }) {
+export function Skeleton({ width = '100%', height = 12, className = '', style }) {
     return (
         <span
             className={cx(styles.skeleton, className)}
-            style={{ width, height, borderRadius: radius, ...style }}
+            style={{ width, height, ...style }}
             aria-hidden="true"
         />
     );
@@ -326,20 +334,16 @@ export function Spinner({ size = 'md', center = false, label = 'Loading' }) {
     return center ? <div className={styles.spinnerCenter}>{el}</div> : el;
 }
 
-const CALLOUT_ICONS = {
-    info: InfoIcon,
-    accent: InfoIcon,
-    neutral: InfoIcon,
-    success: CheckCircleIcon,
-    warning: AlertIcon,
-    danger: AlertIcon,
-};
-
-export function Callout({ tone = 'neutral', title, icon, action, className = '', children, role }) {
-    const Icon = CALLOUT_ICONS[tone] || InfoIcon;
+/**
+ * A note in the margin: a rule in the note's colour down its left edge, the
+ * words beside it. For warnings and explanations that belong to a place on
+ * the page, not to the whole app.
+ *
+ * tone: neutral | info | accent | success | warning | danger
+ */
+export function Callout({ tone = 'neutral', title, action, className = '', children, role }) {
     return (
-        <div className={cx(styles.callout, tone !== 'neutral' && styles[`callout_${tone}`], className)} role={role || (tone === 'danger' ? 'alert' : undefined)}>
-            {icon === false ? null : (icon || <Icon />)}
+        <div className={cx(styles.callout, styles[`callout_${tone}`], className)} role={role || (tone === 'danger' ? 'alert' : undefined)}>
             <div className={styles.calloutBody}>
                 {title && <strong className={styles.calloutTitle}>{title}</strong>}
                 {children}
@@ -349,12 +353,12 @@ export function Callout({ tone = 'neutral', title, icon, action, className = '',
     );
 }
 
-/** Segmented meter for small whole numbers ("2 of 5 posts"). */
+/** Whole-number allowance as cells ("3 of 5 posts"): the shape of a timetable row. */
 export function Meter({ value = 0, max = 5, warnAt, label, className = '' }) {
     const segments = Array.from({ length: max }, (_, i) => i < value);
     const warn = warnAt != null && value >= warnAt;
     return (
-        <div
+        <span
             className={cx(styles.meter, warn && styles.meterWarn, className)}
             role="meter"
             aria-valuemin={0}
@@ -363,17 +367,17 @@ export function Meter({ value = 0, max = 5, warnAt, label, className = '' }) {
             aria-label={label}
         >
             {segments.map((on, i) => (
-                <span key={i} className={cx(styles.meterSegment, on && styles.meterSegmentOn)} />
+                <span key={i} className={cx(styles.meterCell, on && styles.meterCellOn)} />
             ))}
-        </div>
+        </span>
     );
 }
 
 export function ProgressBar({ value = 0, label, className = '' }) {
     const pct = Math.max(0, Math.min(100, value));
     return (
-        <div className={cx(styles.meterTrack, className)} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={label}>
-            <div className={styles.meterFill} style={{ width: `${pct}%` }} />
+        <div className={cx(styles.progress, className)} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={label}>
+            <div className={styles.progressFill} style={{ width: `${pct}%` }} />
         </div>
     );
 }
@@ -384,10 +388,14 @@ export function initialsOf(name) {
     return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
 }
 
-export function Avatar({ name, size = 32, tone = 'accent', className = '' }) {
+/**
+ * A person: always a circle (courses are squares). An outline by default;
+ * `solid` for the viewer themself.
+ */
+export function Avatar({ name, size = 32, tone = 'outline', className = '' }) {
     return (
         <span
-            className={cx(styles.avatar, tone === 'neutral' && styles.avatarNeutral, tone === 'solid' && styles.avatarSolid, className)}
+            className={cx(styles.avatar, tone === 'solid' && styles.avatarSolid, tone === 'neutral' && styles.avatarNeutral, className)}
             style={{ '--avatar': `${size}px` }}
             aria-hidden="true"
         >
