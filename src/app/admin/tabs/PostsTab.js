@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { SearchIcon } from '@/components/Icons';
+import { useConfirm, useToast } from '@/components/ui';
 import styles from '../admin.module.css';
 
 const Ctx = createContext(null);
@@ -34,6 +35,8 @@ function PostsProvider({ children }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const supabase = createClient();
+    const confirm = useConfirm();
+    const toast = useToast();
 
     const load = useCallback(async (overrides = {}) => {
         const q = overrides.search !== undefined ? overrides.search : search;
@@ -74,7 +77,12 @@ function PostsProvider({ children }) {
     const submitSearch = (e) => { e?.preventDefault(); load({ search }); };
 
     const handleExpire = async (id) => {
-        if (!confirm('Force-expire this post?')) return;
+        const ok = await confirm({
+            title: 'Expire this post now?',
+            body: 'It comes off the board straight away, as if its week had run out.',
+            confirmLabel: 'Expire it',
+        });
+        if (!ok) return;
         const res = await fetch('/api/admin/posts', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -82,13 +90,20 @@ function PostsProvider({ children }) {
         });
         if (res.ok) {
             setPosts(prev => prev.map(p => p.id === id ? { ...p, status: 'expired' } : p));
+            toast.success('Post expired');
         } else {
-            alert(await errorFrom(res, 'Could not expire this post.'));
+            toast.error(await errorFrom(res, 'Could not expire this post.'));
         }
     };
 
     const handleDelete = async (id) => {
-        if (!confirm('Delete this post permanently?')) return;
+        const ok = await confirm({
+            title: 'Delete this post for good?',
+            body: 'It disappears from the board and from its owner’s history. This can’t be undone.',
+            confirmLabel: 'Delete post',
+            tone: 'danger',
+        });
+        if (!ok) return;
         const res = await fetch('/api/admin/posts', {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
@@ -96,8 +111,9 @@ function PostsProvider({ children }) {
         });
         if (res.ok) {
             setPosts(prev => prev.filter(p => p.id !== id));
+            toast.success('Post deleted');
         } else {
-            alert(await errorFrom(res, 'Could not delete this post.'));
+            toast.error(await errorFrom(res, 'Could not delete this post.'));
         }
     };
 
@@ -119,7 +135,7 @@ function PostsSidebar() {
     return (
         <>
             <div className={styles.sidebarCard}>
-                <p className={styles.sectionTitle}>Filter by status</p>
+                <p className={styles.sectionTitle}>Status</p>
                 <div className={styles.navList}>
                     {STATUSES.map(s => (
                         <button
@@ -134,7 +150,7 @@ function PostsSidebar() {
             </div>
 
             <div className={styles.sidebarCard}>
-                <p className={styles.sectionTitle}>Filter by semester</p>
+                <p className={styles.sectionTitle}>Term</p>
                 <div className={`${styles.navList} ${semesters.length > 5 ? styles.scrollList : ''}`}>
                     <button
                         className={`${styles.navBtn} ${term === '' ? styles.navBtnActive : ''}`}
@@ -154,9 +170,6 @@ function PostsSidebar() {
                         </button>
                     ))}
                 </div>
-                <div style={{ marginTop: 8, textAlign: 'center', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                    {posts.length} result{posts.length === 1 ? '' : 's'}
-                </div>
             </div>
         </>
     );
@@ -175,57 +188,70 @@ function PostsMain() {
 
     return (
         <>
-            <form onSubmit={submitSearch} className={styles.card}>
-                <div className={styles.searchWrapper}>
-                    <span className={styles.searchIcon}><SearchIcon width={18} height={18} /></span>
+            <form onSubmit={submitSearch} className={styles.toolbar}>
+                <div className={`${styles.searchWrapper} ${styles.searchGrow}`}>
+                    <span className={styles.searchIcon}><SearchIcon /></span>
                     <input
-                        type="text"
+                        type="search"
                         className={styles.searchInput}
-                        placeholder="Search by course code or name..."
+                        placeholder="Course code or name, then Enter"
+                        aria-label="Search posts"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                     />
                 </div>
             </form>
 
-            <div className={styles.feedCard}>
-                {error && <div className={styles.error}>{error}</div>}
-                {loading ? (
-                    <div className={styles.loading}><div className={styles.spinner} />Loading posts...</div>
-                ) : posts.length === 0 ? (
-                    <div className={styles.empty}>
-                        <div className={styles.emptyTitle}>No posts</div>
-                        <span>Nothing matches the current filter.</span>
-                    </div>
-                ) : (
-                    <div className={styles.feedList}>
-                        {posts.map(p => (
-                            <div key={p.id} className={styles.row}>
-                                <div className={styles.rowMain}>
-                                    <div className={styles.rowTitle}>
-                                        {p.course_code}
-                                        <span className={styles.badge}>{p.type}</span>
-                                        <span className={`${styles.badge} ${badgeClass(p.status)}`}>{p.status}</span>
-                                        <span className={styles.badge}>{p.term_code}</span>
-                                    </div>
-                                    <div className={styles.rowMeta}>
-                                        {p.course_name} · have {p.have_section}{p.want_section ? ` → want ${p.want_section}` : ''}
-                                    </div>
-                                    <div className={styles.rowMeta}>
-                                        {p.profile?.name || '(unknown)'} ({p.profile?.student_id || 'no ID'}) · {p.profile?.email || 'no email'}
-                                    </div>
-                                </div>
-                                <div className={styles.rowActions}>
-                                    {p.status !== 'expired' && p.status !== 'completed' && (
-                                        <button className={`${styles.btn} ${styles.btnGhost}`} onClick={() => handleExpire(p.id)}>Expire</button>
-                                    )}
-                                    <button className={`${styles.btn} ${styles.btnDanger}`} onClick={() => handleDelete(p.id)}>Delete</button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
+            {error && <div className={styles.error}>{error}</div>}
+            {loading ? (
+                <div className={styles.loading}><div className={styles.spinner} />Reading posts…</div>
+            ) : posts.length === 0 ? (
+                <div className={styles.empty}>
+                    <div className={styles.emptyTitle}>No posts.</div>
+                    <span>Nothing matches these filters.</span>
+                </div>
+            ) : (
+                <div className={styles.tableWrap}>
+                    <table className={styles.table}>
+                        <thead>
+                            <tr>
+                                <th>Course</th>
+                                <th>Kind</th>
+                                <th>Sections</th>
+                                <th>Status</th>
+                                <th>Term</th>
+                                <th>Posted by</th>
+                                <th className={styles.cellActions}><span className="sr-only">Actions</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {posts.map(p => (
+                                <tr key={p.id}>
+                                    <td>
+                                        <span className={`${styles.mono} ${styles.cellStrong}`}>{p.course_code}</span>
+                                        <div className={styles.rowMeta}>{p.course_name}</div>
+                                    </td>
+                                    <td>{p.type === 'swap' ? 'Swap' : p.type === 'giveaway' ? 'Giveaway' : p.type === 'request' ? 'Request' : p.type}</td>
+                                    <td className={styles.mono}>§{p.have_section}{p.want_section ? ` → §${p.want_section}` : ''}</td>
+                                    <td><span className={`${styles.badge} ${badgeClass(p.status)}`}>{p.status}</span></td>
+                                    <td className={styles.mono}>{p.term_code}</td>
+                                    <td>
+                                        {p.profile?.name || <span className={styles.cellMuted}>unknown</span>}
+                                        <div className={`${styles.rowMeta} ${styles.mono}`}>{p.profile?.student_id || 'no ID'}{p.profile?.email ? ` · ${p.profile.email}` : ''}</div>
+                                    </td>
+                                    <td className={styles.cellActions}>
+                                        {p.status !== 'expired' && p.status !== 'completed' && (
+                                            <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={() => handleExpire(p.id)}>Expire</button>
+                                        )}
+                                        <button type="button" className={`${styles.btn} ${styles.btnDanger}`} onClick={() => handleDelete(p.id)}>Delete</button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    <p className={styles.tableFoot}>{posts.length} {posts.length === 1 ? 'post' : 'posts'}</p>
+                </div>
+            )}
         </>
     );
 }
