@@ -8,7 +8,7 @@ import { BellIcon } from '../Icons';
 import styles from './AlertsBell.module.css';
 
 /**
- * Top-bar entry point to /notifications, carrying the unread badge. A guest
+ * The app bar's way into /notifications, carrying the unread count. A guest
  * has no alerts, so the same corner holds their way to sign in.
  */
 export default function AlertsBell() {
@@ -22,12 +22,14 @@ export default function AlertsBell() {
     return (
         <Link
             href="/notifications"
-            className={`${styles.bell} ${isActive ? styles.active : ''}`}
-            aria-label={unread > 0 ? `Alerts, ${unread} unread` : 'Alerts'}
+            className={`${styles.bell} ${isActive ? styles.active : ''} ${unread > 0 ? styles.hasUnread : ''}`}
+            aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
+            aria-current={isActive ? 'page' : undefined}
+            title="Notifications"
         >
             <BellIcon />
             {unread > 0 && (
-                <span className={styles.badge}>{unread > 9 ? '9+' : unread}</span>
+                <span key={unread} className={styles.badge}>{unread > 9 ? '9+' : unread}</span>
             )}
         </Link>
     );
