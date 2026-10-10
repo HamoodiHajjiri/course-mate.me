@@ -3,6 +3,7 @@ export { default as Dialog } from './Dialog';
 export { FeedbackProvider, useConfirm, useToast } from './Feedback';
 export {
     cx,
+    Status,
     Badge,
     Count,
     SegmentedControl,
@@ -16,6 +17,8 @@ export {
     Kbd,
     Card,
     SectionHeader,
+    Rubric,
+    Figure,
     EmptyState,
     Skeleton,
     Spinner,
@@ -25,4 +28,4 @@ export {
     Avatar,
     initialsOf,
 } from './primitives';
-export { CourseSwatch, CourseDot, Ticket, CountUp, Tabs, Tooltip } from './identity';
+export { CourseCode, CourseName, Section, Transfer, CourseMark, CourseSwatch, CourseDot, Ticket, CountUp, Tabs, Tooltip } from './identity';
