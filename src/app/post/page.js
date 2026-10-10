@@ -5,16 +5,38 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { campusFilter } from '@/lib/campus';
 import { useSemester } from '@/lib/SemesterContext';
+import { seatStatus } from '@/lib/seats';
 import PageShell from '@/components/PageShell';
 import PageHeader from '@/components/PageHeader';
+import PostCard from '@/components/PostCard';
+import { Button, Callout, Card, EmptyState, Field, Meter, SearchInput, Select, Spinner, Switch } from '@/components/ui';
+import { ActivityIcon, ArrowRightIcon, CheckIcon, GiftIcon, HandIcon, LayersIcon, SendIcon, ShieldIcon } from '@/components/Icons';
 import { decodeSectionInstructors } from '@/lib/text';
 import styles from './post.module.css';
 
 const POST_TYPES = [
-    { value: 'swap', label: 'Swap', description: 'Exchange your section for another' },
-    { value: 'giveaway', label: 'Giveaway', description: 'Drop a section for others' },
-    { value: 'request', label: 'Request', description: 'Looking for a specific section' },
+    {
+        value: 'swap', label: 'Swap', icon: ActivityIcon, description: 'Trade your section for another',
+        tips: ['Matched automatically, including three-way loops', 'Everyone in a match has 24 hours to accept', 'Contacts unlock only after all accept'],
+    },
+    {
+        value: 'giveaway', label: 'Giveaway', icon: GiftIcon, description: 'Drop a section for someone else',
+        tips: ['Students watching this section get alerted', 'Interested students send you their contact', 'Mark it done once someone has the seat'],
+    },
+    {
+        value: 'request', label: 'Request', icon: HandIcon, description: 'Ask for a section you need',
+        tips: ['Anyone dropping this section can find you', 'They can send you their contact by email', 'Your number stays private unless you share it'],
+    },
 ];
+
+// Messages handleSubmit raises, matched to the field each belongs under.
+const FIELD_FOR_ERROR = {
+    'Please select a course': 'course',
+    'Please enter a valid course ID with available sections': 'course',
+    'Please select a section': 'have',
+    'Please select the section you want': 'want',
+    'Have and want sections cannot be the same': 'want',
+};
 
 function PostContent() {
     const [postType, setPostType] = useState('swap');
@@ -26,6 +48,8 @@ function PostContent() {
     const [shareContact, setShareContact] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [fieldErrors, setFieldErrors] = useState({});
+    const [activeIdx, setActiveIdx] = useState(-1);
     const [profile, setProfile] = useState(null);
     const [activePostCount, setActivePostCount] = useState(0);
     const [courses, setCourses] = useState([]);
@@ -200,11 +224,13 @@ function PostContent() {
         setShowCourseDropdown(false);
         setHaveSection('');
         setWantSection('');
+        setFieldErrors(fe => ({ ...fe, course: null }));
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
+        setFieldErrors({});
         setLoading(true);
 
         try {
@@ -302,125 +328,281 @@ function PostContent() {
 
             router.push('/browse');
         } catch (err) {
-            setError(err.message);
+            // Validation lands under the field it's about; anything else
+            // (a duplicate post, a database error) above the submit button.
+            const field = FIELD_FOR_ERROR[err.message];
+            if (field) setFieldErrors({ [field]: err.message });
+            else setError(err.message);
         } finally {
             setLoading(false);
         }
     };
 
     const isMaxPosts = activePostCount >= 5;
+    const typeConfig = POST_TYPES.find(t => t.value === postType) || POST_TYPES[0];
+    const haveData = sections.find(s => s.section_num === haveSection);
+    const wantData = sections.find(s => s.section_num === wantSection);
+    const selectedCourse = courses.find(c => c.course_id === courseId);
+
+    // What the post will look like on Browse, from what's filled in so far.
+    const draft = {
+        id: 'draft',
+        type: postType,
+        status: 'active',
+        course_code: courseId || '———',
+        course_name: selectedCourse?.name || 'Choose a course',
+        have_section: haveSection || '—',
+        want_section: postType === 'swap' ? (wantSection || '—') : null,
+        have_section_time: haveData?.class_time || '',
+        want_section_time: postType === 'swap' ? (wantData?.class_time || '') : null,
+        created_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
+        profile: profile ? { id: null, name: profile.name, student_id: profile.student_id } : null,
+    };
+
+    const sectionDetail = (s) => {
+        if (!s) return null;
+        const seats = seatStatus(s);
+        return [s.class_time, s.instructor, seats?.label].filter(Boolean).join(' · ');
+    };
+
+    const onCourseKeyDown = (e) => {
+        if (!showCourseDropdown || filteredCourses.length === 0) return;
+        if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx(i => Math.min(filteredCourses.length - 1, i + 1)); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIdx(i => Math.max(0, i - 1)); }
+        else if (e.key === 'Enter' && activeIdx >= 0) { e.preventDefault(); selectCourse(filteredCourses[activeIdx]); }
+        else if (e.key === 'Escape') setShowCourseDropdown(false);
+    };
+
+    const clearFieldError = (key) => setFieldErrors(fe => (fe[key] ? { ...fe, [key]: null } : fe));
 
     return (
-        <PageShell>
-            <PageHeader title="New post" />
+        <PageShell width="standard">
+            <PageHeader
+                title="New post"
+                subtitle="Offer a swap, give a section away, or ask for the one you need."
+            >
+                <div className={styles.quota} title={`${activePostCount} of 5 active posts`}>
+                    <span className={styles.quotaText}><strong>{activePostCount}</strong> of 5 active posts</span>
+                    <Meter value={activePostCount} max={5} warnAt={4} label="Active posts out of 5" />
+                </div>
+            </PageHeader>
 
-            <main className={styles.main}>
-                {isMaxPosts ? (
-                    <div className={styles.maxPostsNotice}>
-                        <span className={styles.noticeIcon}></span>
-                        <h3>Maximum Posts Reached</h3>
-                        <p>You have {activePostCount} active posts. Mark some as completed to create new ones.</p>
-                        <button onClick={() => router.push('/matches')} className={styles.manageBtn}>
-                            Manage Posts
-                        </button>
-                    </div>
-                ) : (
-                    <form onSubmit={handleSubmit} className={styles.form}>
-                        {/* Post Type Selection */}
-                        <div className={styles.typeSelection}>
-                            {POST_TYPES.map((type) => (
-                                <button key={type.value} type="button" onClick={() => setPostType(type.value)} className={`${styles.typeBtn} ${postType === type.value ? styles[`typeBtn${type.value}`] : ''}`}>
-                                    <span className={styles.typeLabel}>{type.label}</span>
-                                    <span className={styles.typeDesc}>{type.description}</span>
-                                </button>
-                            ))}
-                        </div>
+            {isMaxPosts ? (
+                <Card className={styles.maxCard}>
+                    <EmptyState
+                        icon={<LayersIcon />}
+                        title="You have five active posts"
+                        actions={<Button variant="primary" onClick={() => router.push('/matches')}>Manage my posts</Button>}
+                    >
+                        That&rsquo;s the limit, so the marketplace stays fresh. Cancel a post or mark one as swapped to make room for a new one.
+                    </EmptyState>
+                </Card>
+            ) : (
+                <div className={styles.layout}>
+                    <form onSubmit={handleSubmit} className={styles.form} noValidate>
+                        {/* ===== 1. Type ===== */}
+                        <section className={styles.step} aria-labelledby="step-type">
+                            <div className={styles.stepHead}>
+                                <span className={styles.stepNum}>1</span>
+                                <h2 id="step-type" className={styles.stepTitle}>What kind of post?</h2>
+                            </div>
+                            <div className={styles.typeGrid} role="radiogroup" aria-labelledby="step-type">
+                                {POST_TYPES.map((type) => {
+                                    const Icon = type.icon;
+                                    const selected = postType === type.value;
+                                    return (
+                                        <button
+                                            key={type.value}
+                                            type="button"
+                                            role="radio"
+                                            aria-checked={selected}
+                                            onClick={() => setPostType(type.value)}
+                                            className={`${styles.typeCard} ${styles[`type_${type.value}`]} ${selected ? styles.typeCardSelected : ''}`}
+                                        >
+                                            <span className={styles.typeIcon}><Icon /></span>
+                                            <span className={styles.typeText}>
+                                                <span className={styles.typeLabel}>{type.label}</span>
+                                                <span className={styles.typeDesc}>{type.description}</span>
+                                            </span>
+                                            <span className={styles.typeCheck} aria-hidden="true"><CheckIcon strokeWidth={2.5} /></span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </section>
 
-                        {/* Course Selection */}
-                        <div className={styles.card}>
-                            <div className={styles.formGroup}>
-                                <label className={styles.label}>Course *</label>
-                                <div className={styles.searchWrapper}>
-                                    <input type="text" value={courseSearch} onChange={(e) => {
-                                        setCourseSearch(e.target.value);
-                                        setCourseId('');
-                                        setShowCourseDropdown(true);
-                                    }} onFocus={() => setShowCourseDropdown(true)} className={styles.input} placeholder="Search by course name or enter ID..." autoComplete="off" />
+                        {/* ===== 2. Course ===== */}
+                        <section className={styles.step} aria-labelledby="step-course">
+                            <div className={styles.stepHead}>
+                                <span className={styles.stepNum}>2</span>
+                                <h2 id="step-course" className={styles.stepTitle}>Which course?</h2>
+                            </div>
+                            <Field
+                                label="Course"
+                                htmlFor="post-course"
+                                error={fieldErrors.course}
+                                hint={courses.length > 0 ? `${courses.length} courses from your major are open this term.` : 'Loading your major’s courses…'}
+                            >
+                                <div className={styles.combo}>
+                                    <SearchInput
+                                        id="post-course"
+                                        value={courseSearch}
+                                        onChange={(e) => {
+                                            setCourseSearch(e.target.value);
+                                            setCourseId('');
+                                            setShowCourseDropdown(true);
+                                            setActiveIdx(-1);
+                                            clearFieldError('course');
+                                        }}
+                                        onClear={() => { setCourseSearch(''); setCourseId(''); setShowCourseDropdown(false); }}
+                                        onFocus={() => setShowCourseDropdown(true)}
+                                        onBlur={() => setTimeout(() => setShowCourseDropdown(false), 120)}
+                                        onKeyDown={onCourseKeyDown}
+                                        placeholder="Search by course name or ID"
+                                        autoComplete="off"
+                                        role="combobox"
+                                        aria-expanded={showCourseDropdown && filteredCourses.length > 0}
+                                        aria-controls="post-course-list"
+                                        aria-invalid={!!fieldErrors.course || undefined}
+                                    />
                                     {showCourseDropdown && filteredCourses.length > 0 && (
-                                        <div className={styles.dropdown}>
-                                            {filteredCourses.map(course => (
-                                                <button key={course.course_id} type="button" className={styles.dropdownItem} onClick={() => selectCourse(course)}>
-                                                    <span className={styles.dropdownId}>{course.course_id}</span>
-                                                    <span className={styles.dropdownName}>{course.name}</span>
+                                        <div id="post-course-list" role="listbox" className={styles.dropdown}>
+                                            {filteredCourses.map((course, i) => (
+                                                <button
+                                                    key={course.course_id}
+                                                    type="button"
+                                                    role="option"
+                                                    aria-selected={i === activeIdx}
+                                                    className={`${styles.option} ${i === activeIdx ? styles.optionActive : ''}`}
+                                                    onMouseDown={(e) => e.preventDefault()}
+                                                    onClick={() => selectCourse(course)}
+                                                >
+                                                    <span className={styles.optionId}>{course.course_id}</span>
+                                                    <span className={styles.optionName}>{course.name}</span>
                                                 </button>
                                             ))}
                                         </div>
                                     )}
+                                    {showCourseDropdown && courseSearch.length >= 2 && !courseId && filteredCourses.length === 0 && courses.length > 0 && (
+                                        <div className={styles.dropdown}>
+                                            <p className={styles.noOption}>No course in your major matches &ldquo;{courseSearch}&rdquo; this term.</p>
+                                        </div>
+                                    )}
                                 </div>
-                            </div>
+                            </Field>
+                        </section>
 
-                            <div className={styles.formGroup}>
-                                <label className={styles.label}>
-                                    {postType === 'giveaway' ? 'Section to Give Away *' : postType === 'request' ? 'Section Needed *' : 'Section You Have *'}
-                                </label>
-                                <select value={haveSection} onChange={(e) => setHaveSection(e.target.value)} className={`${styles.input} ${styles.select}`} required>
-                                    <option value="">Select section</option>
-                                    {selectableSections.map(s => (
-                                        <option key={s.section_num} value={s.section_num}>
-                                            Section {s.section_num}{s.instructor ? ` - ${s.instructor}` : ''}
-                                        </option>
-                                    ))}
-                                </select>
+                        {/* ===== 3. Sections ===== */}
+                        <section className={`${styles.step} ${!courseId ? styles.stepIdle : ''}`} aria-labelledby="step-sections">
+                            <div className={styles.stepHead}>
+                                <span className={styles.stepNum}>3</span>
+                                <h2 id="step-sections" className={styles.stepTitle}>
+                                    {postType === 'swap' ? 'Which sections?' : postType === 'giveaway' ? 'Which section are you giving away?' : 'Which section do you need?'}
+                                </h2>
                             </div>
-
-                            {postType === 'swap' && (
-                                <div className={styles.formGroup}>
-                                    <label className={styles.label}>Section You Want *</label>
-                                    <select value={wantSection} onChange={(e) => setWantSection(e.target.value)} className={`${styles.input} ${styles.select}`} required>
-                                        <option value="">Select section</option>
-                                        {selectableSections.filter(s => s.section_num !== haveSection).map(s => (
+                            {!courseId && <p className={styles.stepHint}>Pick a course first and its sections will appear here.</p>}
+                            <div className={`${styles.sectionPair} ${postType === 'swap' ? styles.sectionPairSwap : ''}`}>
+                                <Field
+                                    label={postType === 'giveaway' ? 'Section to give away' : postType === 'request' ? 'Section needed' : 'Section you have'}
+                                    htmlFor="post-have"
+                                    error={fieldErrors.have}
+                                    hint={sectionDetail(haveData)}
+                                >
+                                    <Select
+                                        id="post-have"
+                                        value={haveSection}
+                                        onChange={(e) => { setHaveSection(e.target.value); clearFieldError('have'); }}
+                                        disabled={!courseId || selectableSections.length === 0}
+                                        invalid={!!fieldErrors.have}
+                                    >
+                                        <option value="">{courseId ? 'Select section' : '—'}</option>
+                                        {selectableSections.map(s => (
                                             <option key={s.section_num} value={s.section_num}>
                                                 Section {s.section_num}{s.instructor ? ` - ${s.instructor}` : ''}
                                             </option>
                                         ))}
-                                    </select>
-                                </div>
+                                    </Select>
+                                </Field>
+
+                                {postType === 'swap' && (
+                                    <>
+                                        <span className={styles.pairArrow} aria-hidden="true"><ArrowRightIcon /></span>
+                                        <Field
+                                            label="Section you want"
+                                            htmlFor="post-want"
+                                            error={fieldErrors.want}
+                                            hint={sectionDetail(wantData)}
+                                        >
+                                            <Select
+                                                id="post-want"
+                                                value={wantSection}
+                                                onChange={(e) => { setWantSection(e.target.value); clearFieldError('want'); }}
+                                                disabled={!courseId || selectableSections.length === 0}
+                                                invalid={!!fieldErrors.want}
+                                            >
+                                                <option value="">{courseId ? 'Select section' : '—'}</option>
+                                                {selectableSections.filter(s => s.section_num !== haveSection).map(s => (
+                                                    <option key={s.section_num} value={s.section_num}>
+                                                        Section {s.section_num}{s.instructor ? ` - ${s.instructor}` : ''}
+                                                    </option>
+                                                ))}
+                                            </Select>
+                                        </Field>
+                                    </>
+                                )}
+                            </div>
+                        </section>
+
+                        {/* ===== 4. Contact ===== */}
+                        <section className={styles.step} aria-labelledby="step-contact">
+                            <div className={styles.stepHead}>
+                                <span className={styles.stepNum}>4</span>
+                                <h2 id="step-contact" className={styles.stepTitle}>How should people reach you?</h2>
+                            </div>
+                            {postType !== 'swap' && (
+                                <label className={styles.shareRow}>
+                                    <span className={styles.shareText}>
+                                        <span className={styles.shareLabel}>Show my phone number on this post</span>
+                                        <span className={styles.shareSub}>Anyone browsing can call or message you directly.</span>
+                                    </span>
+                                    <Switch checked={shareContact} onChange={setShareContact} label="Show my phone number on this post" />
+                                </label>
                             )}
+                            <Callout tone={postType === 'swap' ? 'accent' : shareContact ? 'warning' : 'info'} icon={<ShieldIcon />}>
+                                {postType === 'swap'
+                                    ? (<>Your contact details stay private. They&rsquo;re shared only after everyone in a match accepts it.</>)
+                                    : shareContact
+                                        ? (<>Your phone number will be visible to anyone viewing this post.</>)
+                                        : (<>Your phone number stays private. Interested students tap &ldquo;I&rsquo;m interested&rdquo; and you get their contact by email.</>)}
+                            </Callout>
+                        </section>
+
+                        {error && <Callout tone="danger" title="Couldn’t publish this post">{error}</Callout>}
+
+                        <div className={styles.submitRow}>
+                            <Button type="submit" variant="primary" size="lg" block loading={loading} icon={<SendIcon />}>
+                                Publish {typeConfig.label.toLowerCase()}
+                            </Button>
+                            <p className={styles.submitNote}>Posts stay up for a week, then expire on their own.</p>
                         </div>
-
-                        {/* Share-contact opt-in for giveaway/request */}
-                        {postType !== 'swap' && (
-                            <label className={styles.shareContactRow}>
-                                <input
-                                    type="checkbox"
-                                    checked={shareContact}
-                                    onChange={(e) => setShareContact(e.target.checked)}
-                                />
-                                <span>Show my phone number on this post</span>
-                            </label>
-                        )}
-
-                        {/* Info Notice */}
-                        <div className={styles.infoNotice}>
-                            {postType === 'swap'
-                                ? (<>Contact info will only be shared after both parties accept the match</>)
-                                : shareContact
-                                    ? (<>Your phone number will be visible to anyone viewing this post</>)
-                                    : (<>Your phone number stays private. Interested students can tap &quot;I&apos;m interested&quot; and you&apos;ll get their contact by email.</>)}
-                        </div>
-
-                        {error && <div className={styles.error}>{error}</div>}
-
-                        <button type="submit" className={styles.submitBtn} disabled={loading}>
-                            {loading ? <span className={styles.spinner}></span> : 'Create Post'}
-                        </button>
-
-                        <p className={styles.postCount}>
-                            {activePostCount}/5 active posts
-                        </p>
                     </form>
-                )}
-            </main>
+
+                    <aside className={styles.previewCol} aria-label="Preview">
+                        <div className={styles.previewSticky}>
+                            <span className={styles.previewLabel}>Preview on Browse</span>
+                            <div className={styles.preview}>
+                                <PostCard post={draft} isOwn />
+                            </div>
+                            <ul className={styles.tips}>
+                                {typeConfig.tips.map(tip => (
+                                    <li key={tip}><CheckIcon strokeWidth={2.25} />{tip}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    </aside>
+                </div>
+            )}
         </PageShell>
     );
 }
@@ -428,8 +610,8 @@ function PostContent() {
 export default function PostPage() {
     return (
         <Suspense fallback={
-            <PageShell innerClassName={styles.loadingInner}>
-                <div className={styles.spinner}></div>
+            <PageShell width="standard">
+                <Spinner center size="lg" />
             </PageShell>
         }>
             <PostContent />
